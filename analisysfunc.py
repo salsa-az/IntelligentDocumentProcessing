@@ -48,15 +48,6 @@ class ClaimEvaluation(BaseModel):
     input_document_doctorform_data: dict = Field(description="data mentah doctor data yang diinputkan")
 
 
-"""class ClaimEvaluation(BaseModel):
-    claim_id: str = Field(..., description="Unique identifier for the claim")
-    decision: str = Field(..., description="the final Suggestion, the only option is Approved/Rejected/Pending. DO NOT GIVE ANY OTHER STATUS AND EXPLANATION")
-    reason: str = Field(..., description="Explanation for the decision")
-    summary: str = Field(description="Summary of the claim")
-    input_customer_data: dict = Field(description="data mentah customer data diinputkan")
-    input_claim_data: dict = Field(description="data mentah claim detail yang diinputkan")
-    input_document_invoice_data: dict = Field(description="data mentah invoice yang diinputkan")
-    input_document_doctorform_data: dict = Field(description="data mentah doctor data yang diinputkan")"""
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")
 cosmos_db_key = os.getenv("COSMOS_DB_KEY")
 database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
@@ -334,12 +325,13 @@ Sys_promt_claim_analysis = """ You are an insurance claim addministrator. Based 
     1. check each document data already have each data that he suposed to have. please ensure that all required fields are present, give the validation. The requirement is as follows:
     {document_requirement}
 
-    2. create a summary of the claim, and pass the result to the summary field.
+    2. create a summary of the claim, and pass the result to the summary field. the summary will contain all the important information from the claim, customer, doctor form, and invoice.
     3. finally give the output in the form of JSON format as follows :
     {format_output}
     RULES:
     1. USE FORMAL LANGUAGE
     2. USE INDONESIAN LANGUAGE
+
 
     claimer data : 
     {customer_data}
@@ -369,7 +361,7 @@ system_prompt = F"""
 
     YOU MUST FOLLOW THIS PROCESS BEFORE GIVING THE RECOMMENDATION:
 
-    1.  **Initial Validation**: Check the validation status from the input. If the status is "NOT VALID", proceed directly to **Step 6**. If the status is "VALID", continue to the next step.
+    1.  **Initial Validation**: Check the validation status from the input. If the status is "NOT VALID", proceed directly to **Step 6**. If the status is "VALID", continue to the next step 2.
 
     2.  **Duplicate Claim Check**: Use the `cosmos_select` or 'add_cosmosDB' tool to check the customer's claim history and policy data. Ensure this is not a duplicate claim based on the `claim_id` or similar `diagnosa` and `tanggal_klaim`.
 
@@ -404,17 +396,18 @@ system_prompt = F"""
         "doc_type" : <document_type from the input>
          "document_content" : <document_content from the input>
     IMPORTANT RULES:
-
-    * Answer in **English** with a concise and professional tone.
+    * Always follow the steps in order.
+    * If at any step you find an issue that warrants a "Rejected" or "Pending" recommendation, you must jump to the step 6 and follow it into step 8.
+    * Answer in **indonesian** with a concise and professional tone.
     * When using the `cosmos_select` tool, you **must** first use the `get_db_details` tool to get the correct container and column names. **Maintain consistency with these names.**
     * If any data is **missing or incomplete**, provide a "Pending" recommendation and explicitly state what specific data is needed.
     * You will only insert invoice and doctor's form data into the documents container.
-
 """
 #llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.6)
 
 llm = AzureChatOpenAI(
-    azure_deployment="gpt-4.1"
+    azure_deployment="gpt-4.1",
+    temperature=0.8,
 )
 
 tools = [cosmos_select_tool, get_db_details, search_tool, get_dieses_info, add_cosmosDB]
@@ -430,16 +423,41 @@ Agent = initialize_agent(
 )
 
 
-analyst_chain = prompt_analyst | llm | parser_claim_analyst | Agent 
 
-def analyst_chain_pro(customer_data, doctor_form_extraction, invoice_claim, claim_data):
-    result = analyst_chain.invoke({
-        "customer_data": customer_data,
+def doc_intel(cusromer_id, claim_id) :
+    customer_data = cosmos_select_tool(f"SELECT * FROM c WHERE c.customer_id = '{cusromer_id}'", "customer")
+    claim_data = cosmos_select_tool(f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'", "claim")
+    document_data = cosmos_select_tool(f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'", "document")
+    document_invoice = [doc for doc in document_data if doc['document_type'] == 'invoice claim']
+    invoice_address = document_invoice["doc_address"]
+    docform = [doc for doc in document_data if doc['document_type'] == 'doctor Form']
+    docform_address = docform["doc_address"]
+    policy_data = cosmos_select_tool(f"SELECT * FROM c WHERE c.policy_id = '{customer_data[0]['policy_id']}'", "policy")
+    # using invoice extraction to extract the invoice data
+    # using doctor form extraction to extract the doctor form data
+    return {
+        "customer_data": customer_data[0] if customer_data else {},
+        "claim_data": claim_data[0] if claim_data else {},
+        "document_invoice": document_invoice[0] if document_invoice else {},
+        "doctor_form_extraction": docform[0] if docform else {},
+        "policy_data": policy_data[0] if policy_data else {}
+    }
+
+analyst_chain =  prompt_analyst | llm | parser_claim_analyst | Agent
+
+def analyst_chain_pro(customer_data, doctor_form_extraction, invoice_claim, claim_data) :
+    result = analyst_chain.invoke(input = {
+        "customer_data": customer_data, 
         "doctor_form_extraction": doctor_form_extraction,
         "invoice_claim": invoice_claim,
         "claim_data": claim_data
-    })
-    print(result['output'])
+        })
+    print(result)
+
+
+#def analyst_func(customer_id, claim_id) :
+    
+
 dummy_claim1 = {
     "claim": {
         "claim_id": "C005",

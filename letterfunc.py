@@ -3,6 +3,7 @@ import os
 from pydantic import BaseModel, Field
 from langchain.chains import LLMChain
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import AzureChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from langchain.agents import initialize_agent, AgentType
@@ -171,7 +172,10 @@ def generate_pdf(data: ClaimLetter) -> str :
     return blob_url
 
 parser_claim_letter = PydanticOutputParser(pydantic_object=ClaimLetter)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
+llm = AzureChatOpenAI(
+    azure_deployment="gpt-4.1",
+    temperature=0.8,
+)
 Sys_promt_claim_letter = """
     You are an insurance claim secretary. Based on the following invoice claim details, you will do 3 task : 
     1. prepare to make the claim letter with give every tool what they need to create the letter

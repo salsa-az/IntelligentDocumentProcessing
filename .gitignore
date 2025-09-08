@@ -1,0 +1,7 @@
+credential*
+token.json
+.vscode/*
+__pycache__/*
+*.pyc
+vemv/*
+.env

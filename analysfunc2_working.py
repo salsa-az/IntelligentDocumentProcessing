@@ -1,5 +1,19 @@
-from langchain.tools import tool, Tool
 import os
+import json
+import io 
+import random
+from typing import List, Dict, Any, Optional
+import re
+import requests 
+
+# Azure Libs
+from azure.cosmos import CosmosClient
+from azure.core.credentials import AzureKeyCredential
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
+
+# Langchain Libs
+from langchain.tools import tool, Tool
 from pydantic import BaseModel, Field
 from langchain.chains import LLMChain
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -7,15 +21,7 @@ from langchain_openai import AzureChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from langchain.agents import initialize_agent, AgentType
-from dotenv import load_dotenv
-import json
 from langchain_community.utilities import SerpAPIWrapper
-from langchain.agents import initialize_agent, AgentType
-import io 
-from azure.cosmos import CosmosClient
-import random
-from typing import Dict, Any
-from dotenv import load_dotenv
 from langchain_google_community import GmailToolkit
 from langchain_google_community.gmail.utils import (
     build_resource_service,
@@ -23,9 +29,7 @@ from langchain_google_community.gmail.utils import (
 )
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import List, Dict, Any, Optional
-import re
-import requests 
+from dotenv import load_dotenv
 load_dotenv()
 
 class ClaimSuggestion(BaseModel):
@@ -37,6 +41,7 @@ class ClaimSuggestion(BaseModel):
     input_claim_data: dict = Field(description="data mentah claim detail yang diinputkan")
     input_document_invoice_data: dict = Field(description="data mentah invoice yang diinputkan")
     input_document_doctorform_data: dict = Field(description="data mentah doctor data yang diinputkan")
+
 class ClaimEvaluation(BaseModel):
     claim_id: str = Field(..., description="Unique identifier for the claim")
     validation: str = Field(..., description="is the claim valid or not, the only option is Valid/Not Valid. DO NOT GIVE ANY OTHER STATUS AND EXPLANATION")
@@ -46,26 +51,13 @@ class ClaimEvaluation(BaseModel):
     input_document_invoice_data: dict = Field(description="data mentah invoice yang diinputkan")
     input_document_doctorform_data: dict = Field(description="data mentah doctor data yang diinputkan")
 
-
-"""class ClaimEvaluation(BaseModel):
-    claim_id: str = Field(..., description="Unique identifier for the claim")
-    decision: str = Field(..., description="the final Suggestion, the only option is Approved/Rejected/Pending. DO NOT GIVE ANY OTHER STATUS AND EXPLANATION")
-    reason: str = Field(..., description="Explanation for the decision")
-    summary: str = Field(description="Summary of the claim")
-    input_customer_data: dict = Field(description="data mentah customer data diinputkan")
-    input_claim_data: dict = Field(description="data mentah claim detail yang diinputkan")
-    input_document_invoice_data: dict = Field(description="data mentah invoice yang diinputkan")
-    input_document_doctorform_data: dict = Field(description="data mentah doctor data yang diinputkan")"""
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")
 cosmos_db_key = os.getenv("COSMOS_DB_KEY")
 database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
 
-# --- Client sederhana ---
 client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
 database = client.get_database_client(database_name)
 
-# tool to search in cosmos db
-# --- Schema input untuk tool ---
 class QueryInput(BaseModel):
     query: str = Field(..., description="Cosmos SQL query, example: SELECT TOP 5 c.id, c.name FROM c")
     container : str = Field(..., description="name container in Cosmos DB")
@@ -74,7 +66,6 @@ class QueryInput(BaseModel):
         description="Opsional. List [{'name':'@param','value':..}] untuk query"
     )
 
-# --- Tool SELECT ---
 @tool("get_DB_details")
 def get_db_details() -> str:
     """get the metadata of the Cosmos DB"""
@@ -165,7 +156,6 @@ def cosmos_select_tool(query: str, container: str, parameters: list = None) -> L
        print(f"Error querying Cosmos DB: {e}")
        return []
 
-# tool for web search 
 search = SerpAPIWrapper()
 search_tool = Tool(
     name="web search",
@@ -173,48 +163,37 @@ search_tool = Tool(
     func=search.run,
 )
 
-# Tool for ICD API 
 @tool("get_disease_info")
-def get_disease_info(search_key, min_score=0.5) :
+def get_disease_info(search_key, min_score=0.5):
     """search for disease information from WHO ICD API, to verify the diagnosa"""
-
     token_endpoint = 'https://icdaccessmanagement.who.int/connect/token'
     client_id = 'ef108bbc-154c-401a-b7ba-15758a60c878_1bd261be-3e0f-495a-ae9d-1f8c0967ed04'
     client_secret = '2gmDnJPBN5CxYl8HxOgS720MtPTWyIb3M0az0Kf/bUI='
     scope = 'icdapi_access'
     grant_type = 'client_credentials'
-    # set data to post
+    
     payload = {'client_id': client_id, 
             'client_secret': client_secret, 
             'scope': scope, 
             'grant_type': grant_type}
             
-    # make request
     r = requests.post(token_endpoint, data=payload, verify=False).json()
     token = r['access_token']
 
-    # access ICD API
-
-
-    # HTTP header fields to set
     headers = {'Authorization':  'Bearer '+token, 
             'Accept': 'application/json', 
             'Accept-Language': 'en',
         'API-Version': 'v2'}
     uri = f'https://id.who.int/icd/entity/search?q={search_key}'
 
-    # make request
     searchData = requests.get(uri, headers=headers, verify=False)
     searchData = searchData.json()
     finalData = {}
-    # Memastikan respons berisi daftar entitas yang diharapkan
+    
     if "destinationEntities" in searchData and isinstance(searchData["destinationEntities"], list):
-
         for i, entity in enumerate(searchData["destinationEntities"]):
             score = entity.get("score", 0)
-            print(entity)
             if score >= min_score:
-                # Mendapatkan data utama dari setiap entitas
                 title = entity.get("title", "Tidak tersedia").replace("<em>", "").replace("</em>", "")
                 entity_id = entity.get("id", "Tidak tersedia")
                 score = entity.get("score", "Tidak tersedia")
@@ -223,7 +202,6 @@ def get_disease_info(search_key, min_score=0.5) :
                 response = response.json()
                 detail = response.get('definition') 
                 if detail:
-                    # Menghapus tag HTML dari definisi
                     detail = detail.get('@value', 'Tidak tersedia')
                 else:
                     detail = "Tidak tersedia"
@@ -242,10 +220,8 @@ def add_cosmosDB(item_claim : dict, item_doc : dict, item_invoice : dict) -> str
         cosmos_db_uri = os.getenv("COSMOS_DB_URI")
         cosmos_db_key = os.getenv("COSMOS_DB_KEY")
         database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
-        # Inisialisasi CosmosClient
         client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
-        # Mendapatkan referensi ke database
-        # menambahkan id 
+        
         item_claim['id'] = str(random.randint(100000, 999999))
         item_claim['claim_status'] = "Prosses"
         item_doc['id'] = str(random.randint(100000, 999999))
@@ -255,11 +231,46 @@ def add_cosmosDB(item_claim : dict, item_doc : dict, item_invoice : dict) -> str
         items = [item_claim, item_doc, item_invoice]
         for i in range(len(container_names)):
             container = database.get_container_client(container_names[i])
-            created_document = container.upsert_item(body=  items[i])
+            created_document = container.upsert_item(body=items[i])
         print(f'successfully created document: {created_document}')
         return "done"
     except Exception as e:
         return f"Terjadi kesalahan saat menambahkan dokumen ke Cosmos DB: {e}"
+
+# Azure Document Intelligence setup
+AZURE_DOC_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_DOC_INTELLIGENCE_ENDPOINT")
+AZURE_DOC_INTELLIGENCE_KEY = os.getenv("AZURE_DOC_INTELLIGENCE_KEY")
+CUSTOM_MODEL_ID = os.getenv("CUSTOM_MODEL_ID")
+
+document_intelligence_client = DocumentIntelligenceClient(
+    endpoint=AZURE_DOC_INTELLIGENCE_ENDPOINT,
+    credential=AzureKeyCredential(AZURE_DOC_INTELLIGENCE_KEY)
+)
+
+def extract_doctor_form(file_path: str) -> dict:
+    """Extract doctor form using Azure Document Intelligence custom model"""
+    try:
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+        
+        poller = document_intelligence_client.begin_analyze_document(
+            CUSTOM_MODEL_ID,
+            AnalyzeDocumentRequest(bytes_source=file_content)
+        )
+        result = poller.result()
+        
+        extracted_fields = {}
+        if result.documents:
+            for document in result.documents:
+                for name, field in document.fields.items():
+                    extracted_fields[name] = {
+                        "content": field.content,
+                        "confidence": field.confidence
+                    }
+        
+        return extracted_fields
+    except Exception as e:
+        return {"error": str(e)}
 
 parser_claim_analyst = PydanticOutputParser(pydantic_object=ClaimEvaluation)
 document_requirement = """
@@ -325,6 +336,7 @@ document_requirement = """
         16. Official Stamp/Seal of Hospital (if required)
         17. Signature of Authorized Hospital Staff (if required)
 """
+
 Sys_promt_claim_analysis = """ You are an insurance claim addministrator. Based on the following invoice claim details, you will do 4 task : 
     1. check each document data already have each data that he suposed to have. please ensure that all required fields are present, give the validation. The requirement is as follows:
     {document_requirement}
@@ -355,10 +367,8 @@ prompt_analyst = PromptTemplate(
         partial_variables={"format_output": parser_claim_analyst.get_format_instructions(), "document_requirement": document_requirement},
         )
 
-# tool for  rag : 
-
 parser_claim_decision = PydanticOutputParser(pydantic_object=ClaimSuggestion)
-# tool to do web search
+
 system_prompt = F"""
     You are an insurance claims assistant. Your purpose is to provide a claim recommendation—whether it should be **Approved**, **Rejected**, or **Pending**—based on the data provided.
 
@@ -406,17 +416,13 @@ system_prompt = F"""
     * You will only insert invoice and doctor's form data into the documents container.
 
 """
-#llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.6)
 
 llm = AzureChatOpenAI(
-    # azure_deployment="gpt-4.1-mini"
     azure_deployment="gpt-4.1"
 )
 
 tools = [cosmos_select_tool, get_db_details, search_tool, get_disease_info, add_cosmosDB]
- 
 
-# Initialize agent
 Agent = initialize_agent(
     tools,   
     llm,
@@ -425,10 +431,18 @@ Agent = initialize_agent(
     prefix=system_prompt
 )
 
-
 analyst_chain = prompt_analyst | llm | parser_claim_analyst | Agent 
 
 def analyst_chain_pro(customer_data, doctor_form_extraction, invoice_claim, claim_data):
+    # If doctor_form_extraction is a file path, extract it first
+    if isinstance(doctor_form_extraction, str) and doctor_form_extraction.endswith('.pdf'):
+        print(f"Extracting doctor form from: {doctor_form_extraction}")
+        extracted_data = extract_doctor_form(doctor_form_extraction)
+        if "error" in extracted_data:
+            print(f"Error extracting: {extracted_data['error']}")
+            return None
+        doctor_form_extraction = extracted_data
+    
     result = analyst_chain.invoke({
         "customer_data": customer_data,
         "doctor_form_extraction": doctor_form_extraction,
@@ -436,6 +450,8 @@ def analyst_chain_pro(customer_data, doctor_form_extraction, invoice_claim, clai
         "claim_data": claim_data
     })
     print(result['output'])
+    return result
+
 dummy_claim1 = {
     "claim": {
         "claim_id": "C005",
@@ -445,19 +461,6 @@ dummy_claim1 = {
         "claim_date": "2025-08-01",
         "claim_status": "Prosses",
         "documents": ["D006", "D007"]
-    },
-    "document_form": {
-        "document_name": "Medical Report - RS Harapan Bunda",
-        "doc_id" : "D007",
-        "document_type": "doctor Form",
-        "claim_id": "C001",
-        "document_content": {
-            "hospital": "RS Harapan Bunda",
-            "doctor": "Dr. Siti Rahma",
-            "diagnosis": "Demam Berdarah",
-            "treatment": "Rawat Inap 5 hari",
-            "date_issued": "2025-07-30"
-        }
     },
     "customer": {
         "customer_id": "CU1001",
@@ -493,10 +496,15 @@ dummy_claim1 = {
         }
     }
 }
-analyst_chain_pro(
-    customer_data=dummy_claim1["customer"],
-    doctor_form_extraction=dummy_claim1["document_form"],
-    invoice_claim=dummy_claim1["invoice"],
-    claim_data=dummy_claim1["claim"])
 
-# di bawah rules tambahin policy data
+def main():
+    """Test with PDF extraction using analyst_chain_pro"""
+    result = analyst_chain_pro(
+        customer_data=dummy_claim1["customer"],
+        doctor_form_extraction="form_dokter_7.pdf",  # Pass PDF path directly
+        invoice_claim=dummy_claim1["invoice"],
+        claim_data=dummy_claim1["claim"]
+    )
+
+if __name__ == "__main__":
+    main()

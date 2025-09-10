@@ -1,8 +1,6 @@
 from langchain.tools import tool, Tool
 import os
 from pydantic import BaseModel, Field
-from langchain.chains import LLMChain
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import AzureChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
@@ -229,7 +227,7 @@ def get_dieses_info(search_key, min_score=0.5) :
 
 @tool('add_cosmosDB')
 def add_cosmosDB(item_claim : dict, item_doc : dict, item_invoice : dict) -> str : 
-    """claim item, doc item and invoice item is in dict format"""
+    """doc item and invoice item is in dict format"""
     try:
         cosmos_db_uri = os.getenv("COSMOS_DB_URI")
         cosmos_db_key = os.getenv("COSMOS_DB_KEY")
@@ -238,13 +236,11 @@ def add_cosmosDB(item_claim : dict, item_doc : dict, item_invoice : dict) -> str
         client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
         # Mendapatkan referensi ke database
         # menambahkan id 
-        item_claim['id'] = str(random.randint(100000, 999999))
-        item_claim['claim_status'] = "Prosses"
         item_doc['id'] = str(random.randint(100000, 999999))
         item_invoice['id'] = str(random.randint(100000, 999999))
         database = client.get_database_client(database_name)
-        container_names = ["claim", "document", "document"]
-        items = [item_claim, item_doc, item_invoice]
+        container_names = ["document", "document"]
+        items = [item_doc, item_invoice]
         for i in range(len(container_names)):
             container = database.get_container_client(container_names[i])
             created_document = container.upsert_item(body=  items[i])
@@ -394,7 +390,7 @@ system_prompt = F"""
         "doc_id" : <unique identifier for each document, from the input>
         "claim_id" : <claim_id from the input>
         "doc_type" : <document_type from the input>
-         "document_content" : <document_content from the input>
+        "document_content" : <document_content from the input>
     IMPORTANT RULES:
     * Always follow the steps in order.
     * If at any step you find an issue that warrants a "Rejected" or "Pending" recommendation, you must jump to the step 6 and follow it into step 8.
@@ -426,7 +422,15 @@ Agent = initialize_agent(
 
 def doc_intel(cusromer_id, claim_id) :
     customer_data = cosmos_select_tool(f"SELECT * FROM c WHERE c.customer_id = '{cusromer_id}'", "customer")
-    claim_data = cosmos_select_tool(f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'", "claim")
+    claim_data = {
+        "claim_id": "C005",
+        "customer_id": "CU1001",
+        "claim_type": "Medical",
+        "claim_amount": 1200000,
+        "claim_date": "2025-08-01",
+        "claim_status": "Prosses",
+        "documents": ["D006", "D007"]
+    }
     document_data = cosmos_select_tool(f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'", "document")
     document_invoice = [doc for doc in document_data if doc['document_type'] == 'invoice claim']
     invoice_address = document_invoice["doc_address"]

@@ -213,29 +213,31 @@ def get_disease_info(search_key, min_score=0.5):
                 }
     return finalData
 
-@tool('add_cosmosDB')
-def add_cosmosDB(item_claim : dict, item_doc : dict, item_invoice : dict) -> str : 
-    """claim item, doc item and invoice item is in dict format"""
+@tool('update_claim_with_ai_decision')
+def update_claim_with_ai_decision(claim_id: str, ai_suggestion: str, ai_reasoning: str, summary: str) -> str:
+    """Update existing claim with AI suggestion and reasoning"""
     try:
-        cosmos_db_uri = os.getenv("COSMOS_DB_URI")
-        cosmos_db_key = os.getenv("COSMOS_DB_KEY")
-        database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
-        client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
+        container_client = database.get_container_client("claim")
         
-        item_claim['id'] = str(random.randint(100000, 999999))
-        item_claim['claim_status'] = "Prosses"
-        item_doc['id'] = str(random.randint(100000, 999999))
-        item_invoice['id'] = str(random.randint(100000, 999999))
-        database = client.get_database_client(database_name)
-        container_names = ["claim", "document", "document"]
-        items = [item_claim, item_doc, item_invoice]
-        for i in range(len(container_names)):
-            container = database.get_container_client(container_names[i])
-            created_document = container.upsert_item(body=items[i])
-        print(f'successfully created document: {created_document}')
+        # Get existing claim
+        existing_claims = list(container_client.query_items(
+            query=f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'",
+            enable_cross_partition_query=True
+        ))
+        
+        if not existing_claims:
+            return f"Claim {claim_id} not found"
+        
+        claim = existing_claims[0]
+        claim['AI_suggestion'] = ai_suggestion
+        claim['AI_reasoning'] = ai_reasoning
+        claim['summary'] = summary
+        
+        container_client.upsert_item(claim)
+        print(f'Successfully updated claim {claim_id} with AI decision')
         return "done"
     except Exception as e:
-        return f"Terjadi kesalahan saat menambahkan dokumen ke Cosmos DB: {e}"
+        return f"Error updating claim: {e}"
 
 # Azure Document Intelligence setup
 AZURE_DOC_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_DOC_INTELLIGENCE_ENDPOINT")
@@ -247,15 +249,60 @@ document_intelligence_client = DocumentIntelligenceClient(
     credential=AzureKeyCredential(AZURE_DOC_INTELLIGENCE_KEY)
 )
 
-def extract_doctor_form(file_path: str) -> dict:
+from azure.storage.blob import BlobServiceClient
+
+def get_blob_content(blob_url: str) -> bytes:
+    """Download blob content using connection string"""
+    try:
+        conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        if conn_str:
+            blob_service = BlobServiceClient.from_connection_string(conn_str)
+            url_parts = blob_url.replace('%20', ' ').split('/')
+            container_name = url_parts[3]
+            blob_name = '/'.join(url_parts[4:])
+            blob_client = blob_service.get_blob_client(container=container_name, blob=blob_name)
+            return blob_client.download_blob().readall()
+        return None
+    except Exception as e:
+        print(f"Blob download error: {e}")
+        return None
+
+def extract_doctor_form(blob_url: str) -> dict:
     """Extract doctor form using Azure Document Intelligence custom model"""
     try:
-        with open(file_path, "rb") as f:
-            file_content = f.read()
+        blob_content = get_blob_content(blob_url)
+        if not blob_content:
+            return {"error": "Failed to download blob"}
         
         poller = document_intelligence_client.begin_analyze_document(
             CUSTOM_MODEL_ID,
-            AnalyzeDocumentRequest(bytes_source=file_content)
+            AnalyzeDocumentRequest(bytes_source=blob_content)
+        )
+        result = poller.result()
+        
+        extracted_fields = {}
+        if result.documents:
+            for document in result.documents:
+                for name, field in document.fields.items():
+                    extracted_fields[name] = {
+                        "content": field.content,
+                        "confidence": field.confidence
+                    }
+        
+        return extracted_fields
+    except Exception as e:
+        return {"error": str(e)}
+
+def extract_invoice(blob_url: str) -> dict:
+    """Extract invoice using prebuilt-invoice model"""
+    try:
+        blob_content = get_blob_content(blob_url)
+        if not blob_content:
+            return {"error": "Failed to download blob"}
+        
+        poller = document_intelligence_client.begin_analyze_document(
+            "prebuilt-invoice",
+            AnalyzeDocumentRequest(bytes_source=blob_content)
         )
         result = poller.result()
         
@@ -283,7 +330,7 @@ document_requirement = """
             - Admission Date - Format: DD/MM/YYYY
             - Discharge Date - Format: DD/MM/YYYY
 
-        2. Doctor-Patient Relationship
+        2. Doctor-Patient Relationship (Which is filled by choosing one of the options in the checkbox)
             - Are you the patient's family doctor? (Yes/No + date if Yes)  
             - Do you have a family relationship with the patient? (Yes + type of relationship / No)  
 
@@ -333,8 +380,6 @@ document_requirement = """
         11. Hospital/Provider Address
         12. Hospital/Provider Contact Information
         14. Payment Instructions or Method
-        16. Official Stamp/Seal of Hospital (if required)
-        17. Signature of Authorized Hospital Staff (if required)
 """
 
 Sys_promt_claim_analysis = """ You are an insurance claim addministrator. Based on the following invoice claim details, you will do 4 task : 
@@ -376,7 +421,7 @@ system_prompt = F"""
 
     1.  **Initial Validation**: Check the validation status from the input. If the status is "NOT VALID", proceed directly to **Step 6**. If the status is "VALID", continue to the next step.
 
-    2.  **Duplicate Claim Check**: Use the `cosmos_select` or 'add_cosmosDB' tool to check the customer's claim history and policy data. Ensure this is not a duplicate claim based on the `claim_id` or similar `diagnosa` and `tanggal_klaim`.
+    2.  **Duplicate Claim Check**: Use the `cosmos_select` tool to check the customer's claim history and policy data. Ensure this is not a duplicate claim based on the `claim_id`.
 
     3.  **Policy Limit Verification**: Check the claim amount. Ensure it does not exceed the policy's specified limit.
 
@@ -386,43 +431,26 @@ system_prompt = F"""
 
     6.  **Final Recommendation**: Provide the final recommendation for the `AI_suggestion` column: "Approved", "Rejected", or "Pending".
 
-    7.  **Recommendation Reasoning**: Provide a clear and concise reason for your recommendation. This is for the `AI_reasoning` column.
+    7.  **Recommendation Reasoning**: Provide a clear and concise reason for your recommendation. This is for the `AI_reasoning` column. Include specific validation issues found (e.g., name mismatch between invoice and customer data, missing required fields).
 
-    8.  **Data Insertion to Cosmos DB**: this will be to insert  claim item into "claim" container &  extracted document(invoice & doctor form) item into "document" container and the item format is this : 
-        claim item : 
-        "claim_id" : <claim_id from the input>
-        "customer_id" : <customer_id from the input>
-        "admin_id" : ""
-        "claim_type" : <claim_type from the input>
-        "claim_amount" : <claim_amount from the input>
-        "claim_date" : <claim_date from the input>
-        "documents" : <list of document_id related to the claim>
-        "claim_status" : ""<leave this empty>
-        "claim_reason" :  "" <leave this empty>
-        "summary" : <pass from the input>
-        "AI_suggestion" : <the suggestion by system for the claim by AI Agent>
-        "AI_reasoning" : <the reasoning behind the system's suggestion by AI Agent>
-        --------------------------------------------------------------------------
-        document item (for each document, invoice & doctor form) :
-        "doc_id" : <unique identifier for each document, from the input>
-        "claim_id" : <claim_id from the input>
-        "doc_type" : <document_type from the input>
-         "document_content" : <document_content from the input>
+    8.  **Update Existing Claim**: Use the `update_claim_with_ai_decision` tool to update the existing claim record with your AI_suggestion, AI_reasoning, and summary. DO NOT create new records.
+
     IMPORTANT RULES:
-
-    * Answer in **English** with a concise and professional tone.
-    * When using the `cosmos_select` tool, you **must** first use the `get_db_details` tool to get the correct container and column names. **Maintain consistency with these names.**
+    * Answer in **Indonesian** with a concise and professional tone.
+    * When using the `cosmos_select` tool, you **must** first use the `get_db_details` tool to get the correct container and column names.
     * If any data is **missing or incomplete**, provide a "Pending" recommendation and explicitly state what specific data is needed.
-    * You will only insert invoice and doctor's form data into the documents container.
+    * ALWAYS update the existing claim record, never create duplicates.
+    * Include detailed reasoning for invalid claims, such as name mismatches, missing fields, etc.
 
 """
 
 llm = AzureChatOpenAI(
-    azure_deployment="gpt-4.1"
+    azure_deployment="gpt-4.1",
+    temperature=0.8,
 )
+tools = [cosmos_select_tool, get_db_details, search_tool, get_disease_info, update_claim_with_ai_decision]
 
-tools = [cosmos_select_tool, get_db_details, search_tool, get_disease_info, add_cosmosDB]
-
+# Initialize agent
 Agent = initialize_agent(
     tools,   
     llm,
@@ -431,80 +459,192 @@ Agent = initialize_agent(
     prefix=system_prompt
 )
 
-analyst_chain = prompt_analyst | llm | parser_claim_analyst | Agent 
+def cosmos_select_raw(query: str, container: str):
+    """Raw Cosmos DB query without LangChain tool wrapper"""
+    try:
+        container_client = database.get_container_client(container)
+        items = list(container_client.query_items(
+            query=query,
+            enable_cross_partition_query=True
+        ))
+        return items
+    except Exception as e:
+        print(f"Error querying Cosmos DB: {e}")
+        return []
 
-def analyst_chain_pro(customer_data, doctor_form_extraction, invoice_claim, claim_data):
-    # If doctor_form_extraction is a file path, extract it first
-    if isinstance(doctor_form_extraction, str) and doctor_form_extraction.endswith('.pdf'):
-        print(f"Extracting doctor form from: {doctor_form_extraction}")
-        extracted_data = extract_doctor_form(doctor_form_extraction)
-        if "error" in extracted_data:
-            print(f"Error extracting: {extracted_data['error']}")
-            return None
-        doctor_form_extraction = extracted_data
+def doc_intel(customer_id, claim_id):
+    customer_data = cosmos_select_raw(f"SELECT * FROM c WHERE c.customer_id = '{customer_id}'", "customer")
+    claim_data = cosmos_select_raw(f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'", "claim")
+    document_data = cosmos_select_raw(f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'", "document")
     
-    result = analyst_chain.invoke({
-        "customer_data": customer_data,
-        "doctor_form_extraction": doctor_form_extraction,
-        "invoice_claim": invoice_claim,
-        "claim_data": claim_data
-    })
-    print(result['output'])
-    return result
+    # Find documents by type
+    document_invoice = [doc for doc in document_data if doc.get('doc_type') == 'invoice claim']
+    docform = [doc for doc in document_data if doc.get('doc_type') == 'doctor form']
+    
+    # Extract documents from blob storage
+    extracted_invoice = {}
+    if document_invoice:
+        blob_url = document_invoice[0].get('blob_url')
+        if blob_url:
+            extracted_invoice = extract_invoice(blob_url)
+    
+    extracted_docform = {}
+    if docform:
+        blob_url = docform[0].get('blob_url')
+        if blob_url:
+            extracted_docform = extract_doctor_form(blob_url)
+    
+    policy_data = []
+    if customer_data:
+        policy_data = cosmos_select_raw(f"SELECT * FROM c WHERE c.policy_id = '{customer_data[0]['policy_id']}'", "policy")
+    
+    return {
+        "customer_data": customer_data[0] if customer_data else {},
+        "claim_data": claim_data[0] if claim_data else {},
+        "document_invoice": extracted_invoice,
+        "doctor_form_extraction": extracted_docform,
+        "policy_data": policy_data[0] if policy_data else {}
+    }
+
+analyst_chain = prompt_analyst | llm | parser_claim_analyst | Agent
+
+def analyst_chain_pro(customer_id, claim_id):
+    # Get all data from Cosmos DB and extract documents from blob storage
+    doc_data = doc_intel(customer_id, claim_id)
+    
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            result = analyst_chain.invoke(input={
+                "customer_data": doc_data["customer_data"],
+                "doctor_form_extraction": doc_data["doctor_form_extraction"],
+                "invoice_claim": doc_data["document_invoice"],
+                "claim_data": doc_data["claim_data"]
+            })
+            print(result)
+            return result
+        except Exception as e:
+            if "503" in str(e) or "InternalServerError" in str(e):
+                print(f"Azure OpenAI service error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)  # Wait 5 seconds before retry
+                    continue
+            raise e
 
 dummy_claim1 = {
     "claim": {
-        "claim_id": "C005",
-        "customer_id": "CU1001",
+        "claim_id": "C007",
+        "customer_id": "CU1002",
         "claim_type": "Medical",
-        "claim_amount": 1200000,
+        "claim_amount": 7720000,
         "claim_date": "2025-08-01",
         "claim_status": "Prosses",
-        "documents": ["D006", "D007"]
+        "documents": ["D010", "D011"]
     },
     "customer": {
-        "customer_id": "CU1001",
-        "policy_id": "P001",
-        "customer_no": "CUST-2025-01",
-        "name": "Budi Santoso",
-        "dob": "1990-04-12",
-        "age": 35,
-        "gender": "Male",
-        "NIK": "3174051204900001",
+        "customer_id": "CU1002",
+        "policy_id": "P002",
+        "customer_no": "082145153149",
+        "name": "Feri Hussen",
+        "dob": "15/03/1985",
+        "age": 39,
+        "gender": "MALE",
+        "NIK": "54321",
         "email": "salsabilaazzhr@gmail.com",
-        "is_policy_holder": True,
-        "realtion_with_policy_holder": "Self",
-        "employment_status": "Full-time",
-        "marrital_status": "Married",
-        "income": 12000000,
-        "claim_history": ["C001"]
-    }, 
-    "invoice": {
-        "doc_id" : "D006",
-        "document_name": "Invoice - RS Harapan Bunda",
-        "document_type": "invoice claim",
-        "claim_id": "C001",
-        "document_content": {
-            "invoice_no": "INV-2025-0001",
-            "date": "2025-07-30",
-            "amount": 1200000,
-            "items": [
-                {"description": "Rawat Inap 5 hari", "cost": 1000000},
-                {"description": "Obat-obatan", "cost": 200000}
-            ],
-            "hospital": "RS Harapan Bunda"
-        }
+        "is_policy_holder": "True",
+        "relation_with_policy_holder": "Self",
+        "employment_status": "employ",
+        "marital_status": "Married",
+        "income": 350000,
+        "claim_history": []
     }
 }
 
+def upload_form_docs_and_create_claim():
+    """Upload documents from /form folder and create claim records"""
+    
+    # Upload to blob storage
+    conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    print(f"Connection string: {conn_str}")
+    if not conn_str:
+        print("Error: AZURE_STORAGE_CONNECTION_STRING not found")
+        return None
+    
+    blob_service = BlobServiceClient.from_connection_string(conn_str)
+    container_name = "intelegent-document-processing-st"
+    
+    # File mappings
+    files = [
+        {"local": "form/dokter_form_siloam.pdf", "blob": "input_folder/doctor_form/dokter_form_siloam.pdf", "type": "doctor form"},
+        {"local": "form/invoice_siloam.pdf", "blob": "input_folder/invoice/invoice_siloam.pdf", "type": "invoice claim"}
+    ]
+    
+    uploaded_docs = []
+    for file_info in files:
+        if os.path.exists(file_info["local"]):
+            blob_client = blob_service.get_blob_client(container=container_name, blob=file_info["blob"])
+            
+            with open(file_info["local"], "rb") as data:
+                blob_client.upload_blob(data, overwrite=True)
+            
+            blob_url = f"https://internbatch1a29d.blob.core.windows.net/{container_name}/{file_info['blob']}"
+            uploaded_docs.append({
+                "blob_url": blob_url,
+                "doc_type": file_info["type"]
+            })
+            print(f"Uploaded: {file_info['local']} -> {blob_url}")
+    
+    # Create claim using dummy_claim1 data
+    claim_id = dummy_claim1["claim"]["claim_id"]
+    claim_data = {
+        "id": claim_id,
+        "claim_id": claim_id,
+        "customer_id": dummy_claim1["claim"]["customer_id"],
+        "admin_id": "",
+        "claim_type": dummy_claim1["claim"]["claim_type"],
+        "claim_amount": dummy_claim1["claim"]["claim_amount"],
+        "claim_date": dummy_claim1["claim"]["claim_date"],
+        "documents": [],
+        "summary": "",
+        "AI_suggestion": "",
+        "AI_reasoning": "",
+        "claim_status": dummy_claim1["claim"]["claim_status"]
+    }
+    
+    # Create document records
+    doc_ids = []
+    for doc in uploaded_docs:
+        doc_id = f"D{random.randint(100, 999)}"
+        doc_record = {
+            "id": doc_id,
+            "doc_id": doc_id,
+            "claim_id": claim_id,
+            "doc_type": doc["doc_type"],
+            "blob_url": doc["blob_url"],
+            "document_content": {}
+        }
+        
+        # Insert document
+        doc_container = database.get_container_client("document")
+        doc_container.upsert_item(doc_record)
+        doc_ids.append(doc_id)
+        print(f"Created document record: {doc_id} ({doc['doc_type']})")
+    
+    # Update claim with document IDs
+    claim_data["documents"] = doc_ids
+    
+    # Insert claim
+    claim_container = database.get_container_client("claim")
+    claim_container.upsert_item(claim_data)
+    print(f"Created claim: {claim_id}")
+    
+    return claim_id
+
 def main():
-    """Test with PDF extraction using analyst_chain_pro"""
-    result = analyst_chain_pro(
-        customer_data=dummy_claim1["customer"],
-        doctor_form_extraction="form_dokter_7.pdf",  # Pass PDF path directly
-        invoice_claim=dummy_claim1["invoice"],
-        claim_data=dummy_claim1["claim"]
-    )
+    """Upload documents and analyze claim"""
+    claim_id = upload_form_docs_and_create_claim()
+    result = analyst_chain_pro(customer_id=dummy_claim1["claim"]["customer_id"], claim_id=claim_id)
 
 if __name__ == "__main__":
     main()

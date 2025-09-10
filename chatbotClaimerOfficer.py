@@ -203,7 +203,10 @@ system_prompt = """
     4. ANSWER IN A CLEAR AND CONCISE MANNER, AND DO NOT USE THIRD-PERSON PERSPECTIVE.
     5. if user ask about something that you don't know and don't have the information in database, you may start with using web search tools
 """
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.6)
+llm = AzureChatOpenAI(
+    azure_deployment="gpt-4.1",
+    temperature=0.8,
+)
 
 tools = [cosmos_select_tool, get_db_details, search_tool, get_dieses_info]
 

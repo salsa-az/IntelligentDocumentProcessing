@@ -180,7 +180,7 @@ def generate_pdf(data: ClaimLetter) -> str :
     content.append(Paragraph("Hormat kami,", style_normal))
     content.append(Spacer(1, 40))
     content.append(Paragraph(f"<b>{data.tanda_tangan}</b>", style_normal))
-    connection_string = os.getenv("BLOB_STORAGE_ENDPOINT")
+    connection_string = os.getenv("BLOB_STRING_CONECTION")
     container_name = "intelegent-document-processing-st"
     # Build PDF
     doc.build(content)

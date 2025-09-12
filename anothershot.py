@@ -9,9 +9,17 @@ from langchain.agents import initialize_agent, AgentType
 from prompt_analyst_func import document_requirement, Sys_promt_claim_analysis, system_prompt_agent
 from funcHelp_analyst import cosmos_retrive_data
 from document_intelegent import analize_doc
-from anlisystToolAgent import cosmos_select_tool, get_db_details, search_tool, get_disease_info, update_claim_with_ai_decision, docrecinfo
+from anlisystToolAgent import cosmos_select_tool, get_db_details, search_tool, get_disease_info, update_claim_with_ai_decision
 from dotenv import load_dotenv
+from langchain_core.runnables import RunnableParallel, RunnableLambda
 load_dotenv()
+
+cosmos_db_uri = os.getenv("COSMOS_DB_URI")
+cosmos_db_key = os.getenv("COSMOS_DB_KEY")
+database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
+
+client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
+database = client.get_database_client(database_name)
 
 class ClaimEvaluation(BaseModel):
     claim_id: str = Field(..., description="Unique identifier for the claim")
@@ -41,24 +49,24 @@ prompt_analyst = PromptTemplate(
 # Initialize LLM 
 llm = AzureChatOpenAI(
     azure_deployment="gpt-5-chat",
-    temperature=0.8,
+    temperature=0.4,
 )
 # Define tools for the Fact checking agent
 tools = [cosmos_select_tool, get_db_details, search_tool, get_disease_info, update_claim_with_ai_decision]
 
 # Initialize Fact checking agent
-Agent = initialize_agent(
+agent = initialize_agent(
     tools,   
     llm,
     agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
     prefix=system_prompt_agent
 )
-
-analyst_chain = prompt_analyst | llm | parser_claim_analyst | Agent
 # Main chain for claim analysis and decision sugestion
 
-def analyst_function_executor(cus_id, claim_id) : 
+def document_intelegent(ids) :
+    cus_id = ids["cus_id"]
+    claim_id = ids['claim_id'] 
     print(cus_id)
     customer_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.customer_id= @customeridParam", "customer", parameters=[{
         "name" : "@customeridParam",
@@ -84,12 +92,11 @@ def analyst_function_executor(cus_id, claim_id) :
     docform_content = analize_doc(doc_docform["doc_blob_address"], "form_doctor")
     doc_invoice["doc_contents"] = invoice_content
     doc_docform["doc_contents"] = docform_content
-    input_agent ={
-        "customer_data" : customer_data, 
+    input_agent ={ "input" :{"customer_data" : customer_data, 
         "doctor_form_extraction" : doc_docform, 
         "invoice_claim" : doc_invoice,
-        "claim_data" : claim_data
-    }
-    analyst_chain.invoke(input=input_agent)
-
-
+        "claim_data" : claim_data}}
+    return input_agent
+doc_intel = RunnableLambda(document_intelegent)
+analyst_chain = document_intelegent | agent 
+    

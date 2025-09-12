@@ -4,12 +4,16 @@ from azure.cosmos import CosmosClient
 from langchain.tools import tool, Tool
 from typing import List, Dict, Any, Optional
 from langchain_community.utilities import SerpAPIWrapper
+from funcHelp_analyst import cosmos_retrive_data
+from dotenv import load_dotenv
+from prompt_analyst_func import document_requirement
+load_dotenv()
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")
 cosmos_db_key = os.getenv("COSMOS_DB_KEY")
 database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
 
-client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
-database = client.get_database_client(database_name)
+client = CosmosClient("", credential="")
+database = client.get_database_client("dokumenI-intelejen-db")
 
 
 @tool("get_DB_details")
@@ -88,13 +92,14 @@ def get_db_details() -> str:
     return details
 
 @tool("cosmos_select")
-def cosmos_select_tool(query: str, container: str, parameters: list = None) -> List[Dict[str, Any]]:
+def cosmos_select_tool(query: str, container: str, parameter) -> List[Dict[str, Any]]:
     """Run a Cosmos DB select query."""
     try:
         container_client = database.get_container_client(container)
         items = list(container_client.query_items(
             query=query,
-            enable_cross_partition_query=True
+            enable_cross_partition_query=True,
+            parameters=parameter
         ))
         print(f"Query executed successfully. Retrieved {len(items)} items.")
         return items
@@ -110,77 +115,90 @@ search_tool = Tool(
 )
 
 @tool("get_disease_info")
-def get_disease_info(search_key, min_score=0.5):
-    """search for disease information from WHO ICD API, to verify the diagnosa"""
-    token_endpoint = 'https://icdaccessmanagement.who.int/connect/token'
-    client_id = 'ef108bbc-154c-401a-b7ba-15758a60c878_1bd261be-3e0f-495a-ae9d-1f8c0967ed04'
-    client_secret = '2gmDnJPBN5CxYl8HxOgS720MtPTWyIb3M0az0Kf/bUI='
-    scope = 'icdapi_access'
-    grant_type = 'client_credentials'
-    
-    payload = {'client_id': client_id, 
-            'client_secret': client_secret, 
-            'scope': scope, 
-            'grant_type': grant_type}
-            
-    r = requests.post(token_endpoint, data=payload, verify=False).json()
-    token = r['access_token']
+def get_disease_info(search_key):
+    """search for disease information from WHO ICD API, to verify the diagnosa. given the diagnosis and it will return the information. if it return {} it means there is no info in there """
+    try : 
+        token_endpoint = 'https://icdaccessmanagement.who.int/connect/token'
+        client_id = 'ef108bbc-154c-401a-b7ba-15758a60c878_1bd261be-3e0f-495a-ae9d-1f8c0967ed04'
+        client_secret = '2gmDnJPBN5CxYl8HxOgS720MtPTWyIb3M0az0Kf/bUI='
+        scope = 'icdapi_access'
+        grant_type = 'client_credentials'
+        
+        payload = {'client_id': client_id, 
+                'client_secret': client_secret, 
+                'scope': scope, 
+                'grant_type': grant_type}
+                
+        r = requests.post(token_endpoint, data=payload, verify=False).json()
+        token = r['access_token']
 
-    headers = {'Authorization':  'Bearer '+token, 
-            'Accept': 'application/json', 
-            'Accept-Language': 'en',
-        'API-Version': 'v2'}
-    uri = f'https://id.who.int/icd/entity/search?q={search_key}'
+        headers = {'Authorization':  'Bearer '+token, 
+                'Accept': 'application/json', 
+                'Accept-Language': 'en',
+            'API-Version': 'v2'}
+        uri = f'https://id.who.int/icd/entity/search?q={search_key}'
 
-    searchData = requests.get(uri, headers=headers, verify=False)
-    searchData = searchData.json()
-    finalData = {}
-    
-    if "destinationEntities" in searchData and isinstance(searchData["destinationEntities"], list):
-        for i, entity in enumerate(searchData["destinationEntities"]):
-            score = entity.get("score", 0)
-            if score >= min_score:
-                title = entity.get("title", "Tidak tersedia").replace("<em>", "").replace("</em>", "")
-                entity_id = entity.get("id", "Tidak tersedia")
-                score = entity.get("score", "Tidak tersedia")
-                response = requests.get(entity_id, headers=headers, verify=False)
-                response.raise_for_status()
-                response = response.json()
-                detail = response.get('definition') 
-                if detail:
-                    detail = detail.get('@value', 'Tidak tersedia')
-                else:
-                    detail = "Tidak tersedia"
-                finalData[i] = {
-                        "title": title.replace("<em class='found'>", "").replace("</em>", ""),
-                        "id": entity_id,
-                        "score": score,
-                        "details": detail
-                }
-    return finalData
+        searchData = requests.get(uri, headers=headers, verify=False)
+        searchData = searchData.json()
+        finalData = {}
+        
+        if "destinationEntities" in searchData and isinstance(searchData["destinationEntities"], list):
+            for i, entity in enumerate(searchData["destinationEntities"]):
+                score = entity.get("score", 0)
+                if score >= 0:
+                    title = entity.get("title", "Tidak tersedia").replace("<em>", "").replace("</em>", "")
+                    entity_id = entity.get("id", "Tidak tersedia")
+                    score = entity.get("score", "Tidak tersedia")
+                    response = requests.get(entity_id, headers=headers, verify=False)
+                    response.raise_for_status()
+                    response = response.json()
+                    detail = response.get('definition') 
+                    if detail:
+                        detail = detail.get('@value', 'Tidak tersedia')
+                    else:
+                        detail = "Tidak tersedia"
+                    finalData[i] = {
+                            "title": title.replace("<em class='found'>", "").replace("</em>", ""),
+                            "id": entity_id,
+                            "score": score,
+                            "details": detail
+                    }
+        return finalData
+    except : 
+        print("eror")
+        return []
 
 @tool('update_claim_with_ai_decision')
-def update_claim_with_ai_decision(claim_id: str, ai_suggestion: str, ai_reasoning: str, summary: str) -> str:
-    """Update existing claim with AI suggestion and reasoning"""
+def update_claim_with_ai_decision(claim_id: str, ai_suggestion: str, ai_reasoning: str, summary: str, invoice_doc_id : str, invoice_doc_contents : dict, doctor_form_doc_id : str, doctor_form_doc_contents : dict) -> str:
+    """Update existing claim with AI suggestion AI Reasoning, Summary and invoice document data's doc_id and doc_contents, also doctor Form document data's doc_id and doc_contents"""
     try:
-        container_client = database.get_container_client("claim")
-        
-        # Get existing claim
-        existing_claims = list(container_client.query_items(
-            query=f"SELECT * FROM c WHERE c.claim_id = '{claim_id}'",
-            enable_cross_partition_query=True
-        ))
-        
-        if not existing_claims:
-            return f"Claim {claim_id} not found"
-        
-        claim = existing_claims[0]
-        claim['AI_suggestion'] = ai_suggestion
-        claim['AI_reasoning'] = ai_reasoning
-        claim['summary'] = summary
-        
-        container_client.upsert_item(claim)
+        """container_client = database.get_container_client("claim")
+        claim_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.claim_id= @idParam", "claim", parameters=[{
+            "name" : "@idParam",
+            "value" : claim_id
+        }] )
+        claim_data =  claim_data[0]
+        claim_data['AI_suggestion'] = ai_suggestion
+        claim_data['AI_reasoning'] = ai_reasoning
+        claim_data['summary'] = summary
+        container_client.upsert_item(claim_data)
+        container_client = database.get_container_client("document")
+        doc_ids = [invoice_doc_id, doctor_form_doc_id] 
+        doc_contents = [invoice_doc_contents, doctor_form_doc_contents]
+        for i in range(2):
+            doc_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.doc_id=@idParam", "document",parameters=[{
+                "name" : "@idParam",
+                "value" : doc_ids[i]
+            }])
+            doc_data = doc_data[0]
+            doc_data['doc_content'] = doc_contents[i]
+            container_client.upsert_item(doc_data)"""
         print(f'Successfully updated claim {claim_id} with AI decision')
         return "done"
     except Exception as e:
         return f"Error updating claim: {e}"
+@tool("document_reuierement_info")
+def docrecinfo():
+    """retrive information about document recuirement that claim must have"""
+    return document_requirement
+

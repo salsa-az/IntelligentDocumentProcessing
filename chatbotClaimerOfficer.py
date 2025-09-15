@@ -5,10 +5,9 @@ from dotenv import load_dotenv
 from azure.cosmos import CosmosClient
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool, Tool
 from langchain_community.utilities import SerpAPIWrapper
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.output_parsers import PydanticOutputParser
 from langchain.agents import initialize_agent, AgentType
 load_dotenv()
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")

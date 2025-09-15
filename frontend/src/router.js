@@ -1,9 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from './pages/Dashboard.vue'
+import CustomerDashboard from './pages/CustomerDashboard.vue'
 import FormClaim from './pages/FormClaim.vue'
+import ClaimHistory from './pages/ClaimHistory.vue'
 import Signin from './pages/Signin.vue'
 import Signup from './pages/Signup.vue'
 import ResetPassword from './pages/ResetPassword.vue'
+import MyAccount from './pages/MyAccount.vue'
 
 const routerHistory = createWebHistory()
 
@@ -31,8 +34,20 @@ const router = createRouter({
       component: Dashboard
     },
     {
+      path: '/customer-dashboard',
+      component: CustomerDashboard
+    },
+    {
       path: '/claim-form',
       component: FormClaim
+    },
+    {
+      path: '/claim-history',
+      component: ClaimHistory
+    },
+    {
+      path: '/my-account',
+      component: MyAccount
     },
   ]
 })

@@ -1,0 +1,153 @@
+.progress-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Connector line for all steps except the first */
+.progress-step.with-connector::before {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  top: -2rem;
+  width: 2px;
+  height: calc(100% + 0.1rem);
+  background-color: var(--color-gray-200);
+  z-index: 1;
+}
+.dark .progress-step.with-connector::before {
+  background-color: var(--color-gray-700);
+}
+
+/* Green connector if previous step is completed */
+.progress-step.connector-completed::before {
+  background-color: var(--color-green-500);
+}
+.dark .progress-step.connector-completed::before {
+  background-color: var(--color-green-500);
+}
+
+.progress-step:last-child::after {
+  display: none;
+}
+
+.progress-step.completed::after {
+  background-color: var(--color-green-500);
+}
+
+.progress-step.active::after {
+  background-color: var(--color-sky-500);
+}
+
+.progress-circle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  z-index: 10;
+  background-color: white;
+}
+
+.dark .progress-circle {
+  background-color: var(--color-gray-800);
+}
+
+.progress-circle.completed {
+  border-color: var(--color-green-500);
+  color: var(--color-green-500);
+  background-color: var(--color-green-50);
+}
+
+.dark .progress-circle.completed {
+  background-color: var(--color-green-900);
+}
+
+.progress-circle.active {
+  border-color: var(--color-sky-500);
+  color: var(--color-sky-500);
+  background-color: var(--color-sky-50);
+}
+
+.dark .progress-circle.active {
+  background-color: var(--color-sky-900);
+}
+
+.progress-circle.pending {
+  border-color: var(--color-gray-300);
+  color: var(--color-gray-400);
+}
+
+.dark .progress-circle.pending {
+  border-color: var(--color-gray-600);
+  color: var(--color-gray-500);
+}
+
+.claim-card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-gray-200);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.dark .claim-card {
+  background-color: var(--color-gray-800);
+  border-color: var(--color-gray-700);
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-pengajuan {
+  background-color: var(--color-yellow-100);
+  color: var(--color-yellow-800);
+}
+
+.dark .status-pengajuan {
+  background-color: var(--color-yellow-900);
+  color: var(--color-yellow-200);
+}
+
+.status-proses {
+  background-color: var(--color-sky-100);
+  color: var(--color-sky-800);
+}
+
+.dark .status-proses {
+  background-color: var(--color-sky-900);
+  color: var(--color-sky-200);
+}
+
+.status-approved {
+  background-color: var(--color-green-100);
+  color: var(--color-green-800);
+}
+
+.dark .status-approved {
+  background-color: var(--color-green-900);
+  color: var(--color-green-200);
+}
+
+.status-rejected {
+  background-color: var(--color-red-100);
+  color: var(--color-red-800);
+}
+
+.dark .status-rejected {
+  background-color: var(--color-red-900);
+  color: var(--color-red-200);
+}
+
+.is-last-step .progress-step::after {
+  display: none !important;
+}

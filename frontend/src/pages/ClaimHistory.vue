@@ -36,7 +36,6 @@
                   class="px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-32"
                 >
                   <option value="">All Status</option>
-                  <option value="pengajuan">Pengajuan</option>
                   <option value="proses">Proses</option>
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
@@ -147,6 +146,14 @@
                             <p v-if="step.date" class="text-xs text-gray-500 dark:text-gray-400">{{ formatDateTime(step.date) }}</p>
                           </div>
                           <p v-if="step.notes" class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ step.notes }}</p>
+                          <div v-if="step.title === 'Keputusan' && claim.status === 'rejected'" class="mt-2">
+                            <button @click="editClaim(claim)" class="flex items-center px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                              <svg class="w-3 h-3 mr-1" viewBox="0 0 16 16">
+                                <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" fill="currentColor"></path>
+                              </svg>
+                              Edit Claim
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -203,9 +210,22 @@
             <button @click="downloadAllDocuments" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
               Download All
             </button>
+            <!-- Edit Form Submit -->
+             <div class="ctq43">
+                 <button @click="submitClaim" class="btn bg-white border-gray-200 text-gray-800 cc0oq cghq3 cspbm c0zkc c2vpa">
+                   <svg class="cmpw7 cdqku cbm9w coqgc" width="16" height="16" viewBox="0 0 16 16">
+                   <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z"></path>
+                     </svg>
+                     <span class="c8bkw">Edit Claim</span>
+                 </button>
+             </div>
           </div>
         </div>
+
+
       </div>
+
+
     </div>
   </div>
 </template>
@@ -296,26 +316,26 @@ export default {
           { id: 2, name: 'Form Medis Dokter.pdf', size: '1.5 MB', type: 'PDF', url: '/documents/medical-form-3.pdf' }
         ]
       },
-    //   {
-    //     id: 4,
-    //     claimNumber: 'CLM-2024-004',
-    //     hospitalName: 'RS Mayapada',
-    //     type: 'kehamilan-melahirkan',
-    //     amount: 12000000,
-    //     checkIn: '2024-02-15',
-    //     checkOut: '2024-02-17',
-    //     status: 'pengajuan',
-    //     submittedDate: '2024-02-18T14:45:00',
-    //     progress: [
-    //       { title: 'Pengajuan', status: 'active', date: '2024-02-18T14:45:00', notes: 'Menunggu kelengkapan dokumen tambahan' },
-    //       { title: 'Proses', status: 'pending', date: null, notes: null },
-    //       { title: 'Keputusan', status: 'pending', date: null, notes: null }
-    //     ],
-    //     documents: [
-    //       { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '2.2 MB', type: 'PDF', url: '/documents/invoice-4.pdf' },
-    //       { id: 2, name: 'Form Medis Dokter.pdf', size: '3.1 MB', type: 'PDF', url: '/documents/medical-form-4.pdf' }
-    //     ]
-    //   }
+      {
+        id: 4,
+        claimNumber: 'CLM-2024-004',
+        hospitalName: 'RS Mayapada',
+        type: 'kehamilan-melahirkan',
+        amount: 12000000,
+        checkIn: '2024-02-15',
+        checkOut: '2024-02-17',
+        status: 'rejected',
+        submittedDate: '2024-02-18T14:45:00',
+        progress: [
+          { title: 'Pengajuan', status: 'completed', date: '2024-02-18T14:45:00', notes: 'Dokumen diterima' },
+          { title: 'Proses', status: 'completed', date: '2024-02-19T10:30:00', notes: 'Verifikasi dokumen selesai' },
+          { title: 'Keputusan', status: 'completed', date: '2024-02-20T15:20:00', notes: 'Klaim ditolak. Dokumen tidak lengkap - Invoice tidak sesuai format dan form medis tidak memiliki tanda tangan dokter yang valid.' }
+        ],
+        documents: [
+          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '2.2 MB', type: 'PDF', url: '/documents/invoice-4.pdf' },
+          { id: 2, name: 'Form Medis Dokter.pdf', size: '3.1 MB', type: 'PDF', url: '/documents/medical-form-4.pdf' }
+        ]
+      }
     ]
 
     const filteredClaims = computed(() => {
@@ -395,7 +415,7 @@ export default {
         'rawat-inap': 'Rawat Inap',
         'rawat-jalan': 'Rawat Jalan',
         'pra-pasca-rawat-inap': 'Pra/Pasca Rawat Inap',
-        'kehamilan-melahirkan': 'Kehamilan/Melahirkan',
+        'kehamilan-melahirkan': 'Kehamilan/ Melahirkan',
         'santunan-harian': 'Santunan Harian',
         'gigi': 'Gigi',
         'penyakit-kritis': 'Penyakit Kritis',
@@ -464,6 +484,11 @@ export default {
       closeModal()
     }
 
+    const editClaim = (claim) => {
+      console.log('Editing claim:', claim.claimNumber)
+      alert(`Redirecting to edit form for ${claim.claimNumber}`)
+    }
+
     onMounted(() => {
       claims.value = mockClaims
     })
@@ -489,7 +514,8 @@ export default {
       showDocumentModal,
       closeModal,
       downloadDocument,
-      downloadAllDocuments
+      downloadAllDocuments,
+      editClaim
     }
   }
 }

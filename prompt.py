@@ -27,6 +27,7 @@ YOU MUST DO THE FOLOWING STEP :
 
 system_prompt_task_treatment_cost_validation = """
 Now, you are tasked with verifying the validity of the treatment cost
+ALWAYS SEARCH THE COST TREATMENT
 PLEASE CONTINUE TO THE "Final Answer"
 PELASE DO THOUGHT, ACTION 
 YOU MUST DO THE FOLOWING STEP : 

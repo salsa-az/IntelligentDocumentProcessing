@@ -6,21 +6,11 @@ from langchain.prompts import PromptTemplate
 from azure.cosmos import CosmosClient
 from langchain.output_parsers import PydanticOutputParser
 from langchain.agents import initialize_agent, AgentType
-from prompt_analyst_func import document_requirement, Sys_promt_claim_analysis, system_prompt_agent
-from funcHelp_analyst import cosmos_retrive_data
-from document_intelegent import analize_doc
-from anlisystToolAgent import cosmos_select_tool, get_db_details, search_tool, get_disease_info, update_claim_with_ai_decision, docrecinfo
+from prompt import system_prompt_task_addministrative, system_prompt_task_diagnosis_validation, system_prompt_task_treatment_cost_validation, system_prompt_task_decion_making
+from analyst_tools import cosmos_retrive_data, get_db_details, get_disease_info, update_claim_and_document, document_reuierement_info, search_tool
+from doc_intel import analize_doc
 from dotenv import load_dotenv
 load_dotenv()
-
-class ClaimEvaluation(BaseModel):
-    claim_id: str = Field(..., description="Unique identifier for the claim")
-    completeandsyncronisestatus: bool = Field(..., description="is the document allready complete and syncronise. DO NOT GIVE ANY OTHER STATUS AND EXPLANATION")
-    Claim_summary: str = Field(description="Summary of the claim")
-    input_customer_data: dict = Field(description="data mentah customer data diinputkan")
-    input_claim_data: dict = Field(description="data mentah claim detail yang diinputkan")
-    input_document_invoice_data: dict = Field(description="data mentah invoice yang diinputkan")
-    input_document_doctorform_data: dict = Field(description="data mentah doctor data yang diinputkan")
 
 class QueryInput(BaseModel):
     query: str = Field(..., description="Cosmos SQL query, example: SELECT TOP 5 c.id, c.name FROM c")
@@ -30,33 +20,24 @@ class QueryInput(BaseModel):
         description="Opsional. List [{'name':'@param','value':..}] untuk query"
     )
 
-# Prompt Configuration
-parser_claim_analyst = PydanticOutputParser(pydantic_object=ClaimEvaluation)
-prompt_analyst = PromptTemplate(
-        input_variables=["customer_data", "doctor_form_extraction", "invoice_claim", "claim_data"],
-        template=Sys_promt_claim_analysis,
-        partial_variables={"format_output": parser_claim_analyst.get_format_instructions(), "document_requirement": document_requirement},
-        )
-
 # Initialize LLM 
 llm = AzureChatOpenAI(
-    azure_deployment="gpt-5-chat",
+    azure_deployment="gpt-4.1",
     temperature=0.8,
 )
 # Define tools for the Fact checking agent
-tools = [cosmos_select_tool, get_db_details, search_tool, get_disease_info, update_claim_with_ai_decision]
+#tools = [get_db_details, cosmos_select, get_disease_info, update_claim_and_document, document_reuierement_info]
 
 # Initialize Fact checking agent
-Agent = initialize_agent(
-    tools,   
-    llm,
-    agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True,
-    prefix=system_prompt_agent
-)
-
-analyst_chain = prompt_analyst | llm | parser_claim_analyst | Agent
-# Main chain for claim analysis and decision sugestion
+def creating_agent(tools, System_prompt) :
+    Agent = initialize_agent(
+        tools,   
+        llm,
+        agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True,
+        prefix=System_prompt
+    )
+    return Agent
 
 def analyst_function_executor(cus_id, claim_id) : 
     print(cus_id)
@@ -84,12 +65,25 @@ def analyst_function_executor(cus_id, claim_id) :
     docform_content = analize_doc(doc_docform["doc_blob_address"], "form_doctor")
     doc_invoice["doc_contents"] = invoice_content
     doc_docform["doc_contents"] = docform_content
-    input_agent ={
+    input_agent = {
         "customer_data" : customer_data, 
         "doctor_form_extraction" : doc_docform, 
         "invoice_claim" : doc_invoice,
         "claim_data" : claim_data
     }
-    analyst_chain.invoke(input=input_agent)
-
-
+    agent_administrative = creating_agent([document_reuierement_info], system_prompt_task_addministrative)
+    print("initialize agent_administrative")
+    result_administrative = agent_administrative.invoke(input={"input" : input_agent})
+    agent_diag_val = creating_agent([get_disease_info], system_prompt_task_diagnosis_validation)
+    print("initialize agent_med_val")
+    agent_treat_cost_val = creating_agent([search_tool], system_prompt_task_treatment_cost_validation)
+    result_treat_cost = agent_treat_cost_val.invoke(input={"input" : input_agent})
+    result_treat_cost = result_treat_cost['output']
+    result_diag_val = agent_diag_val.invoke(input={"input" : input_agent})
+    result_administrative = result_administrative['output']
+    result_diag_val = result_diag_val['output']
+    input_agent['result_administrative_validation'] = result_administrative
+    input_agent['result_treatment_cost_validation'] = result_treat_cost
+    input_agent['result_diagnosis_validation'] = result_diag_val
+    agent_final_decision = creating_agent([update_claim_and_document], system_prompt_task_decion_making)
+    agent_final_decision.invoke(input={"input" : input_agent})

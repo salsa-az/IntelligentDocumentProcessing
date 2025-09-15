@@ -1,2 +1,2 @@
-from anothershot import analyst_chain
-analyst_chain.invoke(input={"cus_id" :"CU001","claim_id" : "C1"})
+from stepfunc import analyst_function_executor
+analyst_function_executor("CU001", "C1")

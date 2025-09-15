@@ -4,16 +4,32 @@ from azure.cosmos import CosmosClient
 from langchain.tools import tool, Tool
 from typing import List, Dict, Any, Optional
 from langchain_community.utilities import SerpAPIWrapper
-from funcHelp_analyst import cosmos_retrive_data
 from dotenv import load_dotenv
-from prompt_analyst_func import document_requirement
+from prompt import document_requirement
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv()
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")
 cosmos_db_key = os.getenv("COSMOS_DB_KEY")
 database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
 
-client = CosmosClient("", credential="")
+client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
 database = client.get_database_client("dokumenI-intelejen-db")
+
+def cosmos_retrive_data(query: str, container: str, parameters: list = None) -> List[Dict[str, Any]]:
+    """Run a Cosmos DB select query."""
+    try:
+        container_client = database.get_container_client(container)
+        items = list(container_client.query_items(
+            query=query,
+            enable_cross_partition_query=True,
+            parameters=parameters
+        ))
+        print(f"Query executed successfully. Retrieved {len(items)} items.")
+        return items
+    except Exception as e:
+       print(f"Error querying Cosmos DB: {e}")
+       return []
 
 
 @tool("get_DB_details")
@@ -91,32 +107,16 @@ def get_db_details() -> str:
     """
     return details
 
-@tool("cosmos_select")
-def cosmos_select_tool(query: str, container: str, parameter) -> List[Dict[str, Any]]:
-    """Run a Cosmos DB select query."""
-    try:
-        container_client = database.get_container_client(container)
-        items = list(container_client.query_items(
-            query=query,
-            enable_cross_partition_query=True,
-            parameters=parameter
-        ))
-        print(f"Query executed successfully. Retrieved {len(items)} items.")
-        return items
-    except Exception as e:
-       print(f"Error querying Cosmos DB: {e}")
-       return []
-
 search = SerpAPIWrapper()
 search_tool = Tool(
-    name="web search",
-    description="Search the web for information, useful for when you need to find current information or look up specific details online.(e.g. berapa harga rata-rata pengobatan untuk penyakit X di Indonesia?)",
+    name="web_search",
+    description="Search the web for information, use to search the cost treatment to validate the treatment cost",
     func=search.run,
 )
 
 @tool("get_disease_info")
-def get_disease_info(search_key):
-    """search for disease information from WHO ICD API, to verify the diagnosa. given the diagnosis and it will return the information. if it return {} it means there is no info in there """
+def get_disease_info(search_key : str):
+    """search for disease information from WHO ICD XI API, to verify the diagnosa. given the diagnosis in english not the diagnosis code and tool will return the information. if it return empty dict it means there is no info in there """
     try : 
         token_endpoint = 'https://icdaccessmanagement.who.int/connect/token'
         client_id = 'ef108bbc-154c-401a-b7ba-15758a60c878_1bd261be-3e0f-495a-ae9d-1f8c0967ed04'
@@ -145,7 +145,7 @@ def get_disease_info(search_key):
         if "destinationEntities" in searchData and isinstance(searchData["destinationEntities"], list):
             for i, entity in enumerate(searchData["destinationEntities"]):
                 score = entity.get("score", 0)
-                if score >= 0:
+                if score >= 0.8:
                     title = entity.get("title", "Tidak tersedia").replace("<em>", "").replace("</em>", "")
                     entity_id = entity.get("id", "Tidak tersedia")
                     score = entity.get("score", "Tidak tersedia")
@@ -163,14 +163,16 @@ def get_disease_info(search_key):
                             "score": score,
                             "details": detail
                     }
+        if finalData == {} : 
+            return "there is no information about the claim"
         return finalData
     except : 
         print("eror")
-        return []
+        return "there is no information"
 
-@tool('update_claim_with_ai_decision')
-def update_claim_with_ai_decision(claim_id: str, ai_suggestion: str, ai_reasoning: str, summary: str, invoice_doc_id : str, invoice_doc_contents : dict, doctor_form_doc_id : str, doctor_form_doc_contents : dict) -> str:
-    """Update existing claim with AI suggestion AI Reasoning, Summary and invoice document data's doc_id and doc_contents, also doctor Form document data's doc_id and doc_contents"""
+@tool('update_claim_and_document')
+def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reasoning_status: str, summary: str, invoice_doc_id : str, invoice_doc_contents : dict, doctor_form_doc_id : str, doctor_form_doc_contents : dict) -> str:
+    """Update existing claim with AI suggestion status(only Approved/Rejected/Pending), AI Reasoning status, Summary and invoice document data's doc_id and doc_contents, also doctor Form document data's doc_id and doc_contents"""
     try:
         """container_client = database.get_container_client("claim")
         claim_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.claim_id= @idParam", "claim", parameters=[{
@@ -178,8 +180,8 @@ def update_claim_with_ai_decision(claim_id: str, ai_suggestion: str, ai_reasonin
             "value" : claim_id
         }] )
         claim_data =  claim_data[0]
-        claim_data['AI_suggestion'] = ai_suggestion
-        claim_data['AI_reasoning'] = ai_reasoning
+        claim_data['AI_suggestion'] = ai_suggestion_status
+        claim_data['AI_reasoning'] = ai_reasoning_status
         claim_data['summary'] = summary
         container_client.upsert_item(claim_data)
         container_client = database.get_container_client("document")
@@ -198,7 +200,7 @@ def update_claim_with_ai_decision(claim_id: str, ai_suggestion: str, ai_reasonin
     except Exception as e:
         return f"Error updating claim: {e}"
 @tool("document_reuierement_info")
-def docrecinfo():
+def document_reuierement_info():
     """retrive information about document recuirement that claim must have"""
     return document_requirement
 

@@ -6,10 +6,14 @@
         <div class="min-h-[100dvh] h-full flex flex-col justify-center">
           <div class="max-w-lg mx-auto w-full px-4 py-8">
             <!-- Logo -->
-            <div class="flex justify-center mb-8">
+            <div class="flex justify-center">
               <svg class="fill-violet-500" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
                 <path d="M31.956 14.8C31.372 6.92 25.08.628 17.2.044V5.76a9.04 9.04 0 0 0 9.04 9.04h5.716ZM14.8 26.24v5.716C6.92 31.372.63 25.08.044 17.2H5.76a9.04 9.04 0 0 1 9.04 9.04Zm11.44-9.04h5.716c-.584 7.88-6.876 14.172-14.756 14.756V26.24a9.04 9.04 0 0 1 9.04-9.04ZM.044 14.8C.63 6.92 6.92.628 14.8.044V5.76a9.04 9.04 0 0 1-9.04 9.04H.044Z" />
               </svg>
+            </div>
+
+            <div class="flex justify-center mb-8">
+              <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Sign Up</h1>
             </div>
 
             <!-- Form -->
@@ -62,6 +66,16 @@
                   </select>
                 </div>
 
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentStartDate">Tanggal Efektif<span class="text-red-500">*</span></label>
+                    <Datepicker />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentEndDate">Tanggal Kedaluarsa<span class="text-red-500">*</span></label>
+                    <Datepicker />
+                  </div>
+                </div>
                 <div>
                   <label class="block text-sm font-medium mb-1" for="nik">NIK <span class="text-red-500">*</span></label>
                   <input id="nik" v-model="form.nik" class="form-input w-full" type="text" required />
@@ -151,8 +165,17 @@
 </template>
 
 <script>
+
+import Datepicker from '../components/Datepicker.vue'
+
 export default {
   name: 'Signup',
+  components: {
+    // Sidebar,
+    // Header,
+    // Banner,
+    Datepicker,
+  },
   data() {
     return {
       isPemegangPolis: false,

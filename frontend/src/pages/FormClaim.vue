@@ -105,37 +105,12 @@
                       <Datepicker />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentEndDate">Tanggal Keluar Perawatan</label>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentEndDate">Tanggal Keluar Perawatan <span class="text-red-500">*</span></label>
                       <Datepicker />
                     </div>
                   </div>
                   
-                  <!-- Accident Details -->
-                  <div class="mt-6">
-                    <div class="mb-4">
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Apakah ini kasus kecelakaan? <span class="text-red-500">*</span></label>
-                      <div class="flex gap-4">
-                        <label class="flex items-center">
-                          <input type="radio" v-model="form.isAccident" :value="true" class="form-radio mr-2">
-                          <span class="text-sm">Ya</span>
-                        </label>
-                        <label class="flex items-center">
-                          <input type="radio" v-model="form.isAccident" :value="false" class="form-radio mr-2">
-                          <span class="text-sm">Tidak</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div v-if="form.isAccident === true" class="space-y-4">
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="accidentDate">Tanggal Kejadian <span class="text-red-500">*</span></label>
-                        <Datepicker />
-                      </div>
-                      <div>
-                        <label class="block text-sm font-medium mb-1" for="accidentChronology">Kronologi Singkat <span class="text-red-500">*</span></label>
-                        <textarea id="accidentChronology" v-model="form.accidentChronology" required rows="3" class="form-textarea w-full" placeholder="Jelaskan kronologi kejadian secara singkat"></textarea>
-                      </div>
-                    </div>
-                  </div>
+
                 </div>
 
                 <!-- D. Jumlah Klaim -->
@@ -238,9 +213,6 @@ export default {
       otherClaimType: '',
       treatmentStartDate: '',
       treatmentEndDate: '',
-      isAccident: null,
-      accidentDate: '',
-      accidentChronology: '',
       currency: 'IDR',
       claimAmount: '',
       hospitalInvoice: null,
@@ -251,14 +223,58 @@ export default {
     const handleFileUpload = (event, fieldName) => {
       const file = event.target.files[0]
       if (file) {
+        // Validate tipe file dan size
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png']
+        // const maxSize = 5 * 1024 * 1024 // 5MB
+        
+        if (!allowedTypes.includes(file.type)) {
+          alert('File type not supported. Please upload PDF, JPG, or PNG files.')
+          return
+        }
+        
+        // if (file.size > maxSize) {
+        //   alert('File size too large. Maximum size is 5MB.')
+        //   return
+        // }
+        
         form.value[fieldName] = file
       }
     }
 
-    const submitClaim = () => {
-      // Handle form submission
-      console.log('Claim submitted:', form.value)
-      alert('Klaim berhasil diajukan!')
+    const submitClaim = async () => {
+      try {
+        const formData = new FormData()
+        
+        // Add form fields
+        formData.append('claimType', form.value.claimType)
+        formData.append('claimAmount', form.value.claimAmount)
+        formData.append('currency', form.value.currency)
+        formData.append('customerId', 'CU001') // Default customer ID
+        
+        // Add files
+        if (form.value.hospitalInvoice) {
+          formData.append('hospitalInvoice', form.value.hospitalInvoice)
+        }
+        if (form.value.doctorForm) {
+          formData.append('doctorForm', form.value.doctorForm)
+        }
+        
+        const response = await fetch('http://localhost:5000/api/submit-claim', {
+          method: 'POST',
+          body: formData
+        })
+        
+        const result = await response.json()
+        
+        if (response.ok) {
+          alert(`Klaim berhasil diajukan! ID: ${result.claim_id}`)
+          // Reset form or redirect
+        } else {
+          alert(`Error: ${result.error}`)
+        }
+      } catch (error) {
+        alert(`Error: ${error.message}`)
+      }
     }
 
     return {

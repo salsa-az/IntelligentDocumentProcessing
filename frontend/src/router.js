@@ -7,6 +7,7 @@ import Signin from './pages/Signin.vue'
 import Signup from './pages/Signup.vue'
 import ResetPassword from './pages/ResetPassword.vue'
 import MyAccount from './pages/MyAccount.vue'
+import ClaimApproval from './pages/ClaimApproval.vue'
 
 const routerHistory = createWebHistory()
 
@@ -48,6 +49,10 @@ const router = createRouter({
     {
       path: '/my-account',
       component: MyAccount
+    },
+    {
+      path: '/claim-approval',
+      component: ClaimApproval
     },
   ]
 })

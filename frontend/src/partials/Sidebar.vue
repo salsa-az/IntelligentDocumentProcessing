@@ -106,16 +106,23 @@
                       </a>
                     </li>
                   </router-link>
-                  <router-link to="/claim-approval" custom v-slot="{ href, navigate }">
-                    <li class="mb-1 last:mb-0">
-                      <a class="block text-gray-500/90 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition truncate" :href="href" @click="navigate">
-                        <span class="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Claim Approval</span>
-                      </a>
-                    </li>
-                  </router-link>
                 </ul>
               </div>
             </SidebarLinkGroup>
+            
+            <!-- Submitted Claim -->
+            <router-link to="/claim-approval" custom v-slot="{ href, navigate, isExactActive }">
+              <li class="pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
+                <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="isExactActive ? '' : 'hover:text-gray-900 dark:hover:text-white'" :href="href" @click="navigate">
+                  <div class="flex items-center">
+                    <svg class="shrink-0 fill-current text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                      <path d="M14.5 2h-13C.7 2 0 2.7 0 3.5v9c0 .8.7 1.5 1.5 1.5h13c.8 0 1.5-.7 1.5-1.5v-9c0-.8-.7-1.5-1.5-1.5zM2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h10v1H2v-1z" />
+                    </svg>
+                    <span class="text-sm font-medium ml-4 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Claims Approval</span>
+                  </div>
+                </a>
+              </li>
+            </router-link>
             
             <!-- My Account -->
             <router-link to="/my-account" custom v-slot="{ href, navigate, isExactActive }">

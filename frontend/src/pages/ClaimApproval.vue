@@ -108,65 +108,17 @@
         </div>
       </main>
 
-      <Banner />
-    
-              <!-- Right Column - AI Analysis & Actions -->
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">AI Analysis</h3>
-                <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
-                  <div class="flex items-start space-x-3">
-                    <svg class="w-6 h-6 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                    </svg>
-                    <div>
-                      <h4 class="font-medium text-blue-900 dark:text-blue-100 mb-2">AI Recommendation</h4>
-                      <p class="text-sm text-blue-800 dark:text-blue-200 mb-3">{{ selectedClaim?.aiAnalysis?.recommendation }}</p>
-                      <div class="text-xs text-blue-700 dark:text-blue-300">
-                        <p><strong>Confidence:</strong> {{ selectedClaim?.aiAnalysis?.confidence }}%</p>
-                        <p><strong>Risk Score:</strong> {{ selectedClaim?.aiAnalysis?.riskScore }}/10</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Analysis Details</h4>
-                <div class="space-y-3 mb-6">
-                  <div v-for="detail in selectedClaim?.aiAnalysis?.details" :key="detail.category" class="border-l-4 border-gray-300 pl-3">
-                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ detail.category }}</p>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">{{ detail.finding }}</p>
-                  </div>
-                </div>
-
-                <!-- Admin Decision -->
-                <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-                  <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-4">Admin Decision</h4>
-                  <div class="space-y-4">
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decision Notes</label>
-                      <textarea v-model="adminNotes" rows="3" class="form-textarea w-full" placeholder="Add your review notes..."></textarea>
-                    </div>
-                    <div class="flex space-x-3">
-                      <button @click="approveClaim" class="flex-1 btn bg-green-600 hover:bg-green-700 text-white">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        Approve
-                      </button>
-                      <button @click="rejectClaim" class="flex-1 btn bg-red-600 hover:bg-red-700 text-white">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Banner :claimDetailOpen="showDetailModal" />
     </div>
+
+    <ClaimDetail 
+      :show="showDetailModal" 
+      :claim="selectedClaim" 
+      @close="closeDetailModal"
+      @approve="approveClaim"
+      @reject="rejectClaim"
+      @view-document="downloadDocument"
+    />
   </div>
 </template>
 
@@ -175,6 +127,7 @@ import { ref, computed, onMounted } from 'vue'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
 import Banner from '../partials/AIAssistant.vue'
+import ClaimDetail from '../partials/ClaimDetail.vue'
 
 export default {
   name: 'ClaimHistory',
@@ -182,6 +135,7 @@ export default {
     Sidebar,
     Header,
     Banner,
+    ClaimDetail,
   },
   setup() {
     const sidebarOpen = ref(false)
@@ -192,7 +146,6 @@ export default {
     const claims = ref([])
     const showDetailModal = ref(false)
     const selectedClaim = ref(null)
-    const adminNotes = ref('')
 
     // Mock data for admin review
     const mockClaims = [
@@ -383,15 +336,15 @@ export default {
     }
 
     const openClaimDetail = (claim) => {
+      console.log('Opening claim detail for:', claim)
       selectedClaim.value = claim
       showDetailModal.value = true
-      adminNotes.value = ''
+      console.log('showDetailModal:', showDetailModal.value)
     }
 
     const closeDetailModal = () => {
       showDetailModal.value = false
       selectedClaim.value = null
-      adminNotes.value = ''
     }
 
     const downloadDocument = (document) => {
@@ -399,8 +352,8 @@ export default {
       alert(`Opening ${document.name} for review`)
     }
 
-    const approveClaim = () => {
-      if (!adminNotes.value.trim()) {
+    const approveClaim = (notes) => {
+      if (!notes.trim()) {
         alert('Please add review notes before approving')
         return
       }
@@ -412,7 +365,7 @@ export default {
       
       console.log('Claim approved:', {
         claimId: selectedClaim.value.id,
-        notes: adminNotes.value,
+        notes: notes,
         aiRecommendation: selectedClaim.value.aiAnalysis.recommendation
       })
       
@@ -420,8 +373,8 @@ export default {
       closeDetailModal()
     }
 
-    const rejectClaim = () => {
-      if (!adminNotes.value.trim()) {
+    const rejectClaim = (notes) => {
+      if (!notes.trim()) {
         alert('Please add review notes before rejecting')
         return
       }
@@ -433,7 +386,7 @@ export default {
       
       console.log('Claim rejected:', {
         claimId: selectedClaim.value.id,
-        notes: adminNotes.value,
+        notes: notes,
         aiRecommendation: selectedClaim.value.aiAnalysis.recommendation
       })
       
@@ -454,7 +407,6 @@ export default {
       filteredClaims,
       showDetailModal,
       selectedClaim,
-      adminNotes,
       getStatusClass,
       getStatusText,
       getClaimTypeText,

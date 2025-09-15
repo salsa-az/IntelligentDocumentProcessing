@@ -1,10 +1,10 @@
 <template>
   <!-- AI Assistant Chat Widget -->
-  <div class="fixed bottom-0 right-4 z-50">
+  <div class="fixed bottom-0 z-50 transition-all duration-300" :class="claimDetailOpen ? 'right-[24rem]' : 'right-2'">
     <!-- Expanded Chat Window -->
-    <div v-if="isExpanded" class="bg-white dark:bg-gray-800 rounded-tl-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-96 h-screen flex flex-col">
+    <div v-if="isExpanded" class="bg-white dark:bg-gray-800 rounded-tl-lg rounded-tr-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-96 h-screen flex flex-col">
       <!-- Chat Header -->
-      <div class="bg-violet-500 text-white p-4 rounded-tl-lg flex justify-between items-center">
+      <div class="bg-violet-500 text-white p-4 rounded-tl-lg rounded-tr-lg flex justify-between items-center">
         <div class="flex items-center">
           <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center mr-3">
             <svg class="w-5 h-5 text-violet-500" fill="currentColor" viewBox="0 0 20 20">
@@ -95,7 +95,7 @@
     <button 
       v-if="!isExpanded"
       @click="toggleChat"
-      class="bg-violet-500 hover:bg-violet-600 text-white shadow-lg transition-all duration-200 flex items-center justify-center w-30 h-12 rounded-tl-lg"
+      class="bg-violet-500 hover:bg-violet-600 text-white shadow-lg transition-all duration-200 flex items-center justify-center w-30 h-12 rounded-tl-lg rounded-tr-lg mr-2"
     >
       <div class="flex items-center space-x-2.5">
         <svg class="w-6.5 h-6.5" fill="currentColor" viewBox="0 0 20 20">
@@ -117,7 +117,13 @@ import { ref, nextTick } from 'vue'
 
 export default {
   name: 'AIAssistant',
-  setup() {
+  props: {
+    claimDetailOpen: {
+      type: Boolean,
+      default: false
+    }
+  },
+  setup(props) {
     const isExpanded = ref(false)
     const newMessage = ref('')
     const isTyping = ref(false)

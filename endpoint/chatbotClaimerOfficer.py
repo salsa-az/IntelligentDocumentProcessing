@@ -218,5 +218,4 @@ Agent_Insurance = initialize_agent(
     prefix=system_prompt 
 )
 print("Agent siap digunakan")
-agent_response = Agent_Insurance.run("Coba Cari claim yang telah di approve di database, dapatkan diagnoasanya dan pastikan diagnosa tersebut sesuai valid, lalu pastikan harga pengobatan yang di claim sesuai dengan diagnosa tersebut, lalu buatkan ringkasan singkat untuk claim tersebut dalam bahasa indonesia")
-print(agent_response)
+

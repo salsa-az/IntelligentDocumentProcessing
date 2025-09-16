@@ -174,7 +174,7 @@ def get_disease_info(search_key : str):
 def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reasoning_status: str, summary: str, invoice_doc_id : str, invoice_doc_contents : dict, doctor_form_doc_id : str, doctor_form_doc_contents : dict) -> str:
     """Update existing claim with AI suggestion status(only Approved/Rejected/Pending), AI Reasoning status, Summary and invoice document data's doc_id and doc_contents, also doctor Form document data's doc_id and doc_contents"""
     try:
-        """container_client = database.get_container_client("claim")
+        container_client = database.get_container_client("claim")
         claim_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.claim_id= @idParam", "claim", parameters=[{
             "name" : "@idParam",
             "value" : claim_id
@@ -194,7 +194,7 @@ def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reaso
             }])
             doc_data = doc_data[0]
             doc_data['doc_content'] = doc_contents[i]
-            container_client.upsert_item(doc_data)"""
+            container_client.upsert_item(doc_data)
         print(f'Successfully updated claim {claim_id} with AI decision')
         return "done"
     except Exception as e:

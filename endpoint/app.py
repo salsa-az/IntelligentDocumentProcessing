@@ -1,17 +1,19 @@
 import sys
 import os
+import requests
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import uuid
 from datetime import datetime
 from azure.storage.blob import BlobServiceClient
 from azure.cosmos import CosmosClient
-from stepfunc import analyst_function_executor
+# from IntelegentDocumentProcecing.endpoint.analyst_func import analyst_function_executor
+from endpoint.analyst_func import analyst_function_executor
 from doc_intel import analize_doc
 from analyst_tools import cosmos_retrive_data
 from dotenv import load_dotenv
+from letterfunc import letter_chain_pro
 
 load_dotenv()
 
@@ -47,52 +49,36 @@ def analyze_claim():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/extract-document', methods=['POST'])
-def extract_document():
-    """Extract document using blob address and model type"""
+
+@app.route('/api/approved-claim', methods=['GET'])
+def approved_claim():
+    """Approved all the claim that the user need"""
     try:
-        data = request.json
-        blob_address = data.get('blob_address')
-        model_type = data.get('model_type', 'prebuilt-invoice')
-        
-        if not blob_address:
-            return jsonify({'error': 'blob_address required'}), 400
-        
-        # Extract document
-        result = analize_doc(blob_address, model_type)
-        
-        return jsonify({'status': 'success', 'data': result})
-    
-    except Exception as e:
+        claim_id = request.form.get('claim_id')
+        admin_id = request.form.get('admin_id')
+        claim_data = cosmos_retrive_data("SELECT * FROM c WHERE c.claim_id=@idParam","claim", [{"name": "@idParam", "value": claim_id}])
+        claim_data = claim_data[0]
+        admin_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","insurance_admin", [{"name": "@idParam", "value": admin_id}])
+        admin_data = admin_data[0]
+        customer_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","customer", [{"name": "@idParam", "value": claim_data['customer_id']}])
+        policy_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","policy", [{"name": "@idParam", "value": claim_data['policy_id']}])
+        letter_chain_pro(customer_data, claim_data, policy_data, admin_data)
+        return jsonify({'status': 'success', 'data': claim_data})
+    except Exception as e : 
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/get-claims', methods=['GET'])
-def get_claims():
-    """Get all claims from database"""
-    try:
-        claims = cosmos_retrive_data("SELECT * FROM c", "claim")
-        return jsonify({'status': 'success', 'data': claims})
-    
-    except Exception as e:
+@app.route('/api/query', methods=['GET'])
+def query_from_cosmosDB() : 
+    """Query all the data that needed from cosmosDB"""
+    try : 
+        query = request.form.get('query')
+        container = request.form.get('container')
+        parameter = request.form.get('parameter')
+        return cosmos_retrive_data(query, container, parameter)
+    except Exception as e : 
         return jsonify({'error': str(e)}), 500
+        
 
-@app.route('/api/get-claim/<claim_id>', methods=['GET'])
-def get_claim(claim_id):
-    """Get specific claim by ID"""
-    try:
-        claim = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.claim_id = @id", 
-            "claim", 
-            parameters=[{"name": "@id", "value": claim_id}]
-        )
-        
-        if not claim:
-            return jsonify({'error': 'Claim not found'}), 404
-        
-        return jsonify({'status': 'success', 'data': claim[0]})
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/submit-claim', methods=['POST'])
 def submit_claim():
@@ -102,7 +88,8 @@ def submit_claim():
         claim_type = request.form.get('claimType')
         claim_amount = request.form.get('claimAmount')
         currency = request.form.get('currency')
-        customer_id = request.form.get('customerId', 'CU001')  # Default for now
+        customer_id = request.form.get('customerId')  # Default for now
+        policy_id = request.form.get('policyId')
         
         # Generate IDs
         claim_id = f"C{uuid.uuid4().hex[:8].upper()}"
@@ -125,7 +112,7 @@ def submit_claim():
                     "doc_id": doc_id,
                     "claim_id": claim_id,
                     "doc_type": "invoice",
-                    "doc_blob_address": blob_name,
+                    "doc_blob_address": "Input_document/invoice/"+ blob_name,
                     "upload_date": datetime.now().isoformat()
                 }
                 database.get_container_client("document").create_item(doc_data)
@@ -146,7 +133,7 @@ def submit_claim():
                     "doc_id": doc_id,
                     "claim_id": claim_id,
                     "doc_type": "doctor_form",
-                    "doc_blob_address": blob_name,
+                    "doc_blob_address": "Input_document/Docform/"+blob_name,
                     "upload_date": datetime.now().isoformat()
                 }
                 database.get_container_client("document").create_item(doc_data)
@@ -157,17 +144,14 @@ def submit_claim():
             "id": claim_id,
             "claim_id": claim_id,
             "customer_id": customer_id,
-            "policy_id": "P001",  # Default policy ID
-            "admin_id": 3001,  # Default admin ID
+            "policy_id": policy_id, 
             "claim_type": claim_type,
             "claim_amount": float(claim_amount) if claim_amount else 0,
+            "currency" : currency, 
             "claim_date": datetime.now().strftime("%d/%m/%Y"),
             "claim_status": "Proses",
             "documents": uploaded_docs,
-            "insurance_company": "PT Asuransi Terpercaya",
-            "summary": "",
-            "AI_suggestion": "",
-            "AI_reasoning": ""
+            "insurance_company": "XYZ Insurance"
         }
         
         database.get_container_client("claim").create_item(claim_data)

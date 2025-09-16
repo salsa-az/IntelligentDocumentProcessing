@@ -214,11 +214,12 @@ Sys_promt_claim_letter = """
 
     claim data : 
     {claim_data}
-    approver name : {approval_name}
+    approver data : 
+    {approval_data}
 """
 
 prompt_letter = PromptTemplate(
-        input_variables=["customer_data", "claim_data", "policy_data", "approval_name"],
+        input_variables=["customer_data", "claim_data", "policy_data", "approval_data"],
         template=Sys_promt_claim_letter,
         partial_variables={"format_output": parser_claim_letter.get_format_instructions()},
         )
@@ -227,10 +228,10 @@ sendemail = RunnableLambda(send_email)
 
 letter_chain = prompt_letter | llm | parser_claim_letter | pdf_result | sendemail
 
-def letter_chain_pro(customer_data, claim_data, policy_data, approval_name):
+def letter_chain_pro(customer_data, claim_data, policy_data, approval_data):
     return letter_chain.invoke({
         "customer_data": customer_data,
         "claim_data": claim_data,
         "policy_data": policy_data,
-        "approval_name": approval_name
+        "approval_data": approval_data
     })

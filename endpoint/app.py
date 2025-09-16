@@ -1,19 +1,27 @@
 import sys
 import os
 import requests
+import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import uuid
 from datetime import datetime
+
+# Flask
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+
+# Azure
 from azure.storage.blob import BlobServiceClient
 from azure.cosmos import CosmosClient
 # from IntelegentDocumentProcecing.endpoint.analyst_func import analyst_function_executor
+
+# Langchain Functions
 from endpoint.analyst_func import analyst_function_executor
 from doc_intel import analize_doc
 from analyst_tools import cosmos_retrive_data
 from dotenv import load_dotenv
 from letterfunc import letter_chain_pro
+from chatbotClaimerOfficer import Agent_Insurance
 
 load_dotenv()
 
@@ -102,38 +110,35 @@ def submit_claim():
             file = request.files['hospitalInvoice']
             if file.filename:
                 doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"{doc_id}_{file.filename}"
+                blob_name = f"input_folder/invoice/{doc_id}_{file.filename}"
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                 blob_client.upload_blob(file.read(), overwrite=True)
-                
                 # Save document to CosmosDB
                 doc_data = {
                     "id": doc_id,
                     "doc_id": doc_id,
                     "claim_id": claim_id,
                     "doc_type": "invoice",
-                    "doc_blob_address": "Input_document/invoice/"+ blob_name,
+                    "doc_blob_address": blob_name,
                     "upload_date": datetime.now().isoformat()
                 }
                 database.get_container_client("document").create_item(doc_data)
                 uploaded_docs.append(doc_id)
-        
         # Doctor form
         if 'doctorForm' in request.files:
             file = request.files['doctorForm']
             if file.filename:
                 doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"{doc_id}_{file.filename}"
+                blob_name = f"input_folder/doctor_form/{doc_id}_{file.filename}"
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                 blob_client.upload_blob(file.read(), overwrite=True)
-                
                 # Save document ke CosmosDB
                 doc_data = {
                     "id": doc_id,
                     "doc_id": doc_id,
                     "claim_id": claim_id,
                     "doc_type": "doctor_form",
-                    "doc_blob_address": "Input_document/Docform/"+blob_name,
+                    "doc_blob_address": blob_name,
                     "upload_date": datetime.now().isoformat()
                 }
                 database.get_container_client("document").create_item(doc_data)
@@ -151,10 +156,20 @@ def submit_claim():
             "claim_date": datetime.now().strftime("%d/%m/%Y"),
             "claim_status": "Proses",
             "documents": uploaded_docs,
-            "insurance_company": "XYZ Insurance"
+            "insurance_company": "XYZ Insurance",
+            
         }
         
         database.get_container_client("claim").create_item(claim_data)
+        
+        def run_analysis_async(customer_id, claim_id):
+            def target():
+                try:
+                    analyst_function_executor(customer_id, claim_id)
+                except Exception as e:
+                    print(f"Error in analyst_function_executor: {e}", file=sys.stderr)
+            threading.Thread(target=target).start()
+        run_analysis_async(customer_id, claim_id)
         
         return jsonify({
             'status': 'success', 
@@ -163,6 +178,23 @@ def submit_claim():
             'documents_uploaded': len(uploaded_docs)
         })
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+    
+@app.route('/api/chatbot', methods=['POST'])
+def chatbot_api():
+    """Chatbot endpoint for insurance claim officer"""
+    try:
+        data = request.json
+        user_message = data.get('message')
+        if not user_message:
+            return jsonify({'error': 'Message is required'}), 400
+        
+        agent = Agent_Insurance()
+        response = agent.run(user_message)
+        
+        return jsonify({'response': response})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

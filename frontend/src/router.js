@@ -8,6 +8,7 @@ import Signup from './pages/Signup.vue'
 import ResetPassword from './pages/ResetPassword.vue'
 import MyAccount from './pages/MyAccount.vue'
 import ClaimApproval from './pages/ClaimApproval.vue'
+import AlertDemo from './pages/AlertDemo.vue'
 
 const routerHistory = createWebHistory()
 
@@ -53,6 +54,10 @@ const router = createRouter({
     {
       path: '/claim-approval',
       component: ClaimApproval
+    },
+    {
+      path: '/alert-demo',
+      component: AlertDemo
     },
   ]
 })

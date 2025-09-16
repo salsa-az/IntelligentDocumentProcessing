@@ -182,6 +182,7 @@ import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
 import Banner from '../partials/AIAssistant.vue'
 import Datepicker from '../components/Datepicker.vue'
+import { useAlert } from '../composables/useAlert.js'
 
 export default {
   name: 'FormClaim',
@@ -241,6 +242,8 @@ export default {
       }
     }
 
+    const { showSuccess, showError } = useAlert()
+
     const submitClaim = async () => {
       try {
         const formData = new FormData()
@@ -267,13 +270,22 @@ export default {
         const result = await response.json()
         
         if (response.ok) {
-          alert(`Klaim berhasil diajukan! ID: ${result.claim_id}`)
+          showSuccess(
+            'Klaim Berhasil Diajukan!',
+            `Klaim Anda telah berhasil disubmit dengan ID: ${result.claim_id}. Tim kami akan memproses klaim Anda dalam 1-3 hari kerja.`
+          )
           // Reset form or redirect
         } else {
-          alert(`Error: ${result.error}`)
+          showError(
+            'Gagal Mengajukan Klaim',
+            result.error || 'Terjadi kesalahan saat mengajukan klaim. Silakan coba lagi.'
+          )
         }
       } catch (error) {
-        alert(`Error: ${error.message}`)
+        showError(
+          'Kesalahan Sistem',
+          'Terjadi kesalahan koneksi. Silakan periksa koneksi internet Anda dan coba lagi.'
+        )
       }
     }
 

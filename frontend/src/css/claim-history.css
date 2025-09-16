@@ -27,8 +27,8 @@
   background-color: var(--color-green-500);
 }
 
-.progress-step:last-child::after {
-  display: none;
+.progress-step.completed.with-connector.connector-completed.is-last::after {
+  display: none !important;
 }
 
 .progress-step.completed::after {
@@ -148,6 +148,6 @@
   color: var(--color-red-200);
 }
 
-.is-last-step .progress-step::after {
+.progress-step.completed.with-connector.connector-completed.is-last::after {
   display: none !important;
 }

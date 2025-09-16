@@ -132,7 +132,8 @@
                     </div>
                     <div :class="{ 'is-last-step': true }">
                       <div v-for="(step, index) in claim.progress" :key="index"
-                        :class="['progress-step', getProgressClass(step.status), { 'with-connector': index !== 0, 'connector-completed': index !== 0 && claim.progress[index-1].status === 'completed' }]">
+                        :class="['progress-step', getProgressClass(step.status), { 'with-connector': index !== 0, 'connector-completed': index !== 0 && claim.progress[index-1].status === 'completed', 'is-last': index === claim.progress.length - 1 }]" 
+                        :style="{ 'align-items': 'flex-start', 'margin-bottom': index === claim.progress.length - 1 ? '0' : '1rem' }">
                         <div :class="['progress-circle', getProgressClass(step.status)]">
                           <svg v-if="step.status === 'completed'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M6.75,15h-.002c-.227,0-.442-.104-.583-.281L2.165,9.719c-.259-.324-.207-.795,.117-1.054,.325-.259,.796-.206,1.054,.117l3.418,4.272L14.667,3.278c.261-.322,.732-.373,1.055-.111,.322,.261,.372,.733,.111,1.055L7.333,14.722c-.143,.176-.357,.278-.583,.278Z" fill="currentColor"/>
@@ -141,9 +142,11 @@
                           <span v-else>{{ index + 1 }}</span>
                         </div>
                         <div class="ml-4 flex-1">
-                          <div class="flex items-center justify-between">
-                            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ step.title }}</p>
-                            <p v-if="step.date" class="text-xs text-gray-500 dark:text-gray-400">{{ formatDateTime(step.date) }}</p>
+                          <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-2">
+                              <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ step.title }}</p>
+                              <p v-if="step.date" class="text-xs text-gray-500 dark:text-gray-400">{{ formatDateTime(step.date) }}</p>
+                            </div>
                           </div>
                           <p v-if="step.notes" class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ step.notes }}</p>
                           <div v-if="step.title === 'Keputusan' && claim.status === 'rejected'" class="mt-2">

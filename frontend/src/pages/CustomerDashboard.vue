@@ -51,7 +51,7 @@
                   <div class="flex items-center text-sm text-blue-100">
                     <span class="bg-orange-500 text-white px-2 py-1 rounded text-xs font-medium mr-2">Platinum</span>
                   </div>
-                  <div class="text-xs text-blue-200 mt-1">{{ policyData.policyNumber }}</div>
+                  <!-- <div class="text-xs text-blue-200">{{ policyData.policyNumber }}</div> -->
                 </div>
               </div>
             </div>

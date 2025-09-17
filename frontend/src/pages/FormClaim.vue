@@ -31,48 +31,48 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-sm font-medium mb-1" for="nomorPolis">Nomor Polis</label>
-                      <input id="nomorPolis" type="text" v-model="form.nomorPolis" readonly class="form-input w-full">
+                      <input id="nomorPolis" type="text" v-model="form.nomorPolis" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="namaPerusahaan">Nama Perusahaan Asuransi</label>
-                      <input id="namaPerusahaan" type="text" v-model="form.namaPerusahaan" readonly class="form-input w-full">
+                      <input id="namaPerusahaan" type="text" v-model="form.namaPerusahaan" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700 ">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="nomorPeserta">Nomor Peserta</label>
-                      <input id="nomorPeserta" type="text" v-model="form.nomorPeserta" readonly class="form-input w-full">
+                      <input id="nomorPeserta" type="text" v-model="form.nomorPeserta" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="namaPemegang">Nama Pemegang Polis</label>
-                      <input id="namaPemegang" type="text" v-model="form.namaPemegang" readonly class="form-input w-full">
+                      <input id="namaPemegang" type="text" v-model="form.namaPemegang" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="nik">NIK</label>
-                      <input id="nik" type="text" v-model="form.nik" readonly class="form-input w-full">
+                      <input id="nik" type="text" v-model="form.nik" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="tanggalLahir">Tanggal Lahir</label>
-                      <input id="tanggalLahir" type="date" v-model="form.tanggalLahir" readonly class="form-input w-full">
+                      <input id="tanggalLahir" type="date" v-model="form.tanggalLahir" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="jenisKelamin">Jenis Kelamin</label>
-                      <input id="jenisKelamin" type="text" v-model="form.jenisKelamin" readonly class="form-input w-full">
+                      <input id="jenisKelamin" type="text" v-model="form.jenisKelamin" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="statusPernikahan">Status Pernikahan</label>
-                      <input id="statusPernikahan" type="text" v-model="form.statusPernikahan" readonly class="form-input w-full">
+                      <input id="statusPernikahan" type="text" v-model="form.statusPernikahan" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="email">Email</label>
-                      <input id="email" type="email" v-model="form.email" readonly class="form-input w-full">
+                      <input id="email" type="email" v-model="form.email" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1" for="nomorTelepon">Nomor Telepon</label>
-                      <input id="nomorTelepon" type="tel" v-model="form.nomorTelepon" readonly class="form-input w-full">
+                      <input id="nomorTelepon" type="tel" v-model="form.nomorTelepon" readonly class="form-input w-full bg-gray-50 dark:bg-gray-700">
                     </div>
-                    <div class="md:col-span-2">
+                    <!-- <div class="md:col-span-2">
                       <label class="block text-sm font-medium mb-1" for="alamat">Alamat</label>
-                      <textarea id="alamat" v-model="form.alamat" readonly rows="2" class="form-textarea w-full"></textarea>
-                    </div>
+                      <textarea id="alamat" v-model="form.alamat" readonly rows="2" class="form-textarea w-full bg-gray-50 dark:bg-gray-700"></textarea>
+                    </div> -->
                   </div>
                 </div>
                 
@@ -106,11 +106,11 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentStartDate">Tanggal Masuk Perawatan <span class="text-red-500">*</span></label>
-                      <input id="treatmentStartDate" type="date" v-model="form.treatmentStartDate" required class="form-input w-full">
+                      <Datepicker v-model="form.treatmentStartDate"/>
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentEndDate">Tanggal Keluar Perawatan <span class="text-red-500">*</span></label>
-                      <input id="treatmentEndDate" type="date" v-model="form.treatmentEndDate" required class="form-input w-full">
+                      <Datepicker v-model="form.treatmentEndDate"/>
                     </div>
                   </div>
                 </div>
@@ -196,7 +196,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
@@ -331,8 +331,8 @@ export default {
           // Load claim data
           form.value.claimType = claim.type
           form.value.claimAmount = claim.amount
-          form.value.treatmentStartDate = claim.checkIn
-          form.value.treatmentEndDate = claim.checkOut
+          form.value.treatmentStartDate = formatDateForDatepicker(claim.checkIn)
+          form.value.treatmentEndDate = formatDateForDatepicker(claim.checkOut)
           existingDocuments.value = claim.documents || []
           // Load profile data
           if (claim.profile) {
@@ -341,6 +341,16 @@ export default {
           console.log('Form loaded with data:', form.value)
         }
       }
+    }
+
+    const formatDateForDatepicker = (dateString) => {
+      if (!dateString) return null
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      })
     }
 
     const getExistingDocument = (type) => {
@@ -419,6 +429,19 @@ export default {
         )
       }
     }
+
+    // Watch for changes in form dates to update Datepicker
+    watch(() => form.value.treatmentStartDate, (newVal) => {
+      if (newVal && isEditing.value) {
+        console.log('Start date updated:', newVal)
+      }
+    })
+
+    watch(() => form.value.treatmentEndDate, (newVal) => {
+      if (newVal && isEditing.value) {
+        console.log('End date updated:', newVal)
+      }
+    })
 
     onMounted(() => {
       loadClaimData()

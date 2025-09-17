@@ -12,7 +12,7 @@
         <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
           <!-- Page header -->
           <div class="mb-8">
-            <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Admin - Claims Approval</h1>
+            <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Approver - Claims Approval</h1>
             <p class="text-gray-600 dark:text-gray-400">Review and approve submitted insurance claims</p>
           </div>
 
@@ -147,7 +147,7 @@ export default {
     const showDetailModal = ref(false)
     const selectedClaim = ref(null)
 
-    // Mock data for admin review
+    // Mock data for approver review
     const mockClaims = [
       {
         id: 1,
@@ -170,7 +170,7 @@ export default {
           confidence: 92,
           riskScore: 2,
           details: [
-            { category: 'Administrative Validation', finding: 'All required fields present and complete' },
+            { category: 'Approval Validation', finding: 'All required fields present and complete' },
             { category: 'Diagnosis Validation', finding: 'Hypertension (ICD X: I10) correctly coded and consistent' },
             { category: 'Treatment Validation', finding: 'Treatments appropriate for diagnosis' },
             { category: 'Cost Analysis', finding: 'Invoice total (7,720,000 IDR) reasonable for treatment type' }
@@ -198,7 +198,7 @@ export default {
           confidence: 67,
           riskScore: 6,
           details: [
-            { category: 'Administrative Validation', finding: 'Some required fields missing in documentation' },
+            { category: 'Approval Validation', finding: 'Some required fields missing in documentation' },
             { category: 'Cost Analysis', finding: 'Costs appear elevated for outpatient treatment type' },
             { category: 'Treatment Validation', finding: 'Treatment plan needs verification' }
           ]

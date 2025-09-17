@@ -200,12 +200,6 @@ def submit_claim():
         def run_analysis_async(customer_id, claim_id):
             def target():
                 try:
-                    data = request.json
-                    customer_id = data.get('customer_id')
-                    claim_id = data.get('claim_id')
-                    
-                    if not customer_id or not claim_id:
-                        return jsonify({'error': 'customer_id and claim_id required'}), 400
                     analyst_function_executor(customer_id, claim_id)
                 except Exception as e:
                     print(f"Error in analyst_function_executor: {e}", file=sys.stderr)

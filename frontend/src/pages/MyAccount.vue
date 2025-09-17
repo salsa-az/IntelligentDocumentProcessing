@@ -48,7 +48,7 @@
                       
                       <!-- Personal Information -->
                       <div class="col-span-12">
-                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Informasi Pribadi</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Informasi Pribadi</h3>
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
@@ -78,27 +78,27 @@
 
                       <!-- Policy Information -->
                       <div class="col-span-12">
-                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 mt-6">Informasi Polis</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-6">Informasi Polis</h3>
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
                         <label class="block text-sm font-medium mb-1" for="insuranceComp">Nama Perusahan Asuransi</label>
-                        <input id="insuranceComp" v-model="form.insuranceComp" class="form-input w-full bg-gray-50 dark:bg-gray-700" type="text" readonly />
+                        <input id="insuranceComp" v-model="form.insuranceComp" class="form-input w-full" type="text" />
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
                         <label class="block text-sm font-medium mb-1" for="policyType">Jenis Polis</label>
-                        <input id="policyType" v-model="form.policyType" class="form-input w-full bg-gray-50 dark:bg-gray-700" type="text" readonly />
+                        <input id="policyType" v-model="form.policyType" class="form-input w-full" type="text" />
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
                         <label class="block text-sm font-medium mb-1" for="policyNumber">Nomor Polis</label>
-                        <input id="policyNumber" v-model="form.policyNumber" class="form-input w-full bg-gray-50 dark:bg-gray-700" type="text" readonly />
+                        <input id="policyNumber" v-model="form.policyNumber" class="form-input w-full" type="text" />
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
                         <label class="block text-sm font-medium mb-1" for="policyNumber">Nomor Peserta</label>
-                        <input id="policyNumber" v-model="form.policyNumber" class="form-input w-full bg-gray-50 dark:bg-gray-700" type="text" readonly />
+                        <input id="policyNumber" v-model="form.policyNumber" class="form-input w-full" type="text" />
                       </div>
 
                       <!-- Emergency Contact -->
@@ -118,7 +118,7 @@
 
                       <!-- Password Change -->
                       <div class="col-span-12">
-                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 mt-6">Ubah Password</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-6">Ubah Password</h3>
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
@@ -176,6 +176,7 @@ export default {
       birthDate: '1985-04-12',
       address: 'Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10220',
       policyNumber: 'P001',
+      insuranceComp: 'PT XYZ Asuransi',
       policyType: 'Asuransi Kesehatan Platinum',
       emergencyName: 'Siti Santoso',
       emergencyPhone: '+62 812-9876-5432',

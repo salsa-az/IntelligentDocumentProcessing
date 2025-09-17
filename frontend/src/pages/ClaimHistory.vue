@@ -150,11 +150,11 @@
                           </div>
                           <p v-if="step.notes" class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ step.notes }}</p>
                           <div v-if="step.title === 'Keputusan' && claim.status === 'rejected'" class="mt-2 ctq43">
-                            <button @click="editClaim(claim)" class="flex items-center px-3 py-1 text-xs btn bg-white border-gray-200 text-gray-800 hover:bg-gray-100 transition-colors">
-                              <svg class="w-3 h-3 mr-1 cmpw7 cdqku cbm9w coqgc" viewBox="0 0 16 16">
-                                <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" fill="currentColor"></path>
+                            <button @click="editClaim(claim)" class="btn-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-300">
+                              <svg class="w-3 h-3 mr-2 fill-current opacity-50 shrink-0" viewBox="0 0 16 16">
+                                <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" />
                               </svg>
-                              <span class="c8bkw">
+                              <span class="text-xs">
                                 Edit Claim
                               </span>
                             </button>
@@ -217,11 +217,11 @@
             </button>
             <!-- Edit Form Submit -->
              <div class="ctq43">
-                 <button @click="submitClaim" class="btn bg-white border-gray-200 text-gray-800 cc0oq cghq3 cspbm c0zkc c2vpa">
-                   <svg class="cmpw7 cdqku cbm9w coqgc" width="16" height="16" viewBox="0 0 16 16">
+                 <button @click="submitClaim" class="btn bg-white border-gray-200 text-gray-800">
+                   <svg width="16" height="16" viewBox="0 0 16 16">
                    <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z"></path>
                      </svg>
-                     <span class="c8bkw">Edit Claim</span>
+                     <span>Edit Claim</span>
                  </button>
              </div>
           </div>

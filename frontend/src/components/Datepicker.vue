@@ -1,6 +1,6 @@
 <template>
   <div class="relative">
-    <flat-pickr class="form-input pl-9 w-full" :config="config" v-model="date"></flat-pickr>
+    <flat-pickr ref="flatpickr" class="form-input pl-9 w-full" :config="config" v-model="date"></flat-pickr>
     <div class="absolute inset-0 right-auto flex items-center pointer-events-none">
       <svg class="fill-current text-gray-400 dark:text-gray-500 ml-3" width="16" height="16" viewBox="0 0 16 16">
         <path d="M5 4a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2H5Z" />
@@ -15,16 +15,17 @@ import flatPickr from 'vue-flatpickr-component'
 
 export default {
   name: 'Datepicker',
-  props: ['align'],
+  props: ['align', 'modelValue'],
+  emits: ['update:modelValue'],
     data (props) {
       return {
-        date: null, // refer to https://github.com/ankurk91/vue-flatpickr-component
+        date: props.modelValue,
         config: {
           mode: 'single',
           static: false,
-          monthSelectorType: 'static',
+          monthSelectorType: 'dropdown',
           dateFormat: 'M j, Y',
-          defaultDate: new Date(),
+          defaultDate: props.modelValue || new Date(),
           prevArrow: '<svg class="fill-current" width="7" height="11" viewBox="0 0 7 11"><path d="M5.4 10.8l1.4-1.4-4-4 4-4L5.4 0 0 5.4z" /></svg>',
           nextArrow: '<svg class="fill-current" width="7" height="11" viewBox="0 0 7 11"><path d="M1.4 10.8L0 9.4l4-4-4-4L1.4 0l5.4 5.4z" /></svg>',
           onReady: (selectedDates, dateStr, instance) => {
@@ -34,6 +35,7 @@ export default {
           },
           onChange: (selectedDates, dateStr, instance) => {
             instance.element.value = dateStr;
+            this.$emit('update:modelValue', dateStr);
           },
         },                
       }
@@ -41,5 +43,15 @@ export default {
   components: {
     flatPickr
   },
+  watch: {
+    modelValue(newVal) {
+      if (newVal !== this.date) {
+        this.date = newVal;
+        if (this.$refs.flatpickr && this.$refs.flatpickr.fp) {
+          this.$refs.flatpickr.fp.setDate(newVal);
+        }
+      }
+    }
+  }
 }
 </script>

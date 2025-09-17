@@ -88,6 +88,28 @@ def query_from_cosmosDB() :
         
 
 
+def validate_customer_data(form_data, customer_data):
+    """Validate form data against database customer record"""
+    if not customer_data:
+        return False, "Customer not found in database"
+    
+    customer = customer_data[0]
+    
+    # Check if form data matches database
+    form_customer_id = form_data.get('customerId')
+    form_policy_id = form_data.get('policyId')
+    
+    print(f"Validating customer_id: {form_customer_id} with database customer_id: {customer['customer_id']}")
+    print(f"Validating policy_id: {form_policy_id} with database policy_id: {customer['policy_id']}")
+
+    if customer['customer_id'] != form_customer_id:
+        return False, "Customer ID mismatch"
+    
+    if customer['policy_id'] != form_policy_id:
+        return False, "Policy ID mismatch"
+    
+    return True, "Valid customer"
+
 @app.route('/api/submit-claim', methods=['POST'])
 def submit_claim():
     """Submit claim form with file uploads"""
@@ -96,10 +118,22 @@ def submit_claim():
         claim_type = request.form.get('claimType')
         claim_amount = request.form.get('claimAmount')
         currency = request.form.get('currency')
-        customer_id = request.form.get('customerId')  # Default for now
+        customer_id = request.form.get('customerId')
         policy_id = request.form.get('policyId')
         
-        # Generate IDs
+        # Get customer data from database
+        customer_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId", 
+            "customer", 
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        # Validate customer exists and data matches
+        is_valid, message = validate_customer_data(request.form, customer_data)
+        if not is_valid:
+            return jsonify({'error': message}), 400
+        
+        # Get Claim ID
         claim_id = f"C{uuid.uuid4().hex[:8].upper()}"
         
         # Upload files ke Blob Storage
@@ -110,7 +144,7 @@ def submit_claim():
             file = request.files['hospitalInvoice']
             if file.filename:
                 doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"input_folder/invoice/{doc_id}_{file.filename}"
+                blob_name = f"Input_document/invoice/{doc_id}_{file.filename}"
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                 blob_client.upload_blob(file.read(), overwrite=True)
                 # Save document to CosmosDB
@@ -129,7 +163,7 @@ def submit_claim():
             file = request.files['doctorForm']
             if file.filename:
                 doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"input_folder/doctor_form/{doc_id}_{file.filename}"
+                blob_name = f"Input_document/Docform/{doc_id}_{file.filename}"
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                 blob_client.upload_blob(file.read(), overwrite=True)
                 # Save document ke CosmosDB
@@ -148,8 +182,9 @@ def submit_claim():
         claim_data = {
             "id": claim_id,
             "claim_id": claim_id,
-            "customer_id": customer_id,
-            "policy_id": policy_id, 
+            "customer_id": customer_data[0]['customer_id'],
+            "name": customer_data[0]['name'],
+            "policy_id": customer_data[0]['policy_id'], 
             "claim_type": claim_type,
             "claim_amount": float(claim_amount) if claim_amount else 0,
             "currency" : currency, 
@@ -165,6 +200,12 @@ def submit_claim():
         def run_analysis_async(customer_id, claim_id):
             def target():
                 try:
+                    data = request.json
+                    customer_id = data.get('customer_id')
+                    claim_id = data.get('claim_id')
+                    
+                    if not customer_id or not claim_id:
+                        return jsonify({'error': 'customer_id and claim_id required'}), 400
                     analyst_function_executor(customer_id, claim_id)
                 except Exception as e:
                     print(f"Error in analyst_function_executor: {e}", file=sys.stderr)

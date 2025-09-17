@@ -149,12 +149,14 @@
                             </div>
                           </div>
                           <p v-if="step.notes" class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ step.notes }}</p>
-                          <div v-if="step.title === 'Keputusan' && claim.status === 'rejected'" class="mt-2">
-                            <button @click="editClaim(claim)" class="flex items-center px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                              <svg class="w-3 h-3 mr-1" viewBox="0 0 16 16">
+                          <div v-if="step.title === 'Keputusan' && claim.status === 'rejected'" class="mt-2 ctq43">
+                            <button @click="editClaim(claim)" class="flex items-center px-3 py-1 text-xs btn bg-white border-gray-200 text-gray-800 hover:bg-gray-100 transition-colors">
+                              <svg class="w-3 h-3 mr-1 cmpw7 cdqku cbm9w coqgc" viewBox="0 0 16 16">
                                 <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" fill="currentColor"></path>
                               </svg>
-                              Edit Claim
+                              <span class="c8bkw">
+                                Edit Claim
+                              </span>
                             </button>
                           </div>
                         </div>
@@ -235,9 +237,10 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
-import Banner from '../partials/AIAssistant.vue'
+import Banner from '../partials/Chatbot.vue'
 
 export default {
   name: 'ClaimHistory',
@@ -247,6 +250,7 @@ export default {
     Banner,
   },
   setup() {
+    const router = useRouter()
     const sidebarOpen = ref(false)
     const searchQuery = ref('')
     const statusFilter = ref('')
@@ -275,8 +279,8 @@ export default {
           { title: 'Keputusan', status: 'completed', date: '2024-01-22T09:45:00', notes: 'Klaim disetujui. Dana akan ditransfer dalam 3-5 hari kerja.' }
         ],
         documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '1.8 MB', type: 'PDF', url: '/documents/invoice-1.pdf' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '2.4 MB', type: 'PDF', url: '/documents/medical-form-1.pdf' }
+          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '1.8 MB', type: 'PDF', url: '/form/invoice-1.pdf' },
+          { id: 2, name: 'Form Medis Dokter.pdf', size: '2.4 MB', type: 'PDF', url: '/form/dokter form-1.pdf' }
         ]
       },
       {
@@ -295,8 +299,8 @@ export default {
           { title: 'Keputusan', status: 'pending', date: null, notes: null }
         ],
         documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '890 KB', type: 'PDF', url: '/documents/invoice-2.pdf' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.2 MB', type: 'PDF', url: '/documents/medical-form-2.pdf' }
+          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '890 KB', type: 'PDF', url: '/form/invoice-2.pdf' },
+          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.2 MB', type: 'PDF', url: '/form/dokter form-2.pdf' }
         ]
       },
       {
@@ -315,8 +319,8 @@ export default {
           { title: 'Keputusan', status: 'completed', date: '2024-02-13T10:20:00', notes: 'Klaim ditolak. Diagnosis tidak sesuai dengan polis. Silakan hubungi customer service untuk informasi lebih lanjut.' }
         ],
         documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '456 KB', type: 'PDF', url: '/documents/invoice-3.pdf' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.5 MB', type: 'PDF', url: '/documents/medical-form-3.pdf' }
+          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '456 KB', type: 'PDF', url: '/form/invoice-3.pdf' },
+          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.5 MB', type: 'PDF', url: '/form/dokter form-3.pdf' }
         ]
       },
       {
@@ -335,8 +339,8 @@ export default {
           { title: 'Keputusan', status: 'completed', date: '2024-02-20T15:20:00', notes: 'Klaim ditolak. Dokumen tidak lengkap - Invoice tidak sesuai format dan form medis tidak memiliki tanda tangan dokter yang valid.' }
         ],
         documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '2.2 MB', type: 'PDF', url: '/documents/invoice-4.pdf' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '3.1 MB', type: 'PDF', url: '/documents/medical-form-4.pdf' }
+          { id: 1, name: 'Invoice Siloam.pdf', size: '2.2 MB', type: 'PDF', url: '/form/invoice_siloam.pdf' },
+          { id: 2, name: 'Dokter Form Siloam.pdf', size: '3.1 MB', type: 'PDF', url: '/form/dokter_form_siloam.pdf' }
         ]
       }
     ]
@@ -469,27 +473,23 @@ export default {
     }
 
     const downloadDocument = (document) => {
-      // Create a temporary link to download the document
-      const link = document.createElement('a')
-      link.href = document.url
-      link.download = document.name
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      window.open(document.url, '_blank')
     }
 
     const downloadAllDocuments = () => {
       if (selectedClaim.value?.documents) {
         selectedClaim.value.documents.forEach(doc => {
-          setTimeout(() => downloadDocument(doc), 100)
+          window.open(doc.url, '_blank')
         })
       }
       closeModal()
     }
 
     const editClaim = (claim) => {
-      console.log('Editing claim:', claim.claimNumber)
-      alert(`Redirecting to edit form for ${claim.claimNumber}`)
+      router.push({
+        name: 'FormClaim',
+        query: { edit: claim.id }
+      })
     }
 
     onMounted(() => {

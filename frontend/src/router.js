@@ -41,6 +41,7 @@ const router = createRouter({
     },
     {
       path: '/claim-form',
+      name: 'FormClaim',
       component: FormClaim
     },
     {

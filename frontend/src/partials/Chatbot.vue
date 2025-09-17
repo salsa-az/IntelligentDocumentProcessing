@@ -12,7 +12,7 @@
             </svg>
           </div>
           <div>
-            <h3 class="font-semibold">AI Asisten Klaim</h3>
+            <h3 class="font-semibold">Chatbot Asisten Klaim</h3>
             <p class="text-xs opacity-90">Tanya tentang klaim Anda</p>
           </div>
         </div>
@@ -34,7 +34,7 @@
               </svg>
             </div>
             <div class="bg-white dark:bg-gray-800 rounded-lg p-3 max-w-xs">
-              <p class="text-sm text-gray-800 dark:text-gray-200">Halo! Saya AI Asisten untuk membantu Anda dengan pertanyaan seputar klaim asuransi. Ada yang bisa saya bantu?</p>
+              <p class="text-sm text-gray-800 dark:text-gray-200">Halo! Saya Chatbot Asisten untuk membantu Anda dengan pertanyaan seputar klaim asuransi. Ada yang bisa saya bantu?</p>
             </div>
           </div>
 

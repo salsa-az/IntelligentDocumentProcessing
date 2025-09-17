@@ -100,7 +100,7 @@ import DashboardCard10 from '../partials/dashboard/DashboardCard10.vue'
 import DashboardCard11 from '../partials/dashboard/DashboardCard11.vue'
 import DashboardCard12 from '../partials/dashboard/DashboardCard12.vue'
 import DashboardCard13 from '../partials/dashboard/DashboardCard13.vue'
-import Banner from '../partials/AIAssistant.vue'
+import Banner from '../partials/Chatbot.vue'
 
 export default {
   name: 'Dashboard',

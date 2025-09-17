@@ -126,7 +126,7 @@
 import { ref, computed, onMounted } from 'vue'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
-import Banner from '../partials/AIAssistant.vue'
+import Banner from '../partials/Chatbot.vue'
 import ClaimDetail from '../partials/ClaimDetail.vue'
 
 export default {

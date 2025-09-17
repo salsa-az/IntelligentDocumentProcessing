@@ -12,8 +12,12 @@
         <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-4xl mx-auto">
           <!-- Page header -->
           <div class="mb-8">
-            <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Form Klaim Asuransi</h1>
-            <p class="text-gray-600 dark:text-gray-400">Ajukan klaim asuransi Anda dengan dokumen yang diperlukan</p>
+            <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">
+              {{ isEditing ? 'Edit Klaim Asuransi' : 'Form Klaim Asuransi' }}
+            </h1>
+            <p class="text-gray-600 dark:text-gray-400">
+              {{ isEditing ? 'Edit klaim yang ditolak dengan dokumen yang diperlukan' : 'Ajukan klaim asuransi Anda dengan dokumen yang diperlukan' }}
+            </p>
           </div>
 
           <!-- Form -->
@@ -102,15 +106,13 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentStartDate">Tanggal Masuk Perawatan <span class="text-red-500">*</span></label>
-                      <Datepicker />
+                      <input id="treatmentStartDate" type="date" v-model="form.treatmentStartDate" required class="form-input w-full">
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="treatmentEndDate">Tanggal Keluar Perawatan <span class="text-red-500">*</span></label>
-                      <Datepicker />
+                      <input id="treatmentEndDate" type="date" v-model="form.treatmentEndDate" required class="form-input w-full">
                     </div>
                   </div>
-                  
-
                 </div>
 
                 <!-- D. Jumlah Klaim -->
@@ -135,15 +137,32 @@
                 <!-- Dokumen yang Perlu Diupload -->
                 <div class="mb-8">
                   <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Dokumen yang Perlu Diupload</h2>
+                  
                   <div class="space-y-4">
                     <div>
-                      <label class="block text-sm font-medium mb-1" for="hospitalInvoice">Invoice Tagihan Rumah Sakit <span class="text-red-500">*</span></label>
-                      <input id="hospitalInvoice" type="file" @change="handleFileUpload($event, 'hospitalInvoice')" accept=".pdf,.jpg,.jpeg,.png" required class="form-input w-full">
+                      <label class="block text-sm font-medium mb-1" for="hospitalInvoice">
+                        Invoice Tagihan Rumah Sakit 
+                        <span class="text-red-500">{{ !isEditing ? '*' : '' }}</span>
+                      </label>
+                      <div class="flex items-center gap-4">
+                        <input id="hospitalInvoice" type="file" @change="handleFileUpload($event, 'hospitalInvoice')" accept=".pdf,.jpg,.jpeg,.png" :required="!isEditing" class="form-input flex-1">
+                        <button v-if="isEditing && getExistingDocument('invoice')" type="button" @click="viewDocument(getExistingDocument('invoice'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
+                          Unduh
+                        </button>
+                      </div>
                       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload invoice/tagihan rumah sakit (PDF, JPG, PNG)</p>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium mb-1" for="doctorForm">Surat Form yang Diisi Dokter <span class="text-red-500">*</span></label>
-                      <input id="doctorForm" type="file" @change="handleFileUpload($event, 'doctorForm')" accept=".pdf,.jpg,.jpeg,.png" required class="form-input w-full">
+                      <label class="block text-sm font-medium mb-1" for="doctorForm">
+                        Surat Form yang Diisi Dokter 
+                        <span class="text-red-500">{{ !isEditing ? '*' : '' }}</span>
+                      </label>
+                      <div class="flex items-center gap-4">
+                        <input id="doctorForm" type="file" @change="handleFileUpload($event, 'doctorForm')" accept=".pdf,.jpg,.jpeg,.png" :required="!isEditing" class="form-input flex-1">
+                        <button v-if="isEditing && getExistingDocument('form')" type="button" @click="viewDocument(getExistingDocument('form'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
+                          Unduh
+                        </button>
+                      </div>
                       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload surat form yang telah diisi dokter (PDF, JPG, PNG)</p>
                     </div>
                   </div>
@@ -163,7 +182,7 @@
                 <!-- Submit Button -->
                 <div class="flex justify-end">
                   <button type="submit" class="btn bg-violet-500 hover:bg-violet-600 text-white shadow-lg transition-all duration-200">
-                    Ajukan Klaim
+                    {{ isEditing ? 'Update Klaim' : 'Ajukan Klaim' }}
                   </button>
                 </div>
 
@@ -177,10 +196,11 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
-import Banner from '../partials/AIAssistant.vue'
+import Banner from '../partials/Chatbot.vue'
 import Datepicker from '../components/Datepicker.vue'
 import { useAlert } from '../composables/useAlert.js'
 
@@ -193,20 +213,24 @@ export default {
     Datepicker,
   },
   setup() {
+    const route = useRoute()
+    const router = useRouter()
     const sidebarOpen = ref(false)
+    const isEditing = ref(false)
+    const existingDocuments = ref([])
     
     const form = ref({
       // Auto-filled profile data
-      nomorPolis: 'POL-001-2024',
-      namaPerusahaan: 'PT Asuransi Terpercaya',
-      nomorPeserta: 'PST-001-2024',
-      namaPemegang: 'John Doe',
-      nik: '1234567890123456',
-      tanggalLahir: '1990-01-01',
-      jenisKelamin: 'Laki-laki',
-      statusPernikahan: 'Menikah',
+      nomorPolis: 'P001',
+      namaPerusahaan: 'PT XYZ Asuransi',
+      nomorPeserta: 'CUST1234',
+      namaPemegang: 'Feri Hussen',
+      nik: '32010298345',
+      tanggalLahir: '1985-04-12',
+      jenisKelamin: 'Male',
+      statusPernikahan: 'Married',
       alamat: 'Jl. Contoh No. 123, Jakarta',
-      email: 'john.doe@example.com',
+      email: 'feri.hussen@xyz.com',
       nomorTelepon: '081234567890',
       
       // Form fields
@@ -242,6 +266,98 @@ export default {
       }
     }
 
+    // Mock claims data with profile info
+    const mockClaims = [
+      {
+        id: 3,
+        type: 'rawat-jalan',
+        amount: 2500000,
+        checkIn: '2024-02-10',
+        checkOut: '2024-02-10',
+        status: 'rejected',
+        profile: {
+          nomorPolis: 'P003',
+          namaPerusahaan: 'PT Asuransi Mandiri',
+          nomorPeserta: 'CUST3456',
+          namaPemegang: 'Sari Dewi',
+          nik: '3201029834567',
+          tanggalLahir: '1990-08-15',
+          jenisKelamin: 'Female',
+          statusPernikahan: 'Single',
+          alamat: 'Jl. Merdeka No. 45, Bandung',
+          email: 'sari.dewi@email.com',
+          nomorTelepon: '081234567891'
+        },
+        documents: [
+          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '456 KB', type: 'PDF', url: '/form/invoice-3.pdf' },
+          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.5 MB', type: 'PDF', url: '/form/dokter form-3.pdf' }
+        ]
+      },
+      {
+        id: 4,
+        type: 'kehamilan-melahirkan',
+        amount: 12000000,
+        checkIn: '2024-02-15',
+        checkOut: '2024-02-17',
+        status: 'rejected',
+        profile: {
+          nomorPolis: 'P004',
+          namaPerusahaan: 'PT Asuransi Central Asia',
+          nomorPeserta: 'CUST4567',
+          namaPemegang: 'Maya Sari',
+          nik: '3201029834568',
+          tanggalLahir: '1988-12-20',
+          jenisKelamin: 'Female',
+          statusPernikahan: 'Married',
+          alamat: 'Jl. Sudirman No. 78, Jakarta',
+          email: 'maya.sari@email.com',
+          nomorTelepon: '081234567892'
+        },
+        documents: [
+          { id: 1, name: 'Invoice Siloam.pdf', size: '2.2 MB', type: 'PDF', url: '/form/invoice_siloam.pdf' },
+          { id: 2, name: 'Dokter Form Siloam.pdf', size: '3.1 MB', type: 'PDF', url: '/form/dokter_form_siloam.pdf' }
+        ]
+      }
+    ]
+
+    const loadClaimData = () => {
+      const editId = route.query.edit
+      console.log('Edit ID:', editId)
+      if (editId) {
+        const claim = mockClaims.find(c => c.id == editId)
+        console.log('Found claim:', claim)
+        if (claim) {
+          isEditing.value = true
+          // Load claim data
+          form.value.claimType = claim.type
+          form.value.claimAmount = claim.amount
+          form.value.treatmentStartDate = claim.checkIn
+          form.value.treatmentEndDate = claim.checkOut
+          existingDocuments.value = claim.documents || []
+          // Load profile data
+          if (claim.profile) {
+            Object.assign(form.value, claim.profile)
+          }
+          console.log('Form loaded with data:', form.value)
+        }
+      }
+    }
+
+    const getExistingDocument = (type) => {
+      if (!existingDocuments.value.length) return null
+      if (type === 'invoice') {
+        return existingDocuments.value.find(doc => doc.name.toLowerCase().includes('invoice'))
+      }
+      if (type === 'form') {
+        return existingDocuments.value.find(doc => doc.name.toLowerCase().includes('form') || doc.name.toLowerCase().includes('dokter'))
+      }
+      return null
+    }
+
+    const viewDocument = (document) => {
+      window.open(document.url, '_blank')
+    }
+
     const { showSuccess, showError } = useAlert()
 
     const submitClaim = async () => {
@@ -252,7 +368,16 @@ export default {
         formData.append('claimType', form.value.claimType)
         formData.append('claimAmount', form.value.claimAmount)
         formData.append('currency', form.value.currency)
-        formData.append('customerId', 'CU001') // Default customer ID
+        formData.append('customerId', 'CU001')
+        formData.append('policyId', form.value.nomorPolis)
+        formData.append('treatmentStartDate', form.value.treatmentStartDate)
+        formData.append('treatmentEndDate', form.value.treatmentEndDate)
+        
+        if (isEditing.value) {
+          formData.append('claimId', route.query.edit)
+          formData.append('isEdit', 'true')
+        }
+        
         
         // Add files
         if (form.value.hospitalInvoice) {
@@ -262,7 +387,8 @@ export default {
           formData.append('doctorForm', form.value.doctorForm)
         }
         
-        const response = await fetch('http://localhost:5000/api/submit-claim', {
+        const endpoint = isEditing.value ? 'http://localhost:5000/api/update-claim' : 'http://localhost:5000/api/submit-claim'
+        const response = await fetch(endpoint, {
           method: 'POST',
           body: formData
         })
@@ -271,14 +397,19 @@ export default {
         
         if (response.ok) {
           showSuccess(
-            'Klaim Berhasil Diajukan!',
-            `Klaim Anda telah berhasil disubmit dengan ID: ${result.claim_id}. Tim kami akan memproses klaim Anda dalam 1-3 hari kerja.`
+            isEditing.value ? 'Klaim Berhasil Diupdate!' : 'Klaim Berhasil Diajukan!',
+            isEditing.value 
+              ? `Klaim ${result.claim_id} telah berhasil diupdate. Tim kami akan memproses ulang klaim Anda dalam 1-3 hari kerja.`
+              : `Klaim Anda telah berhasil disubmit dengan ID: ${result.claim_id}. Tim kami akan memproses klaim Anda dalam 1-3 hari kerja.`
           )
-          // Reset form or redirect
+          
+          setTimeout(() => {
+            router.push('/claim-history')
+          }, 2000)
         } else {
           showError(
-            'Gagal Mengajukan Klaim',
-            result.error || 'Terjadi kesalahan saat mengajukan klaim. Silakan coba lagi.'
+            isEditing.value ? 'Gagal Mengupdate Klaim' : 'Gagal Mengajukan Klaim',
+            result.error || 'Terjadi kesalahan saat memproses klaim. Silakan coba lagi.'
           )
         }
       } catch (error) {
@@ -289,10 +420,18 @@ export default {
       }
     }
 
+    onMounted(() => {
+      loadClaimData()
+    })
+
     return {
       sidebarOpen,
       form,
+      isEditing,
+      existingDocuments,
       handleFileUpload,
+      viewDocument,
+      getExistingDocument,
       submitClaim
     }
   }

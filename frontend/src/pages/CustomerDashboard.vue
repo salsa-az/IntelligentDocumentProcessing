@@ -43,7 +43,7 @@
           <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 mb-6 text-white">
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-xl font-semibold mb-1">Halo, John Doe</h2>
+                <h2 class="text-xl font-semibold mb-1">Halo, Feri Hussen</h2>
                 <p class="text-blue-100 text-sm">Selamat datang kembali di dashboard asuransi Anda</p>
               </div>
               <div class="flex items-center space-x-4">
@@ -251,7 +251,7 @@ import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
 import FilterButton from '../components/DropdownFilter.vue'
 import Datepicker from '../components/Datepicker.vue'
-import Banner from '../partials/AIAssistant.vue'
+import Banner from '../partials/Chatbot.vue'
 
 export default {
   name: 'Dashboard',
@@ -300,7 +300,7 @@ export default {
     // Mock policy data from FormClaim
     const policyData = ref({
       status: 'Active',
-      policyNumber: 'POL-001-2024',
+      policyNumber: 'P001',
       company: 'PT Asuransi Terpercaya'
     })
 

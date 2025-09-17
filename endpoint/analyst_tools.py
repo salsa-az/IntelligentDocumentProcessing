@@ -171,8 +171,8 @@ def get_disease_info(search_key : str):
         return "there is no information"
 
 @tool('update_claim_and_document')
-def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reasoning_status: str, summary: str, invoice_doc_id : str, invoice_doc_contents : dict, doctor_form_doc_id : str, doctor_form_doc_contents : dict) -> str:
-    """Update existing claim with AI suggestion status(only Approved/Rejected/Pending), AI Reasoning status, Summary and invoice document data's doc_id and doc_contents, also doctor Form document data's doc_id and doc_contents"""
+def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reasoning: str, summary: str, invoice_doc_id : str, invoice_doc_contents : dict, doctor_form_doc_id : str, doctor_form_doc_contents : dict) -> str:
+    """Update existing claim with AI suggestion status(only Approved/Rejected/Pending), AI Reasoning (reasoning for ai suggestion status), Summary and invoice document data's doc_id and doc_contents, also doctor Form document data's doc_id and doc_contents"""
     try:
         container_client = database.get_container_client("claim")
         claim_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.claim_id= @idParam", "claim", parameters=[{
@@ -181,7 +181,7 @@ def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reaso
         }] )
         claim_data =  claim_data[0]
         claim_data['AI_suggestion'] = ai_suggestion_status
-        claim_data['AI_reasoning'] = ai_reasoning_status
+        claim_data['AI_reasoning'] = ai_reasoning        
         claim_data['summary'] = summary
         container_client.upsert_item(claim_data)
         container_client = database.get_container_client("document")

@@ -46,7 +46,10 @@ Based on the previous steps, you are to make the final recommendation for the cl
     - YOU WILL ONLY GIVE ANSWER : Approved/Rejected/Pending
 
 3) **Recommendation Reasoning:**
-   - Provide a clear and concise reason for the decision, based on the findings from steps 1-4.
+   - Provide a clear and concise reason for the decision, based on the findings from steps several agent oppion.
+   agent_administrative_validation : {result_administrative_validation}
+    agent_treatment_cost_validation : {result_treatment_cost_validation}
+    agent_diagnosis_validation : {result_diagnosis_validation}
 
 4) **Data Update:**
    - Update the claim records with the final decision, reasoning, and any other relevant information for further processing.

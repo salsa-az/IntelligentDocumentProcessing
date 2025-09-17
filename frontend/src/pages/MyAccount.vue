@@ -30,7 +30,7 @@
                     <div class="inline-flex mb-4">
                       <img class="w-20 h-20 rounded-full" src="../images/user-avatar-32.png" width="80" height="80" alt="User" />
                     </div>
-                    <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">Budi Santoso</h2>
+                    <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">Feri Hussen</h2>
                     <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">Pemegang Polis Platinum</div>
                     <button class="btn-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-300">
                       <svg class="w-4 h-4 fill-current opacity-50 shrink-0" viewBox="0 0 16 16">
@@ -170,12 +170,12 @@ export default {
     const sidebarOpen = ref(false)
     
     const form = ref({
-      fullName: 'Budi Santoso',
-      email: 'budi.santoso@email.com',
+      fullName: 'Feri Hussen',
+      email: 'feri.hussen@xyz.com',
       phone: '+62 812-3456-7890',
-      birthDate: '1985-06-15',
+      birthDate: '1985-04-12',
       address: 'Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10220',
-      policyNumber: 'POL-001-2024',
+      policyNumber: 'P001',
       policyType: 'Asuransi Kesehatan Platinum',
       emergencyName: 'Siti Santoso',
       emergencyPhone: '+62 812-9876-5432',

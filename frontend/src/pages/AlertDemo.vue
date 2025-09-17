@@ -108,7 +108,7 @@
 import { ref } from 'vue'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
-import Banner from '../partials/AIAssistant.vue'
+import Banner from '../partials/Chatbot.vue'
 import { useAlert } from '../composables/useAlert.js'
 
 export default {

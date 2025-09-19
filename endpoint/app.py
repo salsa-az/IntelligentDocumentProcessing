@@ -226,10 +226,28 @@ def chatbot_api():
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
-        agent = Agent_Insurance()
-        response = agent.run(user_message)
-        
-        return jsonify({'response': response})
+        try:
+            response = Agent_Insurance.run({'input': user_message})
+            
+            # Extract action_input from JSON response if present
+            try:
+                import json
+                if '"action_input":' in response:
+                    # Find the action_input value
+                    start = response.find('"action_input": "') + len('"action_input": "')
+                    end = response.find('"', start)
+                    while response[end-1] == '\\':
+                        end = response.find('"', end + 1)
+                    clean_response = response[start:end].replace('\\"', '"')
+                    return jsonify({'response': clean_response})
+            except:
+                pass
+                
+            return jsonify({'response': response})
+        except Exception as agent_error:
+            print(f"Agent error: {agent_error}")
+            return jsonify({'response': 'Maaf, chatbot sedang mengalami gangguan. Silakan coba lagi nanti.'})
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

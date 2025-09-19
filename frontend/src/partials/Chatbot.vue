@@ -79,7 +79,7 @@
             class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:bg-gray-700 dark:text-white"
           >
           <button 
-            @click="sendMessage"
+            @click="sendMessage()"
             :disabled="!newMessage.trim()"
             class="px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -166,23 +166,28 @@ export default {
       isTyping.value = true
 
       try {
-        // Call external chatbot API if available
-        if (window.chatbotAPI) {
-          const response = await window.chatbotAPI.sendMessage(message)
-          isTyping.value = false
+        // Call backend chatbot API
+        const response = await fetch('http://localhost:5000/api/chatbot', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message })
+        })
+        
+        const result = await response.json()
+        isTyping.value = false
+        
+        if (response.ok) {
           messages.value.push({
             id: Date.now() + 1,
-            text: response,
+            text: result.response,
             isUser: false
           })
         } else {
-          // Fallback to local responses
-          await new Promise(resolve => setTimeout(resolve, 1500))
-          isTyping.value = false
-          const response = getAIResponse(message)
           messages.value.push({
             id: Date.now() + 1,
-            text: response,
+            text: 'Maaf, terjadi kesalahan. Silakan coba lagi.',
             isUser: false
           })
         }

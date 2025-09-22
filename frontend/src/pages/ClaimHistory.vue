@@ -175,8 +175,6 @@
         </div>
       </main>
 
-      <Banner />
-
       <!-- Document Download Modal -->
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/50" @click="closeModal"></div>

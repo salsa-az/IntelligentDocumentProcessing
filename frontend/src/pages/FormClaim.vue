@@ -165,6 +165,31 @@
                       </div>
                       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload surat form yang telah diisi dokter (PDF, JPG, PNG)</p>
                     </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-1" for="labResults">
+                        Hasil Pemeriksaan Laboratorium
+                        <span class="text-red-500">{{ !isEditing ? '*' : '' }}</span>
+                      </label>
+                      <div class="flex items-center gap-4">
+                        <input id="doctorForm" type="file" @change="handleFileUpload($event, 'doctorForm')" accept=".pdf,.jpg,.jpeg,.png" :required="!isEditing" class="form-input flex-1">
+                        <button v-if="isEditing && getExistingDocument('form')" type="button" @click="viewDocument(getExistingDocument('form'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
+                          Unduh
+                        </button>
+                      </div>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload hasil pemeriksaan laboratorium (PDF, JPG, PNG)</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-1" for="doctorForm">
+                        Dokumen Pendukung Lainnya 
+                      </label>
+                      <div class="flex items-center gap-4">
+                        <input id="doctorForm" type="file" @change="handleFileUpload($event, 'doctorForm')" accept=".pdf,.jpg,.jpeg,.png" class="form-input flex-1">
+                        <button v-if="isEditing && getExistingDocument('form')" type="button" @click="viewDocument(getExistingDocument('form'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
+                          Unduh
+                        </button>
+                      </div>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload dokumen pendukung lainnya (PDF, JPG, PNG) - Opsional</p>
+                    </div>
                   </div>
                 </div>
 
@@ -196,7 +221,6 @@
         </div>
       </main>
 
-      <Banner />
     </div>
   </div>
 </template>

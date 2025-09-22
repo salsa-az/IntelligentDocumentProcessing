@@ -22,6 +22,7 @@ from analyst_tools import cosmos_retrive_data
 from dotenv import load_dotenv
 from letterfunc import letter_chain_pro
 from chatbotClaimerOfficer import Agent_Insurance
+from doc_intel_for_registration import analize_doc as analize_doc_registration
 
 load_dotenv()
 

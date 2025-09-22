@@ -14,6 +14,21 @@
 
             <!-- Form -->
             <div class="rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+              <!-- Demo Credentials -->
+              <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Demo Credentials:</h3>
+                <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                  <div><strong>Customer:</strong> customer@example.com / password123</div>
+                  <div><strong>Approver:</strong> approver@example.com / password123</div>
+                  <div><strong>Customer 2:</strong> customer2@example.com / password123</div>
+                </div>
+              </div>
+
+              <!-- Error Message -->
+              <div v-if="errorMessage" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+                <p class="text-sm text-red-700 dark:text-red-300">{{ errorMessage }}</p>
+              </div>
+
               <form @submit.prevent="handleSignin">
                 <div class="space-y-4">
                   <div>
@@ -35,7 +50,9 @@
                   <router-link class="text-sm underline hover:no-underline" to="/reset-password">Lupa Password?</router-link>
                 </div>
                 <div class="flex flex-wrap items-center justify-between mt-6">
-                  <button class="btn bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white ml-3 w-full shadow-lg hover:shadow-xl transition-all duration-200">Sign In</button>
+                  <button :disabled="loading" class="btn bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white ml-3 w-full shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50">
+                    {{ loading ? 'Signing In...' : 'Sign In' }}
+                  </button>
                 </div>
               </form>
             </div>
@@ -53,6 +70,8 @@
 </template>
 
 <script>
+import { authenticateUser } from '../utils/dummyUsers.js'
+
 export default {
   name: 'Signin',
   data() {
@@ -60,14 +79,56 @@ export default {
       form: {
         email: '',
         password: ''
-      }
+      },
+      loading: false,
+      errorMessage: ''
     }
   },
   methods: {
-    handleSignin() {
-      // Handle sign in logic
-      console.log('Sign in:', this.form)
-      this.$router.push('/dashboard')
+    async handleSignin() {
+      this.loading = true
+      this.errorMessage = ''
+      
+      try {
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        const user = authenticateUser(this.form.email, this.form.password)
+        
+        if (user) {
+          // Store user in localStorage
+          localStorage.setItem('user', JSON.stringify(user))
+          
+          // Redirect based on role
+          if (user.role === 'customer') {
+            this.$router.push('/customer-dashboard')
+          } else if (user.role === 'approver') {
+            this.$router.push('/claim-approval')
+          } else {
+            this.$router.push('/dashboard')
+          }
+        } else {
+          this.errorMessage = 'Email atau password salah. Silakan coba lagi.'
+        }
+      } catch (error) {
+        this.errorMessage = 'Terjadi kesalahan. Silakan coba lagi.'
+        console.error('Sign in error:', error)
+      } finally {
+        this.loading = false
+      }
+    }
+  },
+  mounted() {
+    // Check if user is already logged in
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (user.id) {
+      if (user.role === 'customer') {
+        this.$router.push('/customer-dashboard')
+      } else if (user.role === 'approver') {
+        this.$router.push('/claim-approval')
+      } else {
+        this.$router.push('/dashboard')
+      }
     }
   }
 }

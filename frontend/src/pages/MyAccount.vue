@@ -28,10 +28,10 @@
                 <div class="col-span-12 xl:col-span-4">
                   <div class="text-center">
                     <div class="inline-flex mb-4">
-                      <img class="w-20 h-20 rounded-full" src="../images/user-avatar-32.png" width="80" height="80" alt="User" />
+                      <img class="w-20 h-20 rounded-full" :src="currentUser?.avatar || '../images/user-avatar-32.png'" width="80" height="80" alt="User" />
                     </div>
-                    <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">Feri Hussen</h2>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">Pemegang Polis Platinum</div>
+                    <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">{{ currentUser?.fullName || 'User' }}</h2>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ currentUser?.policyType || 'Pemegang Polis' }}</div>
                     <button class="btn-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-300">
                       <svg class="w-4 h-4 fill-current opacity-50 shrink-0" viewBox="0 0 16 16">
                         <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" />
@@ -97,8 +97,8 @@
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
-                        <label class="block text-sm font-medium mb-1" for="policyNumber">Nomor Peserta</label>
-                        <input id="policyNumber" v-model="form.policyNumber" class="form-input w-full" type="text" />
+                        <label class="block text-sm font-medium mb-1" for="participantNumber">Nomor Peserta</label>
+                        <input id="participantNumber" v-model="form.participantNumber" class="form-input w-full" type="text" />
                       </div>
 
                       <!-- Emergency Contact -->
@@ -162,7 +162,8 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useAuth } from '../composables/useAuth.js'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
 
@@ -174,20 +175,43 @@ export default {
   },
   setup() {
     const sidebarOpen = ref(false)
+    const { currentUser, updateUser } = useAuth()
     
     const form = ref({
-      fullName: 'Feri Hussen',
-      email: 'feri.hussen@xyz.com',
-      phone: '+62 812-3456-7890',
-      birthDate: '1985-04-12',
-      address: 'Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10220',
-      policyNumber: 'P001',
-      insuranceComp: 'PT XYZ Asuransi',
-      policyType: 'Asuransi Kesehatan Platinum',
-      emergencyName: 'Siti Santoso',
-      emergencyPhone: '+62 812-9876-5432',
+      fullName: '',
+      email: '',
+      phone: '',
+      birthDate: '',
+      address: '',
+      policyNumber: '',
+      participantNumber: '',
+      insuranceComp: '',
+      policyType: '',
+      emergencyName: '',
+      emergencyPhone: '',
       currentPassword: '',
       newPassword: ''
+    })
+
+    // Initialize form with user data
+    onMounted(() => {
+      if (currentUser.value) {
+        form.value = {
+          fullName: currentUser.value.fullName || '',
+          email: currentUser.value.email || '',
+          phone: currentUser.value.phone || '',
+          birthDate: currentUser.value.birthDate || '',
+          address: currentUser.value.address || '',
+          policyNumber: currentUser.value.policyNumber || '',
+          participantNumber: currentUser.value.participantNumber || '',
+          insuranceComp: currentUser.value.insuranceComp || '',
+          policyType: currentUser.value.policyType || '',
+          emergencyName: currentUser.value.emergencyName || '',
+          emergencyPhone: currentUser.value.emergencyPhone || '',
+          currentPassword: '',
+          newPassword: ''
+        }
+      }
     })
 
     const updateAccount = () => {
@@ -196,15 +220,33 @@ export default {
         return
       }
       
-      console.log('Updating account:', form.value)
+      // Update user data (excluding passwords for demo)
+      const updateData = {
+        fullName: form.value.fullName,
+        email: form.value.email,
+        phone: form.value.phone,
+        birthDate: form.value.birthDate,
+        address: form.value.address,
+        policyNumber: form.value.policyNumber,
+        participantNumber: form.value.participantNumber,
+        insuranceComp: form.value.insuranceComp,
+        policyType: form.value.policyType,
+        emergencyName: form.value.emergencyName,
+        emergencyPhone: form.value.emergencyPhone
+      }
+      
+      updateUser(updateData)
+      console.log('Updating account:', updateData)
       alert('Akun berhasil diperbarui!')
       
+      // Clear password fields
       form.value.currentPassword = ''
       form.value.newPassword = ''
     }
 
     return {
       sidebarOpen,
+      currentUser,
       form,
       updateAccount
     }

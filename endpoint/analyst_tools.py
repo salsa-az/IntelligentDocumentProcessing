@@ -31,6 +31,21 @@ def cosmos_retrive_data(query: str, container: str, parameters: list = None) -> 
        print(f"Error querying Cosmos DB: {e}")
        return []
 
+@tool("cosmos_select")
+def cosmos_select_tool(query: str, container: str, parameters: list = None) -> List[Dict[str, Any]]:
+    """Run a Cosmos DB select query. please remember that this is comos db not sql also call the get_DB_details before call this tools"""
+    try:
+        container_client = database.get_container_client(container)
+        items = list(container_client.query_items(
+            query=query,
+            enable_cross_partition_query=True,
+            parameters=parameters
+        ))
+        print(f"Query executed successfully. Retrieved {len(items)} items.")
+        return items
+    except Exception as e:
+       print(f"Error querying Cosmos DB: {e}")
+       return []
 
 @tool("get_DB_details")
 def get_db_details() -> str:
@@ -38,14 +53,16 @@ def get_db_details() -> str:
     details = f"""
     here is the format of the Cosmos DB: 
     {'-'*5} item in database {'-'*5}
-    container :
-    1. "document" : container where all the document's detail is stored
+    container : 
+    1. container name =  "document" 
+     container where all the document's detail is stored
     PK: "doc_id" : unique identifier for each document
     FK: "claim_id"
     Attributes:
         "doc_type" : determine the type of document ( invoice, Doctor form)
         "document_content" : the actual content of the document (contain of extracted document from pdf)
-    2. "claim" : 
+    2. container name = "claim" not "claims"
+    where all the claim data is store 
     PK: "claim_id" : unique identifier for each claim
     FKs:
         "customer_id"
@@ -62,7 +79,7 @@ def get_db_details() -> str:
         "AI_suggestion" : the suggestion by system for the claim by AI Agent
         "AI_reasoning" : the reasoning behind the system's suggestion by AI Agent
 
-    3. "customer"
+    3. container name =  "customer"
     PK: "customer_id" : unique identifier for each customer
     FK: "policy_id"
     Attributes:
@@ -80,7 +97,7 @@ def get_db_details() -> str:
         "income" : the income
         "claim_history" : the history of claims made by the customer 
 
-    4. "policy"
+    4. container name =  "policy"
     PK: "policy_id" : unique identifier for each policy
     FK: "user_id"
     Attributes:
@@ -92,7 +109,7 @@ def get_db_details() -> str:
         "insurance_plan_type" : the type of insurance plan
         "total_claim_limit" : the total claim limit for the policy
 
-    5. "Insurance Administrator"
+    5. container name = "Insurance Administrator"
     PK: "admin_id" : unique identifier for each insurance administrator
     Attributes:
         "username" : the username of the insurance administrator
@@ -104,6 +121,7 @@ def get_db_details() -> str:
     Claim → Insurance Administrator: Many-to-One (admin_id)
     Customer → Policy: Many-to-One (policy_id)
     Policy → Customer: One-to-Many (reverse relation)
+    STAY CONSISTENT WITH ALL NAME FROM COLUMN TO CONTAINER NAME
     """
     return details
 
@@ -171,30 +189,20 @@ def get_disease_info(search_key : str):
         return "there is no information"
 
 @tool('update_claim_and_document')
-def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reasoning_status: str, summary: str, invoice_doc_id : str, invoice_doc_contents : dict, doctor_form_doc_id : str, doctor_form_doc_contents : dict) -> str:
-    """Update existing claim with AI suggestion status(only Approved/Rejected/Pending), AI Reasoning status, Summary and invoice document data's doc_id and doc_contents, also doctor Form document data's doc_id and doc_contents"""
-    try:
-        """container_client = database.get_container_client("claim")
+def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reasoning: str, summary: str) -> str:
+    """Update existing claim with AI suggestion status(only Approved/Rejected/Pending), AI Reasoning (reasoning for ai suggestion status), and Summary """
+    try : 
+        container_client = database.get_container_client("claim")
         claim_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.claim_id= @idParam", "claim", parameters=[{
             "name" : "@idParam",
             "value" : claim_id
         }] )
         claim_data =  claim_data[0]
         claim_data['AI_suggestion'] = ai_suggestion_status
-        claim_data['AI_reasoning'] = ai_reasoning_status
+        claim_data['AI_reasoning'] = ai_reasoning
         claim_data['summary'] = summary
         container_client.upsert_item(claim_data)
-        container_client = database.get_container_client("document")
-        doc_ids = [invoice_doc_id, doctor_form_doc_id] 
-        doc_contents = [invoice_doc_contents, doctor_form_doc_contents]
-        for i in range(2):
-            doc_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.doc_id=@idParam", "document",parameters=[{
-                "name" : "@idParam",
-                "value" : doc_ids[i]
-            }])
-            doc_data = doc_data[0]
-            doc_data['doc_content'] = doc_contents[i]
-            container_client.upsert_item(doc_data)"""
+        
         print(f'Successfully updated claim {claim_id} with AI decision')
         return "done"
     except Exception as e:

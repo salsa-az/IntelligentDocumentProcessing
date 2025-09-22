@@ -29,7 +29,8 @@ const router = createRouter({
     },
     {
       path: '/reset-password',
-      component: ResetPassword
+      component: ResetPassword,
+      meta: { requiresAuth: true }
     },
     {
       path: '/dashboard',
@@ -37,30 +38,47 @@ const router = createRouter({
     },
     {
       path: '/customer-dashboard',
-      component: CustomerDashboard
+      component: CustomerDashboard,
+      meta: { requiresAuth: true, role: 'customer' } 
     },
     {
       path: '/claim-form',
       name: 'FormClaim',
-      component: FormClaim
+      component: FormClaim,
+      meta: { requiresAuth: true, role: 'customer' } 
     },
     {
       path: '/claim-history',
-      component: ClaimHistory
+      component: ClaimHistory,
+      meta: { requiresAuth: true, role: 'customer' }
     },
     {
       path: '/my-account',
-      component: MyAccount
+      component: MyAccount,
+      meta: { requiresAuth: true }
     },
     {
       path: '/claim-approval',
-      component: ClaimApproval
+      component: ClaimApproval,
+      meta: { requiresAuth: true, role: 'approver' }
     },
     {
       path: '/alert-demo',
       component: AlertDemo
     },
   ]
+})
+
+router.beforeEach((to, from, next) => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  
+  if (to.meta.requiresAuth && !user.id) {
+    next('/signin')
+  } else if (to.meta.role && user.role !== to.meta.role) {
+    next(user.role === 'approver' ? '/claim-approval' : '/customer-dashboard')
+  } else {
+    next()
+  }
 })
 
 export default router

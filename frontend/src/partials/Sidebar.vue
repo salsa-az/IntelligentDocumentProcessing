@@ -43,8 +43,9 @@
             <span class="lg:hidden lg:sidebar-expanded:block 2xl:block">Pages</span>
           </h3>
           <ul class="mt-3">
-            <!-- Dashboard -->
-            <router-link to="/dashboard" custom v-slot="{ href, navigate, isExactActive }">
+            
+            <!-- Customer Dashboard - Only for customers -->
+            <router-link v-if="isCustomer" to="/customer-dashboard" custom v-slot="{ href, navigate, isExactActive }">
               <li class="pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
                 <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="isExactActive ? '' : 'hover:text-gray-900 dark:hover:text-white'" :href="href" @click="navigate">
                   <div class="flex items-center">
@@ -57,23 +58,9 @@
                 </a>
               </li>
             </router-link>
-            <!-- Customer Dashboard -->
-            <router-link to="/customer-dashboard" custom v-slot="{ href, navigate, isExactActive }">
-              <li class="pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
-                <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="isExactActive ? '' : 'hover:text-gray-900 dark:hover:text-white'" :href="href" @click="navigate">
-                  <div class="flex items-center">
-                    <svg class="shrink-0 fill-current" :class="isExactActive ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
-                      <path d="M5.936.278A7.983 7.983 0 0 1 8 0a8 8 0 1 1-8 8c0-.722.104-1.413.278-2.064a1 1 0 1 1 1.932.516A5.99 5.99 0 0 0 2 8a6 6 0 1 0 6-6c-.53 0-1.045.076-1.548.21A1 1 0 1 1 5.936.278Z" />
-                      <path d="M6.068 7.482A2.003 2.003 0 0 0 8 10a2 2 0 1 0-.518-3.932L3.707 2.293a1 1 0 0 0-1.414 1.414l3.775 3.775Z" />
-                    </svg>
-                    <span class="text-sm font-medium ml-4 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Customer Dashboard</span>
-                  </div>
-                </a>
-              </li>
-            </router-link>
-            
-            <!-- Claims -->
-            <SidebarLinkGroup v-slot="parentLink">
+
+            <!-- Claims Section - Only for customers -->
+            <SidebarLinkGroup v-if="isCustomer" v-slot="parentLink">
               <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="parentLink.expanded ? '' : 'hover:text-gray-900 dark:hover:text-white'" href="#0" @click.prevent="parentLink.handleClick(); sidebarExpanded = true">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
@@ -110,12 +97,12 @@
               </div>
             </SidebarLinkGroup>
             
-            <!-- Submitted Claim -->
-            <router-link to="/claim-approval" custom v-slot="{ href, navigate, isExactActive }">
+            <!-- Claims Approval - Only for approvers -->
+            <router-link v-if="isApprover" to="/claim-approval" custom v-slot="{ href, navigate, isExactActive }">
               <li class="pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
                 <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="isExactActive ? '' : 'hover:text-gray-900 dark:hover:text-white'" :href="href" @click="navigate">
                   <div class="flex items-center">
-                    <svg class="shrink-0 fill-current text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                    <svg class="shrink-0 fill-current" :class="isExactActive ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
                       <path d="M14.5 2h-13C.7 2 0 2.7 0 3.5v9c0 .8.7 1.5 1.5 1.5h13c.8 0 1.5-.7 1.5-1.5v-9c0-.8-.7-1.5-1.5-1.5zM2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h10v1H2v-1z" />
                     </svg>
                     <span class="text-sm font-medium ml-4 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Claims Approval</span>
@@ -123,9 +110,9 @@
                 </a>
               </li>
             </router-link>
-            
-            <!-- My Account -->
-            <router-link to="/my-account" custom v-slot="{ href, navigate, isExactActive }">
+
+            <!-- My Account - Available for all authenticated users -->
+            <router-link v-if="isAuthenticated" to="/my-account" custom v-slot="{ href, navigate, isExactActive }">
               <li class="pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
                 <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="isExactActive ? '' : 'hover:text-gray-900 dark:hover:text-white'" :href="href" @click="navigate">
                   <div class="flex items-center">
@@ -137,11 +124,25 @@
                 </a>
               </li>
             </router-link>
+
+            <!-- Alert Demo - For testing (can be removed) -->
+            <!-- <router-link to="/alert-demo" custom v-slot="{ href, navigate, isExactActive }">
+              <li class="pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
+                <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="isExactActive ? '' : 'hover:text-gray-900 dark:hover:text-white'" :href="href" @click="navigate">
+                  <div class="flex items-center">
+                    <svg class="shrink-0 fill-current" :class="isExactActive ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                      <path d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 12c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1zm1-3H7V4h2v5z" />
+                    </svg>
+                    <span class="text-sm font-medium ml-4 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Alert Demo</span>
+                  </div>
+                </a>
+              </li>
+            </router-link> -->
           </ul>
         </div>
         
-        <!-- Authentication group -->
-        <div>
+        <!-- Authentication group - Only show when not authenticated -->
+        <div v-if="!isAuthenticated">
           <h3 class="text-xs uppercase text-gray-400 dark:text-gray-500 font-semibold pl-3">
             <span class="hidden lg:block lg:sidebar-expanded:hidden 2xl:hidden text-center w-6" aria-hidden="true">•••</span>
             <span class="lg:hidden lg:sidebar-expanded:block 2xl:block">Authentication</span>
@@ -212,9 +213,9 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-
+import { useAuth } from '../composables/useAuth.js'
 import SidebarLinkGroup from './SidebarLinkGroup.vue'
 
 export default {
@@ -230,11 +231,21 @@ export default {
 
     const trigger = ref(null)
     const sidebar = ref(null)
+    const { currentUser, isAuthenticated } = useAuth()
 
     const storedSidebarExpanded = localStorage.getItem('sidebar-expanded')
     const sidebarExpanded = ref(storedSidebarExpanded === null ? false : storedSidebarExpanded === 'true')
 
     const currentRoute = useRouter().currentRoute.value
+
+    // Computed properties for role-based navigation
+    const isCustomer = computed(() => {
+      return isAuthenticated.value && currentUser.value?.role === 'customer'
+    })
+
+    const isApprover = computed(() => {
+      return isAuthenticated.value && currentUser.value?.role === 'approver'
+    })
 
     // close on click outside
     const clickHandler = ({ target }) => {
@@ -276,7 +287,11 @@ export default {
       trigger,
       sidebar,
       sidebarExpanded,
-      currentRoute
+      currentRoute,
+      currentUser,
+      isAuthenticated,
+      isCustomer,
+      isApprover
     }
   },
 }

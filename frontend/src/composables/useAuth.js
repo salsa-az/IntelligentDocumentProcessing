@@ -1,0 +1,75 @@
+import { ref, computed } from 'vue'
+import { getUserById } from '../utils/dummyUsers.js'
+
+// Global reactive state
+const currentUser = ref(null)
+
+export const useAuth = () => {
+  // Initialize user from localStorage
+  const initializeUser = () => {
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      try {
+        currentUser.value = JSON.parse(storedUser)
+      } catch (error) {
+        console.error('Error parsing stored user:', error)
+        localStorage.removeItem('user')
+      }
+    }
+  }
+
+  // Login user
+  const login = (user) => {
+    currentUser.value = user
+    localStorage.setItem('user', JSON.stringify(user))
+  }
+
+  // Logout user
+  const logout = () => {
+    currentUser.value = null
+    localStorage.removeItem('user')
+  }
+
+  // Update user data
+  const updateUser = (userData) => {
+    if (currentUser.value) {
+      currentUser.value = { ...currentUser.value, ...userData }
+      localStorage.setItem('user', JSON.stringify(currentUser.value))
+    }
+  }
+
+  // Refresh user data from storage
+  const refreshUser = () => {
+    if (currentUser.value?.id) {
+      const updatedUser = getUserById(currentUser.value.id)
+      if (updatedUser) {
+        currentUser.value = updatedUser
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+      }
+    }
+  }
+
+  // Computed properties
+  const isAuthenticated = computed(() => !!currentUser.value?.id)
+  const userRole = computed(() => currentUser.value?.role || null)
+  const isCustomer = computed(() => userRole.value === 'customer')
+  const isApprover = computed(() => userRole.value === 'approver')
+
+  // Initialize on first use
+  if (!currentUser.value) {
+    initializeUser()
+  }
+
+  return {
+    currentUser: computed(() => currentUser.value),
+    isAuthenticated,
+    userRole,
+    isCustomer,
+    isApprover,
+    login,
+    logout,
+    updateUser,
+    refreshUser,
+    initializeUser
+  }
+}

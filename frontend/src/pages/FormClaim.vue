@@ -166,25 +166,24 @@
                       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload surat form yang telah diisi dokter (PDF, JPG, PNG)</p>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium mb-1" for="labResults">
-                        Hasil Pemeriksaan Laboratorium
-                        <span class="text-red-500">{{ !isEditing ? '*' : '' }}</span>
+                      <label class="block text-sm font-medium mb-1" for="reportLab">
+                        Hasil Pemeriksaan Laboratorium (Opsional)
                       </label>
                       <div class="flex items-center gap-4">
-                        <input id="doctorForm" type="file" @change="handleFileUpload($event, 'doctorForm')" accept=".pdf,.jpg,.jpeg,.png" :required="!isEditing" class="form-input flex-1">
-                        <button v-if="isEditing && getExistingDocument('form')" type="button" @click="viewDocument(getExistingDocument('form'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
+                        <input id="reportLab" type="file" @change="handleFileUpload($event, 'reportLab')" accept=".pdf,.jpg,.jpeg,.png" class="form-input flex-1">
+                        <button v-if="isEditing && getExistingDocument('reportLab')" type="button" @click="viewDocument(getExistingDocument('reportLab'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
                           Unduh
                         </button>
                       </div>
                       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload hasil pemeriksaan laboratorium (PDF, JPG, PNG)</p>
                     </div>
                     <div>
-                      <label class="block text-sm font-medium mb-1" for="doctorForm">
-                        Dokumen Pendukung Lainnya 
+                      <label class="block text-sm font-medium mb-1" for="additionalDoc">
+                        Dokumen Pendukung Lainnya (Opsional)
                       </label>
                       <div class="flex items-center gap-4">
-                        <input id="doctorForm" type="file" @change="handleFileUpload($event, 'doctorForm')" accept=".pdf,.jpg,.jpeg,.png" class="form-input flex-1">
-                        <button v-if="isEditing && getExistingDocument('form')" type="button" @click="viewDocument(getExistingDocument('form'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
+                        <input id="additionalDoc" type="file" @change="handleFileUpload($event, 'additionalDoc')" accept=".pdf,.jpg,.jpeg,.png" class="form-input flex-1">
+                        <button v-if="isEditing && getExistingDocument('additionalDoc')" type="button" @click="viewDocument(getExistingDocument('additionalDoc'))" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
                           Unduh
                         </button>
                       </div>
@@ -425,6 +424,12 @@ export default {
         }
         if (form.value.doctorForm) {
           formData.append('doctorForm', form.value.doctorForm)
+        }
+        if (form.value.reportLab) {
+          formData.append('reportLab', form.value.reportLab)
+        }
+        if (form.value.additionalDoc) {
+          formData.append('additionalDoc', form.value.additionalDoc)
         }
         
         const endpoint = isEditing.value ? 'http://localhost:5000/api/update-claim' : 'http://localhost:5000/api/submit-claim'

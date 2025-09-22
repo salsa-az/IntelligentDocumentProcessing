@@ -97,9 +97,6 @@
                           </svg>
                           <span class="max-xs:sr-only">Review Claim</span>
                       </button>
-                      <!-- <button @click="openClaimDetail(claim)" class="btn bg-violet-500 hover:bg-blue-700 text-white">
-                        Review Claim
-                      </button> -->
                     </div>
                   </div>
                 </div>
@@ -152,85 +149,208 @@ export default {
     const claims = ref([])
     const showDetailModal = ref(false)
     const selectedClaim = ref(null)
+    const loading = ref(false)
 
-    // Mock data for approver review
-    const mockClaims = [
-      {
-        id: 1,
-        claimNumber: 'CLM-2024-001',
-        patientName: 'Feri Hussen',
-        policyNumber: 'POL-001-2024',
-        hospitalName: 'RS Siloam Kebon Jeruk',
-        type: 'rawat-inap',
-        amount: 7720000,
-        checkIn: '2024-01-15',
-        checkOut: '2024-01-18',
-        status: 'proses',
-        submittedDate: '2024-01-19T10:30:00',
-        documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '1.8 MB' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '2.4 MB' }
-        ],
-        aiAnalysis: {
-          recommendation: 'APPROVE - All documents are complete and valid. Diagnosis matches treatment and costs are reasonable.',
-          confidence: 92,
-          riskScore: 2,
-          details: [
-            { category: 'Approval Validation', finding: 'All required fields present and complete' },
-            { category: 'Diagnosis Validation', finding: 'Hypertension (ICD X: I10) correctly coded and consistent' },
-            { category: 'Treatment Validation', finding: 'Treatments appropriate for diagnosis' },
-            { category: 'Cost Analysis', finding: 'Invoice total (7,720,000 IDR) reasonable for treatment type' }
-          ]
+    // Get current admin user
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+
+    const fetchAllClaims = async () => {
+      loading.value = true
+      try {
+        const response = await fetch('http://localhost:5000/api/claims/all-detailed')
+        const result = await response.json()
+        
+        if (result.status === 'success') {
+          // Transform Cosmos DB data to match frontend format
+          claims.value = result.claims.map(claim => ({
+            id: claim.claim_id,
+            claimNumber: claim.claim_id,
+            patientName: claim.customer_details?.name || claim.name || 'Unknown Patient',
+            policyNumber: claim.policy_id,
+            hospitalName: claim.insurance_company || 'Hospital Name',
+            type: mapClaimType(claim.claim_type),
+            amount: claim.claim_amount,
+            checkIn: extractDate(claim.claim_date),
+            checkOut: extractDate(claim.claim_date, 1),
+            status: mapStatus(claim.claim_status),
+            submittedDate: claim.claim_date,
+            documents: transformDocuments(claim.document_details || []),
+            aiAnalysis: {
+              recommendation: claim.AI_suggestion || 'Pending Analysis',
+              reasoning: claim.AI_reasoning || 'Analysis in progress...',
+              details: [
+                { 
+                  category: 'Administrative Validation', 
+                  finding: 'Documents uploaded and processed' 
+                },
+                { 
+                  category: 'AI Analysis', 
+                  finding: claim.AI_reasoning || 'In progress' 
+                }
+              ]
+            },
+            customer_id: claim.customer_id,
+            rawData: claim
+          }))
         }
-      },
-      {
-        id: 2,
-        claimNumber: 'CLM-2024-002',
-        patientName: 'Siti Rahayu',
-        policyNumber: 'POL-002-2024',
-        hospitalName: 'RSUD Fatmawati',
-        type: 'rawat-jalan',
-        amount: 3500000,
-        checkIn: '2024-02-01',
-        checkOut: '2024-02-01',
-        status: 'proses',
-        submittedDate: '2024-02-03T16:20:00',
-        documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '890 KB' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.2 MB' }
-        ],
-        aiAnalysis: {
-          recommendation: 'REVIEW REQUIRED - Missing some documentation, costs seem high for outpatient treatment.',
-          confidence: 67,
-          riskScore: 6,
-          details: [
-            { category: 'Approval Validation', finding: 'Some required fields missing in documentation' },
-            { category: 'Cost Analysis', finding: 'Costs appear elevated for outpatient treatment type' },
-            { category: 'Treatment Validation', finding: 'Treatment plan needs verification' }
-          ]
+      } catch (error) {
+        console.error('Error fetching claims:', error)
+        // Fallback to mock data
+        claims.value = getMockClaimsForApprover()
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const mapClaimType = (claimType) => {
+      const typeMap = {
+        'Medical Claim': 'rawat-inap',
+        'Outpatient': 'rawat-jalan',
+        'Emergency': 'penyakit-kritis',
+        'Dental': 'gigi',
+        'Maternity': 'kehamilan-melahirkan'
+      }
+      return typeMap[claimType] || 'lainnya'
+    }
+
+    const mapStatus = (status) => {
+      const statusMap = {
+        'Prosses': 'proses',
+        'Proses' : 'proses',
+        'Pending': 'pengajuan',
+        'Approved': 'approved',
+        'Rejected': 'rejected'
+      }
+      return statusMap[status] || 'pengajuan'
+    }
+
+    const extractDate = (dateString, addDays = 0) => {
+      try {
+        const date = new Date(dateString)
+        if (addDays) {
+          date.setDate(date.getDate() + addDays)
         }
-      },
-    //   {
-    //     id: 4,
-    //     claimNumber: 'CLM-2024-004',
-    //     hospitalName: 'RS Mayapada',
-    //     type: 'kehamilan-melahirkan',
-    //     amount: 12000000,
-    //     checkIn: '2024-02-15',
-    //     checkOut: '2024-02-17',
-    //     status: 'pengajuan',
-    //     submittedDate: '2024-02-18T14:45:00',
-    //     progress: [
-    //       { title: 'Pengajuan', status: 'active', date: '2024-02-18T14:45:00', notes: 'Menunggu kelengkapan dokumen tambahan' },
-    //       { title: 'Proses', status: 'pending', date: null, notes: null },
-    //       { title: 'Keputusan', status: 'pending', date: null, notes: null }
-    //     ],
-    //     documents: [
-    //       { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '2.2 MB', type: 'PDF', url: '/documents/invoice-4.pdf' },
-    //       { id: 2, name: 'Form Medis Dokter.pdf', size: '3.1 MB', type: 'PDF', url: '/documents/medical-form-4.pdf' }
-    //     ]
-    //   }
-    ]
+        return date.toISOString().split('T')[0]
+      } catch {
+        return new Date().toISOString().split('T')[0]
+      }
+    }
+
+    const transformDocuments = (documents) => {
+      return documents.map(doc => ({
+        id: doc.doc_id,
+        name: `${doc.doc_type === 'invoice' ? 'Invoice Rumah Sakit' : 'Form Medis Dokter'}.pdf`,
+        size: '1.2 MB',
+        type: 'PDF',
+        url: `/api/documents/${doc.doc_id}`,
+        doc_type: doc.doc_type
+      }))
+    }
+
+    const getMockClaimsForApprover = () => {
+      // Mock data for testing when Cosmos DB is unavailable
+      return [
+        {
+          id: 'C1',
+          claimNumber: 'TEST',
+          patientName: 'Test Patient',
+          policyNumber: 'P001',
+          hospitalName: 'Test Hospital',
+          type: 'rawat-inap',
+          amount: 5000000,
+          status: 'proses',
+          submittedDate: new Date().toISOString(),
+          aiAnalysis: {
+            recommendation: 'Under Review',
+            reasoning: 'Test data for approval system'
+          }
+        }
+      ]
+    }
+
+    const approveClaim = async (notes) => {
+      if (!notes.trim()) {
+        alert('Please add review notes before approving')
+        return
+      }
+      
+      try {
+        const response = await fetch(`http://localhost:5000/api/claims/${selectedClaim.value.id}/update-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: 'Approved',
+            admin_id: currentUser.id || 'ADMIN001',
+            notes: notes
+          })
+        })
+        
+        const result = await response.json()
+        
+        if (result.status === 'success') {
+          // Update local claim status
+          const claimIndex = claims.value.findIndex(c => c.id === selectedClaim.value.id)
+          if (claimIndex !== -1) {
+            claims.value[claimIndex].status = 'approved'
+          }
+          
+          alert('Claim has been approved successfully!')
+          closeDetailModal()
+          
+          // Refresh claims list
+          await fetchAllClaims()
+        } else {
+          alert(`Error: ${result.error}`)
+        }
+      } catch (error) {
+        console.error('Error approving claim:', error)
+        alert('Error approving claim. Please try again.')
+      }
+    }
+
+    const rejectClaim = async (notes) => {
+      if (!notes.trim()) {
+        alert('Please add review notes before rejecting')
+        return
+      }
+      
+      try {
+        const response = await fetch(`http://localhost:5000/api/claims/${selectedClaim.value.id}/update-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: 'Rejected',
+            admin_id: currentUser.id || 'ADMIN001',
+            notes: notes
+          })
+        })
+        
+        const result = await response.json()
+        
+        if (result.status === 'success') {
+          // Update local claim status
+          const claimIndex = claims.value.findIndex(c => c.id === selectedClaim.value.id)
+          if (claimIndex !== -1) {
+            claims.value[claimIndex].status = 'rejected'
+          }
+          
+          alert('Claim has been rejected.')
+          closeDetailModal()
+          
+          // Refresh claims list
+          await fetchAllClaims()
+        } else {
+          alert(`Error: ${result.error}`)
+        }
+      } catch (error) {
+        console.error('Error rejecting claim:', error)
+        alert('Error rejecting claim. Please try again.')
+      }
+    }
 
     const filteredClaims = computed(() => {
       let filtered = claims.value
@@ -353,55 +473,23 @@ export default {
       selectedClaim.value = null
     }
 
+    const handleClickOutside = (event) => {
+      if (showDetailModal.value && modalRef.value && !modalRef.value.contains(event.target)) {
+        closeDetailModal()
+      }
+    }
+
     const downloadDocument = (document) => {
       console.log('Viewing document:', document.name)
       alert(`Opening ${document.name} for review`)
     }
 
-    const approveClaim = (notes) => {
-      if (!notes.trim()) {
-        alert('Please add review notes before approving')
-        return
-      }
+   onMounted(() => {
+      fetchAllClaims()
       
-      const claimIndex = claims.value.findIndex(c => c.id === selectedClaim.value.id)
-      if (claimIndex !== -1) {
-        claims.value[claimIndex].status = 'approved'
-      }
-      
-      console.log('Claim approved:', {
-        claimId: selectedClaim.value.id,
-        notes: notes,
-        aiRecommendation: selectedClaim.value.aiAnalysis.recommendation
-      })
-      
-      alert('Claim has been approved successfully!')
-      closeDetailModal()
-    }
-
-    const rejectClaim = (notes) => {
-      if (!notes.trim()) {
-        alert('Please add review notes before rejecting')
-        return
-      }
-      
-      const claimIndex = claims.value.findIndex(c => c.id === selectedClaim.value.id)
-      if (claimIndex !== -1) {
-        claims.value[claimIndex].status = 'rejected'
-      }
-      
-      console.log('Claim rejected:', {
-        claimId: selectedClaim.value.id,
-        notes: notes,
-        aiRecommendation: selectedClaim.value.aiAnalysis.recommendation
-      })
-      
-      alert('Claim has been rejected.')
-      closeDetailModal()
-    }
-
-    onMounted(() => {
-      claims.value = mockClaims
+      // Set up auto-refresh every 30 seconds
+      setInterval(fetchAllClaims, 30000)
+      document.addEventListener('click', handleClickOutside)
     })
 
     return {

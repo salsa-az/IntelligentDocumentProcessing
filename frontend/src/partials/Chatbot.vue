@@ -116,7 +116,7 @@
 import { ref, nextTick } from 'vue'
 
 export default {
-  name: 'AIAssistant',
+  name: 'Chatbot',
   props: {
     claimDetailOpen: {
       type: Boolean,

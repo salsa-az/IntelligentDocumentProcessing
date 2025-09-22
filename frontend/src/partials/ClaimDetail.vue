@@ -152,11 +152,11 @@
             </svg>
             <div>
               <h5 class="font-medium text-blue-900 dark:text-blue-100 mb-2">AI Recommendation</h5>
-              <p class="text-sm text-blue-800 dark:text-blue-200 mb-3">{{ claim?.aiAnalysis?.recommendation }}</p>
-              <div class="text-xs text-blue-700 dark:text-blue-300">
+              <p class="text-sm text-blue-800 dark:text-blue-200 mb-1">{{ claim?.aiAnalysis?.recommendation }}</p>
+              <!-- <div class="text-xs text-blue-700 dark:text-blue-300">
                 <p><strong>Confidence:</strong> {{ claim?.aiAnalysis?.confidence }}%</p>
                 <p><strong>Risk Score:</strong> {{ claim?.aiAnalysis?.riskScore }}/10</p>
-              </div>
+              </div> -->
             </div>
           </div>
         </div>
@@ -164,14 +164,14 @@
         <div class="space-y-3 mb-6">
           <div v-for="detail in claim?.aiAnalysis?.details" :key="detail.category" class="border-l-4 border-gray-300 pl-3">
             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ detail.category }}</p>
-            <p class="text-xs text-gray-600 dark:text-gray-400">{{ detail.finding }}</p>
+            <p class="text-xs text-gray-600 dark:text-gray-400 text-justify">{{ detail.finding }}</p>
           </div>
         </div>
       </div>
 
       <!-- Admin Decision -->
       <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wide">Admin Decision</h4>
+        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wide">Approver Decision</h4>
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decision Notes</label>

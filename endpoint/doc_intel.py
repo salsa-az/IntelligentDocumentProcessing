@@ -224,8 +224,8 @@ def doctor_form_parser(result):
 def report_lab_parser(result) : 
     out = {}
     for idx, document in enumerate(result.documents):
+        out[idx] = {}
         for name, field in document.fields.items():
-            print("......found field of type '{}' with value '{}' and with confidence {}".format(field.type, field.content, field.confidence))
             out[idx][name]= str(field.content)
     return out 
 
@@ -271,6 +271,7 @@ def general_doc_parser(result) :
 
     return extracted_data
 def get_result(sas_url_dokumen, model_name) :
+    print(f"Memproses dokumen dengan model: {model_name}")
     poller = document_intelligence_client.begin_analyze_document(
         model_id=model_name,
         body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
@@ -289,9 +290,9 @@ def analize_doc(blob_add : str, document_type :str) :
         extracted = doctor_form_parser(result_doc) 
     elif document_type == "report lab" :
         result_doc = get_result(sas_url_dokumen, "report_lab")
-        extracted = doctor_form_parser(result_doc) 
+        extracted = report_lab_parser(result_doc)
     elif document_type == "additional document" :
         result_doc = get_result(sas_url_dokumen, "prebuilt-document")
-        extracted = general_doc_parser()
+        extracted = general_doc_parser(result_doc)
     print("Done Extracting format")
     return extracted

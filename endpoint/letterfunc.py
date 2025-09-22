@@ -1,5 +1,6 @@
 from langchain.tools import tool
 import os
+from pathlib import Path
 from pydantic import BaseModel, Field
 from langchain_openai import AzureChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -32,11 +33,17 @@ from langchain_google_community.gmail.utils import (
     build_resource_service,
     get_gmail_credentials,
 )
+from analyst_tools import cosmos_retrive_data
+from dotenv import load_dotenv
+
+
+load_dotenv()
+PROJECT_ROOT = Path(__file__).parent.parent
 
 credentials = get_gmail_credentials(
-    token_file="token.json",
+    token_file=PROJECT_ROOT / "token.json",
     scopes=["https://mail.google.com/"],
-    client_secrets_file=".\Dev0.2\App\Backend\IntelegentDocumentProcecing\credentials.json",
+    client_secrets_file=PROJECT_ROOT / "credential-idp.json",
 )
 pdf_buffer = io.BytesIO()
 toolkit = GmailToolkit()
@@ -228,10 +235,36 @@ sendemail = RunnableLambda(send_email)
 
 letter_chain = prompt_letter | llm | parser_claim_letter | pdf_result | sendemail
 
-def letter_chain_pro(customer_data, claim_data, policy_data, approval_data):
+def letter_chain_pro(customer_id, claim_id,approver_id):
+    
+    customer_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.customer_id= @customeridParam", "customer", parameters=[{
+        "name" : "@customeridParam",
+        "value" : customer_id
+    }] )
+    print("customer")
+    customer_data = customer_data[0]
+    claim_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.claim_id= @idParam", "claim", parameters=[{
+        "name" : "@idParam",
+        "value" : claim_id
+    }] )
+    print("claim")
+    claim_data = claim_data[0]
+    policy_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.policy_id= @idParam", "policy", parameters=[{
+        "name" : "@idParam",
+        "value" : claim_data["policy_id"]
+    }] )
+    policy_data = policy_data[0]
+    print("policy")
+    approver_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.admin_id= @idParam", "insurance_admin", parameters=[{
+        "name" : "@idParam",
+        "value" : approver_id
+    }] )
+    approver_data = approver_data[0]
+    print("approver")
+    
     return letter_chain.invoke({
         "customer_data": customer_data,
         "claim_data": claim_data,
         "policy_data": policy_data,
-        "approval_data": approval_data
+        "approval_data": approver_data
     })

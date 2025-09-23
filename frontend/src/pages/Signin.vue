@@ -14,15 +14,14 @@
 
             <!-- Form -->
             <div class="rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-              <!-- Demo Credentials -->
+              <!-- Demo Credentials
               <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                 <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Demo Credentials:</h3>
                 <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
                   <div><strong>Customer:</strong> customer@example.com / password123</div>
                   <div><strong>Approver:</strong> approver@example.com / password123</div>
-                  <div><strong>Customer 2:</strong> customer2@example.com / password123</div>
                 </div>
-              </div>
+              </div> -->
 
               <!-- Error Message -->
               <div v-if="errorMessage" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">

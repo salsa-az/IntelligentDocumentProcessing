@@ -236,16 +236,39 @@ export default {
       }
     }
 
-    const transformDocuments = (documents) => {
-      return documents.map(doc => ({
+  const transformDocuments = (documents) => {
+    return documents.map(doc => {
+      let name = 'Unknown Document'
+      
+      // Map document types to proper names
+      switch (doc.doc_type) {
+        case 'invoice':
+          name = 'Invoice Rumah Sakit'
+          break
+        case 'doctor form':
+          name = 'Form Medis Dokter'
+          break
+        case 'report lab':
+          name = 'Hasil Pemeriksaan Laboratorium'
+          break
+        case 'additional doc':
+          name = 'Dokumen Tambahan'
+          break
+        default:
+          name = `${doc.doc_type || 'Document'}`
+          break
+      }
+      
+      return {
         id: doc.doc_id,
-        name: `${doc.doc_type === 'invoice' ? 'Invoice Rumah Sakit' : 'Form Medis Dokter'}.pdf`,
+        name: `${name}.pdf`,
         size: '1.2 MB',
         type: 'PDF',
         url: `/api/documents/${doc.doc_id}`,
         doc_type: doc.doc_type
-      }))
-    }
+      }
+    })
+  }
 
     const getMockClaimsForApprover = () => {
       // Mock data for testing when Cosmos DB is unavailable

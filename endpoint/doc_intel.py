@@ -292,7 +292,7 @@ def analize_doc(blob_add : str, document_type :str) :
         result_doc = get_result(sas_url_dokumen, "report_lab")
         extracted = report_lab_parser(result_doc)
     elif document_type == "additional document" :
-        result_doc = get_result(sas_url_dokumen, "prebuilt-document")
+        result_doc = get_result(sas_url_dokumen, "prebuilt-layout")
         extracted = general_doc_parser(result_doc)
     print("Done Extracting format")
     return extracted

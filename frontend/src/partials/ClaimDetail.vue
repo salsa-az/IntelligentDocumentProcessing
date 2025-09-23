@@ -127,6 +127,81 @@
                     <div><strong>Instruksi/Metode Pembayaran:</strong> Tidak ditemukan</div>
                   </div>
                 </div>
+                
+                <div v-else-if="doc.name.includes('Lab') || doc.name.includes('Laboratorium') || doc.doc_type === 'report lab'">
+                  <h6 class="font-semibold mb-2 text-purple-600">Hasil Pemeriksaan Laboratorium</h6>
+                  <div class="space-y-3">
+                    <!-- Data Administrasi Lab -->
+                    <div>
+                      <strong class="text-gray-700 dark:text-gray-300">Data Administrasi Laboratorium:</strong>
+                      <div class="ml-2 mt-1 space-y-1">
+                        <div><strong>Nama Lab:</strong> PRAMITA</div>
+                        <div><strong>Alamat Lab:</strong> Jln. Moch Toha No. 163 Bandung</div>
+                        <div><strong>No. Registrasi:</strong> 190701017DB</div>
+                        <div><strong>Tanggal Registrasi:</strong> 11-07-2019</div>
+                        <div><strong>Tanggal Laporan:</strong> 11-July-2019 13:53:13</div>
+                        <div><strong>Tanggal Pengambilan Spesimen:</strong> 11/07/2019</div>
+                      </div>
+                    </div>
+
+                    <!-- Data Pasien -->
+                    <div>
+                      <strong class="text-gray-700 dark:text-gray-300">Data Pasien:</strong>
+                      <div class="ml-2 mt-1 space-y-1">
+                        <div><strong>Nama Pasien:</strong> Ny. NURAENI</div>
+                        <div><strong>ID Pasien di Lab:</strong> 2201180300383</div>
+                        <div><strong>Usia:</strong> 49 Tahun 9 Bulan 4 Hari</div>
+                        <div><strong>Jenis Kelamin:</strong> Perempuan</div>
+                        <div><strong>Alamat Pasien:</strong> KANTOR PELAYANAN PAJAK MADYA BANDUNG JL.ASIA AFRIKA NO. 114 LT.2 BANDUNG</div>
+                      </div>
+                    </div>
+
+                    <!-- Data Dokter -->
+                    <div>
+                      <strong class="text-gray-700 dark:text-gray-300">Data Dokter Pengirim:</strong>
+                      <div class="ml-2 mt-1 space-y-1">
+                        <div><strong>Nama Dokter:</strong> dr.SAERAH</div>
+                        <div><strong>Alamat Dokter:</strong> dr.SAERAH</div>
+                      </div>
+                    </div>
+
+                    <!-- Penanggung Jawab Lab -->
+                    <div>
+                      <strong class="text-gray-700 dark:text-gray-300">Penanggung Jawab Laboratorium:</strong>
+                      <div class="ml-2 mt-1 space-y-1">
+                        <div><strong>Penanggung Jawab:</strong> dr. Shintia Kodrata, Sp.PK</div>
+                        <div><strong>Validator:</strong> dr. Shintia Kodrata, Sp.PK</div>
+                      </div>
+                    </div>
+
+                    <!-- Hasil Pemeriksaan -->
+                    <div>
+                      <strong class="text-gray-700 dark:text-gray-300">Hasil Pemeriksaan:</strong>
+                      <div class="ml-2 mt-1">
+                        <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded">
+                          <div class="text-sm">
+                            <div class="mb-2"><strong>Status Pemeriksaan:</strong> <span class="text-orange-600">Menunggu Hasil</span></div>
+                            <div class="text-xs text-gray-600 dark:text-gray-400">
+                              *Hasil pemeriksaan laboratorium akan tersedia setelah proses analisis selesai
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Catatan Tambahan -->
+                    <div>
+                      <strong class="text-gray-700 dark:text-gray-300">Catatan:</strong>
+                      <div class="ml-2 mt-1">
+                        <div class="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                          <div>• Spesimen telah diterima dalam kondisi baik</div>
+                          <div>• Pemeriksaan dilakukan sesuai prosedur standar laboratorium</div>
+                          <div>• Hasil akan dikonfirmasi oleh dokter spesialis patologi klinik</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               
               <div class="mt-3 flex justify-end">

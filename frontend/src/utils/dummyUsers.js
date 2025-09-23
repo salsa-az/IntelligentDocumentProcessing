@@ -17,7 +17,7 @@ export const dummyUsers = [
   },
   {
     id: 2,
-    fullName: 'Sarah Wijaya',
+    fullName: 'Opet Ganteng',
     email: 'approver@example.com',
     password: 'password123',
     role: 'approver',
@@ -30,21 +30,6 @@ export const dummyUsers = [
     policyType: 'Staff Internal',
     avatar: '../images/user-avatar-32.png'
   },
-  {
-    id: 3,
-    fullName: 'Budi Santoso',
-    email: 'customer2@example.com',
-    password: 'password123',
-    role: 'customer',
-    phone: '+62 812-1111-2222',
-    birthDate: '1990-12-25',
-    address: 'Jl. Gatot Subroto No. 789, Jakarta Selatan, DKI Jakarta 12930',
-    policyNumber: 'P002',
-    participantNumber: 'PA002',
-    insuranceComp: 'PT XYZ Asuransi',
-    policyType: 'Asuransi Kesehatan Gold',
-    avatar: '../images/user-avatar-32.png'
-  }
 ]
 
 // Function to authenticate user

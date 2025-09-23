@@ -35,15 +35,15 @@
         >
           <li>
             <router-link class="font-medium text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white flex items-center py-1 px-3" to="/my-account" @click="dropdownOpen = false">
-              <svg class="w-3 h-3 fill-current text-gray-400 dark:text-gray-500 shrink-0 mr-1" viewBox="0 0 12 12">
-                <path d="M6 8a3 3 0 100-6 3 3 0 000 6zM6 10c-2.67 0-8 1.34-8 4v1h16v-1c0-2.66-5.33-4-8-4z" />
-              </svg>
+            <svg class="shrink-0 fill-current mr-1" :class="isExactActive ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+              <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM12.735 14c.618 0 1.093-.561.872-1.139a6.002 6.002 0 0 0-11.215 0c-.22.578.254 1.139.872 1.139h9.47Z" />
+            </svg>
               My Account
             </router-link>
           </li>
           <li v-if="currentUser?.role === 'customer'">
             <router-link class="font-medium text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white flex items-center py-1 px-3" to="/claim-history" @click="dropdownOpen = false">
-              <svg class="w-3 h-3 fill-current text-gray-400 dark:text-gray-500 shrink-0 mr-1" viewBox="0 0 12 12">
+              <svg class="w-3 h-3 fill-current text-gray-400 dark:text-gray-500 shrink-0 mr-2" viewBox="0 0 12 12">
                 <path d="M10.5 0h-9A1.5 1.5 0 000 1.5v9A1.5 1.5 0 001.5 12h9a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0010.5 0zM10 7L8.207 5.207l-3 3-1.414-1.414 3-3L5 2h5v5z" />
               </svg>
               Claim History
@@ -62,8 +62,7 @@
               class="font-medium text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white flex items-center py-1 px-3 w-full text-left" 
               @click="handleSignOut"
             >
-              <svg class="w-3 h-3 fill-current text-gray-400 dark:text-gray-500 shrink-0 mr-1" viewBox="0 0 12 12">
-                <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current text-gray-400 dark:text-gray-500 shrink-0 mr-1" viewBox="0 0 18 18"><title>arrow door out 3</title><g class="nc-icon-wrapper"><path d="M11.75,11.5c-.414,0-.75,.336-.75,.75v2.5c0,.138-.112,.25-.25,.25H5.448l1.725-1.069c.518-.322,.827-.878,.827-1.487V5.557c0-.609-.31-1.166-.827-1.487l-1.725-1.069h5.302c.138,0,.25,.112,.25,.25v2.5c0,.414,.336,.75,.75,.75s.75-.336,.75-.75V3.25c0-.965-.785-1.75-1.75-1.75H4.25c-.965,0-1.75,.785-1.75,1.75V14.75c0,.965,.785,1.75,1.75,1.75h6.5c.965,0,1.75-.785,1.75-1.75v-2.5c0-.414-.336-.75-.75-.75Z"/><path d="M17.78,8.47l-2.75-2.75c-.293-.293-.768-.293-1.061,0s-.293,.768,0,1.061l1.47,1.47h-4.189c-.414,0-.75,.336-.75,.75s.336,.75,.75,.75h4.189l-1.47,1.47c-.293,.293-.293,.768,0,1.061,.146,.146,.338,.22,.53,.22s.384-.073,.53-.22l2.75-2.75c.293-.293,.293-.768,0-1.061Z" data-color="color-2"/></g>
               </svg>
               Sign Out
             </button>

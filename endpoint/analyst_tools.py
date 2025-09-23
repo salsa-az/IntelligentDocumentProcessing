@@ -25,7 +25,7 @@ def cosmos_retrive_data(query: str, container: str, parameters: list = None) -> 
             enable_cross_partition_query=True,
             parameters=parameters
         ))
-        print(f"Query executed successfully. Retrieved {len(items)} items.")
+        # print(f"Query executed successfully. Retrieved {len(items)} items.")
         return items
     except Exception as e:
        print(f"Error querying Cosmos DB: {e}")

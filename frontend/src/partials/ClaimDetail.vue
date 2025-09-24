@@ -72,134 +72,318 @@
             <!-- Expanded Content -->
             <div v-if="expandedDocs.has(doc.id)" class="px-3 pb-3">
               <div class="bg-white dark:bg-gray-800 rounded p-3 text-xs">
-                <div v-if="doc.name.includes('Form Medis')">
+                <!-- Dynamic content based on doc_type and doc_contents -->
+                <div v-if="doc.doc_type === 'doctor form' && doc.doc_contents">
                   <h6 class="font-semibold mb-2">Form Dokter</h6>
                   <div class="space-y-2">
-                    <div><strong>Data Administrasi Pasien</strong><br>
-                    Tanggal Masuk: 07/03/2023<br>
-                    Tanggal Keluar: 07/03/2023</div>
-                    <div><strong>Hubungan Dokter–Pasien</strong><br>
-                    Apakah Anda dokter keluarga pasien?: Tidak<br>
-                    Hubungan keluarga dengan pasien: Tidak</div>
-                    <div><strong>Diagnosis</strong><br>
-                    Diagnosis Masuk: Nyeri dada<br>
-                    Diagnosis Keluar: Hipertensi<br>
-                    Diagnosis Utama + Kode: Hipertensi (I10)<br>
-                    Diagnosis Penyerta + Kode: Demam tidak spesifik (R50.9)</div>
-                    <div><strong>Riwayat Medis & Keluhan</strong><br>
-                    Penyakit terkait: Tidak ada<br>
-                    Keluhan utama & kronologi: Nyeri dada sejak 2 hari<br>
-                    Keluhan tambahan: Pusing<br>
-                    Penyakit/keluhan lain terkait kondisi saat ini: Tidak<br>
-                    Sejak kapan keluhan dirasakan: 05/03/2023 (perkiraan durasi 2 bulan)<br>
-                    Pernah mengalami kondisi serupa sebelum tanggal perawatan: Tidak</div>
-                    <div><strong>Rujukan & Indikasi Rawat Inap</strong><br>
-                    Pasien dirujuk oleh: Dr. Yusak Mangara Tua Siahaan, Sp.S (K)<br>
-                    Indikasi rawat inap: Evaluasi keluhan neurologis dan kardiovaskular<br>
-                    Perkembangan diagnosis: Tidak berkembang perlahan<br>
-                    Estimasi lamanya keluhan ada: 2 bulan</div>
-                    <div><strong>Pemeriksaan & Tindakan</strong><br>
-                    Pemeriksaan fisik/penunjang: Tekanan darah tinggi<br>
-                    Terapi/prosedur: Cardiprin 100 mg, Canderin 16 mg, dll.</div>
-                    <div><strong>Data Dokter Penanggung Jawab</strong><br>
-                    Nama Dokter: Ada<br>
-                    SIP: Ada<br>
-                    Nomor Telepon: Ada<br>
-                    Email: Ada<br>
-                    Tanda tangan & stempel: Ada<br>
-                    Tanggal: 07/03/2023</div>
+                    <!-- Handle the actual flat structure from your database -->
+                    <div>
+                      <strong>Data Administrasi Pasien</strong><br>
+                      <span v-if="doc.doc_contents['Tanggal Masuk']">
+                        Tanggal Masuk: {{ doc.doc_contents['Tanggal Masuk'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Tanggal Keluar']">
+                        Tanggal Keluar: {{ doc.doc_contents['Tanggal Keluar'] }}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <strong>Hubungan Dokter–Pasien</strong><br>
+                      <span v-if="doc.doc_contents['dokterKeluarga_Ya'] === ':selected:' || doc.doc_contents['dokterKeluarga_Tidak'] === ':selected:'">
+                        Apakah Anda dokter keluarga pasien?: {{ doc.doc_contents['dokterKeluarga_Ya'] === ':selected:' ? 'Ya' : 'Tidak' }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Jenis Hubungan']">
+                        Hubungan keluarga dengan pasien: {{ doc.doc_contents['Jenis Hubungan'] }}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <strong>Diagnosis</strong><br>
+                      <span v-if="doc.doc_contents['Diagnosis Masuk']">
+                        Diagnosis Masuk: {{ doc.doc_contents['Diagnosis Masuk'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Diagnosis Keluar']">
+                        Diagnosis Keluar: {{ doc.doc_contents['Diagnosis Keluar'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Diagnosis Utama ICD X']">
+                        Diagnosis Utama + Kode: {{ doc.doc_contents['Diagnosis Utama ICD X'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Diagnosis Penyerta ICD X']">
+                        Diagnosis Penyerta + Kode: {{ doc.doc_contents['Diagnosis Penyerta ICD X'] }}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <strong>Riwayat Medis & Keluhan</strong><br>
+                      <span v-if="doc.doc_contents['Penyakit Lain']">
+                        Penyakit terkait: {{ doc.doc_contents['Penyakit Lain'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Keluhan Utama']">
+                        Keluhan utama & kronologi: {{ doc.doc_contents['Keluhan Utama'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Keluhan Tambahan']">
+                        Keluhan tambahan: {{ doc.doc_contents['Keluhan Tambahan'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Field_Lainnya']">
+                        Penyakit/keluhan lain terkait kondisi saat ini: {{ doc.doc_contents['Field_Lainnya'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Waktu Gejala Muncul']">
+                        Sejak kapan keluhan dirasakan: {{ doc.doc_contents['Waktu Gejala Muncul'] }} (perkiraan durasi {{ doc.doc_contents['Perkiraan Lama Penyebab (bulan)'] }} bulan)<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Pernah Mengalami Sebelumnya']">
+                        Pernah mengalami kondisi serupa sebelum tanggal perawatan: {{ doc.doc_contents['Pernah Mengalami Sebelumnya'] }}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <strong>Rujukan & Indikasi Rawat Inap</strong><br>
+                      <span v-if="doc.doc_contents['Rujukan Dari']">
+                        Pasien dirujuk oleh: {{ doc.doc_contents['Rujukan Dari'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Indikasi Rawat Inap']">
+                        Indikasi rawat inap: {{ doc.doc_contents['Indikasi Rawat Inap'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Dapat Terjadi Singkat']">
+                        Perkembangan diagnosis: {{ doc.doc_contents['Dapat Terjadi Singkat'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Perkiraan Lama Penyebab (bulan)']">
+                        Estimasi lamanya keluhan ada: {{ doc.doc_contents['Perkiraan Lama Penyebab (bulan)'] }} bulan
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <strong>Pemeriksaan & Tindakan</strong><br>
+                      <span v-if="doc.doc_contents['Pemeriksaan Fisik']">
+                        Pemeriksaan fisik/penunjang: {{ doc.doc_contents['Pemeriksaan Fisik'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Terapi & Tindakan']">
+                        Terapi/prosedur: {{ doc.doc_contents['Terapi & Tindakan'] }}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <strong>Data Dokter Penanggung Jawab</strong><br>
+                      <span v-if="doc.doc_contents['Nama Dokter']">
+                        Nama Dokter: {{ doc.doc_contents['Nama Dokter'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['SIP Dokter']">
+                        SIP: {{ doc.doc_contents['SIP Dokter'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Telepon Dokter']">
+                        Nomor Telepon: {{ doc.doc_contents['Telepon Dokter'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Email Dokter']">
+                        Email: {{ doc.doc_contents['Email Dokter'] }}<br>
+                      </span>
+                      <span v-if="doc.doc_contents['Tanggal Form']">
+                        Tanggal: {{ doc.doc_contents['Tanggal Form'] }}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 
-                <div v-else-if="doc.name.includes('Invoice')">
+                <div v-else-if="doc.doc_type === 'invoice' && doc.doc_contents">
                   <h6 class="font-semibold mb-2">Invoice Rumah Sakit</h6>
                   <div class="space-y-1">
-                    <div><strong>Nomor Invoice:</strong> OIV2303070050</div>
-                    <div><strong>Tanggal Invoice:</strong> 07/03/2023</div>
-                    <div><strong>Nama Pasien:</strong> Feri Hussen</div>
-                    <div><strong>Tanggal Layanan/Rawat:</strong> 07/03/2023</div>
-                    <div><strong>Rincian Biaya:</strong> Ada (terperinci per layanan/prosedur)</div>
-                    <div><strong>Total Tagihan:</strong> 7.720.000</div>
-                    <div><strong>Mata Uang:</strong> Tidak tertulis (asumsi IDR – Rupiah Indonesia)</div>
-                    <div><strong>Nama Penyedia Layanan:</strong> Siloam Hospitals</div>
-                    <div><strong>Alamat Penyedia Layanan:</strong> Jl. Siloam No. 6, Lippo Village, Indonesia</div>
-                    <div><strong>Kontak Penyedia Layanan:</strong> Tidak disebutkan eksplisit di invoice</div>
-                    <div><strong>Instruksi/Metode Pembayaran:</strong> Tidak ditemukan</div>
+                    <!-- Handle the actual structure from your database -->
+                    <div v-if="doc.doc_contents['Invoice #1']" class="mb-0.5">
+                      <div v-if="doc.doc_contents['Invoice #1']['Invoice Id']">
+                        <strong>Nomor Invoice:</strong> {{ doc.doc_contents['Invoice #1']['Invoice Id'] }}
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Invoice Date']">
+                        <strong>Tanggal Invoice:</strong> {{ doc.doc_contents['Invoice #1']['Invoice Date'] }}
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Customer Name']">
+                        <strong>Nama Pasien:</strong> {{ doc.doc_contents['Invoice #1']['Customer Name'] }}
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Invoice Date']">
+                        <strong>Tanggal Layanan/Rawat:</strong> {{ doc.doc_contents['Invoice #1']['Invoice Date'] }}
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Items']">
+                        <strong>Rincian Biaya:</strong> {{ doc.doc_contents['Invoice #1']['Items'].length }} item(s) terdaftar
+                        <div v-for="(item, index) in doc.doc_contents['Invoice #1']['Items']" :key="index" class="ml-2 mt-1">
+                        • {{ item.Description || 'Deskripsi tidak tersedia' }} : <em>Rp {{ formatCurrency(item.Amount || 0) }}</em>
+                        </div>
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Invoice Total']">
+                        <strong>Total Tagihan:</strong> Rp {{ formatCurrency(doc.doc_contents['Invoice #1']['Invoice Total']) }}
+                      </div>
+                      <div>
+                        <strong>Mata Uang:</strong> IDR (Rupiah Indonesia)
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Vendor Name']">
+                        <strong>Nama Penyedia Layanan:</strong> {{ doc.doc_contents['Invoice #1']['Vendor Name'].replace('\n', ' ') }}
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Vendor Address Recipient']">
+                        <strong>Alamat Penyedia Layanan:</strong> {{ doc.doc_contents['Invoice #1']['Vendor Address Recipient'] }}
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Subtotal']">
+                        <strong>Subtotal:</strong> Rp {{ formatCurrency(doc.doc_contents['Invoice #1']['Subtotal']) }}
+                      </div>
+                      <div v-if="doc.doc_contents['Invoice #1']['Amount Due']">
+                        <strong>Amount Due:</strong> Rp {{ formatCurrency(doc.doc_contents['Invoice #1']['Amount Due']) }}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
-                <div v-else-if="doc.name.includes('Lab') || doc.name.includes('Laboratorium') || doc.doc_type === 'report lab'">
-                  <h6 class="font-semibold mb-2 text-purple-600">Hasil Pemeriksaan Laboratorium</h6>
+                <div v-else-if="doc.doc_type === 'report lab' && doc.doc_contents">
+                  <h6 class="font-semibold mb-2">Hasil Pemeriksaan Laboratorium</h6>
                   <div class="space-y-3">
-                    <!-- Data Administrasi Lab -->
-                    <div>
-                      <strong class="text-gray-700 dark:text-gray-300">Data Administrasi Laboratorium:</strong>
-                      <div class="ml-2 mt-1 space-y-1">
-                        <div><strong>Nama Lab:</strong> PRAMITA</div>
-                        <div><strong>Alamat Lab:</strong> Jln. Moch Toha No. 163 Bandung</div>
-                        <div><strong>No. Registrasi:</strong> 190701017DB</div>
-                        <div><strong>Tanggal Registrasi:</strong> 11-07-2019</div>
-                        <div><strong>Tanggal Laporan:</strong> 11-July-2019 13:53:13</div>
-                        <div><strong>Tanggal Pengambilan Spesimen:</strong> 11/07/2019</div>
+                    <!-- Handle actual lab report structure -->
+                    <div v-if="doc.doc_contents['0']" class="space-y-3">
+                      <!-- Lab Information -->
+                      <div>
+                        <h6 class="font-semibold text-purple-800 dark:text-purple-300 mb-2">Informasi Laboratorium</h6>
+                        <div>
+                          <div v-if="doc.doc_contents['0']['Lab name']">
+                            <strong>Nama Lab:</strong> {{ doc.doc_contents['0']['Lab name'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Lab address']">
+                            <strong>Alamat Lab:</strong> {{ doc.doc_contents['0']['Lab address'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Report Date']">
+                            <strong>Tanggal Laporan:</strong> {{ doc.doc_contents['0']['Report Date'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Registration Date']">
+                            <strong>Tanggal Registrasi:</strong> {{ doc.doc_contents['0']['Registration Date'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['No. registration']">
+                            <strong>No. Registrasi:</strong> {{ doc.doc_contents['0']['No. registration'] }}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <!-- Data Pasien -->
-                    <div>
-                      <strong class="text-gray-700 dark:text-gray-300">Data Pasien:</strong>
-                      <div class="ml-2 mt-1 space-y-1">
-                        <div><strong>Nama Pasien:</strong> Ny. NURAENI</div>
-                        <div><strong>ID Pasien di Lab:</strong> 2201180300383</div>
-                        <div><strong>Usia:</strong> 49 Tahun 9 Bulan 4 Hari</div>
-                        <div><strong>Jenis Kelamin:</strong> Perempuan</div>
-                        <div><strong>Alamat Pasien:</strong> KANTOR PELAYANAN PAJAK MADYA BANDUNG JL.ASIA AFRIKA NO. 114 LT.2 BANDUNG</div>
+                      <!-- Patient Information -->
+                      <div>
+                        <h6 class="font-semibold text-blue-800 dark:text-blue-300 mb-2">Informasi Pasien</h6>
+                        <div>
+                          <div v-if="doc.doc_contents['0']['Patient Name']">
+                            <strong>Nama Pasien:</strong> {{ doc.doc_contents['0']['Patient Name'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Patient Age']">
+                            <strong>Umur:</strong> {{ doc.doc_contents['0']['Patient Age'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Patient Gender']">
+                            <strong>Jenis Kelamin:</strong> {{ doc.doc_contents['0']['Patient Gender'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['patient Address'] || doc.doc_contents['0']['Patient address']">
+                            <strong>Alamat:</strong> {{ doc.doc_contents['0']['patient Address'] || doc.doc_contents['0']['Patient address'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Patient Contact']">
+                            <strong>Kontak:</strong> {{ doc.doc_contents['0']['Patient Contact'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['ID Patient in lab']">
+                            <strong>ID Pasien Lab:</strong> {{ doc.doc_contents['0']['ID Patient in lab'] }}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <!-- Data Dokter -->
-                    <div>
-                      <strong class="text-gray-700 dark:text-gray-300">Data Dokter Pengirim:</strong>
-                      <div class="ml-2 mt-1 space-y-1">
-                        <div><strong>Nama Dokter:</strong> dr.SAERAH</div>
-                        <div><strong>Alamat Dokter:</strong> dr.SAERAH</div>
+                      <!-- Doctor Information -->
+                      <div>
+                        <h6 class="font-semibold text-green-800 dark:text-green-300 mb-2">Informasi Dokter</h6>
+                        <div>
+                          <div v-if="doc.doc_contents['0']['Doctor Name']">
+                            <strong>Dokter Pengirim:</strong> {{ doc.doc_contents['0']['Doctor Name'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Doctor address']">
+                            <strong>Alamat Dokter:</strong> {{ doc.doc_contents['0']['Doctor address'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Person Responsible']">
+                            <strong>Dokter Penanggung Jawab:</strong> {{ doc.doc_contents['0']['Person Responsible'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Person validated']">
+                            <strong>Validator:</strong> {{ doc.doc_contents['0']['Person validated'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['validator signature']">
+                            <strong>Tanda Tangan Validator:</strong> {{ doc.doc_contents['0']['validator signature'] }}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <!-- Penanggung Jawab Lab -->
-                    <div>
-                      <strong class="text-gray-700 dark:text-gray-300">Penanggung Jawab Laboratorium:</strong>
-                      <div class="ml-2 mt-1 space-y-1">
-                        <div><strong>Penanggung Jawab:</strong> dr. Shintia Kodrata, Sp.PK</div>
-                        <div><strong>Validator:</strong> dr. Shintia Kodrata, Sp.PK</div>
+                      <div>
+                        <h6 class="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Informasi Pemeriksaan</h6>
+                        <div>
+                          <div v-if="doc.doc_contents['0']['speciment']">
+                            <strong>Tanggal Spesimen:</strong> {{ doc.doc_contents['0']['speciment'] }}
+                          </div>
+                          <div v-if="doc.doc_contents['0']['Result test']">
+                            <strong>Hasil Tes:</strong> {{ doc.doc_contents['0']['Result test'] }}
+                          </div>
+                          <div v-else>
+                            <strong>Hasil Tes:</strong> <span class="text-gray-500 italic">Data hasil tes sedang diproses</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <!-- Hasil Pemeriksaan -->
-                    <div>
-                      <strong class="text-gray-700 dark:text-gray-300">Hasil Pemeriksaan:</strong>
-                      <div class="ml-2 mt-1">
-                        <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                          <div class="text-sm">
-                            <div class="mb-2"><strong>Status Pemeriksaan:</strong> <span class="text-orange-600">Menunggu Hasil</span></div>
-                            <div class="text-xs text-gray-600 dark:text-gray-400">
-                              *Hasil pemeriksaan laboratorium akan tersedia setelah proses analisis selesai
+                      <!-- Additional Lab Data -->
+                      <div v-if="Object.keys(doc.doc_contents['0']).some(key => !['Lab name', 'Lab address', 'Report Date', 'Registration Date', 'No. registration', 'Patient Name', 'Patient Age', 'Patient Gender', 'patient Address', 'Patient address', 'Patient Contact', 'ID Patient in lab', 'Doctor Name', 'Doctor address', 'Person Responsible', 'Person validated', 'validator signature', 'speciment', 'Result test'].includes(key))" class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                        <h6 class="font-semibold text-gray-800 dark:text-gray-300 mb-2">Data Tambahan</h6>
+                        <div class="space-y-1 text-sm">
+                          <div v-for="(value, key) in doc.doc_contents['0']" :key="key">
+                            <div v-if="!['Lab name', 'Lab address', 'Report Date', 'Registration Date', 'No. registration', 'Patient Name', 'Patient Age', 'Patient Gender', 'patient Address', 'Patient address', 'Patient Contact', 'ID Patient in lab', 'Doctor Name', 'Doctor address', 'Person Responsible', 'Person validated', 'validator signature', 'speciment', 'Result test'].includes(key) && value && value !== 'None'">
+                              <strong>{{ key }}:</strong> {{ value }}
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-
-                    <!-- Catatan Tambahan -->
-                    <div>
-                      <strong class="text-gray-700 dark:text-gray-300">Catatan:</strong>
-                      <div class="ml-2 mt-1">
-                        <div class="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                          <div>• Spesimen telah diterima dalam kondisi baik</div>
-                          <div>• Pemeriksaan dilakukan sesuai prosedur standar laboratorium</div>
-                          <div>• Hasil akan dikonfirmasi oleh dokter spesialis patologi klinik</div>
+                    
+                    <!-- Fallback if no data in '0' key -->
+                    <div v-else class="text-sm text-gray-600 dark:text-gray-400">
+                      <p>Data laboratorium tidak tersedia atau sedang diproses.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div v-else-if="doc.doc_type === 'additional doc' && doc.doc_contents">
+                  <h6 class="font-semibold mb-2 text-green-600">Dokumen Tambahan</h6>
+                  <div class="space-y-3">
+                    <!-- Handle additional document - could be key-value pairs or other structure -->
+                    <div v-if="doc.doc_contents.Nama || doc.doc_contents.Umur">
+                      <strong class="text-gray-700 dark:text-gray-300">Data Pasien:</strong>
+                      <div class="ml-2 mt-1 space-y-1">
+                        <div v-if="doc.doc_contents.Nama">
+                          <strong>Nama:</strong> {{ doc.doc_contents.Nama }}
+                        </div>
+                        <div v-if="doc.doc_contents.Umur">
+                          <strong>Umur:</strong> {{ doc.doc_contents.Umur }}
+                        </div>
+                        <div v-if="doc.doc_contents['Jenis Kelamin']">
+                          <strong>Jenis Kelamin:</strong> {{ doc.doc_contents['Jenis Kelamin'] }}
+                        </div>
+                        <div v-if="doc.doc_contents.Pekerjaan">
+                          <strong>Pekerjaan:</strong> {{ doc.doc_contents.Pekerjaan }}
+                        </div>
+                        <div v-if="doc.doc_contents.Alamat">
+                          <strong>Alamat:</strong> {{ doc.doc_contents.Alamat }}
                         </div>
                       </div>
                     </div>
+                    
+                    <!-- Show extracted text content if available -->
+                    <div v-if="doc.doc_contents._metadata && doc.doc_contents._metadata.pages">
+                      <strong class="text-gray-700 dark:text-gray-300">Isi Dokumen:</strong>
+                      <div class="ml-2 mt-1">
+                        <div class="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded max-h-32 overflow-y-auto">
+                          <div v-for="line in doc.doc_contents._metadata.pages['1'].lines.slice(0, 10)" :key="line">
+                            {{ line }}
+                          </div>
+                          <div v-if="doc.doc_contents._metadata.pages['1'].lines.length > 10" class="text-gray-500 italic">
+                            ... dan {{ doc.doc_contents._metadata.pages['1'].lines.length - 10 }} baris lainnya
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Fallback for documents without extracted content -->
+                <div v-else>
+                  <h6 class="font-semibold mb-2">{{ doc.name }}</h6>
+                  <div class="text-sm text-gray-600 dark:text-gray-400">
+                    <p>Document content extraction in progress...</p>
+                    <p class="mt-2">Document Type: {{ doc.doc_type || 'Unknown' }}</p>
                   </div>
                 </div>
               </div>
@@ -355,7 +539,10 @@ export default {
     }
 
     const formatCurrency = (amount) => {
-      return new Intl.NumberFormat('id-ID').format(amount)
+      if (!amount) return ''
+      // Handle both string and number inputs
+      const numAmount = typeof amount === 'string' ? parseFloat(amount.replace(/[^\d.-]/g, '')) : amount
+      return new Intl.NumberFormat('id-ID').format(numAmount)
     }
 
     const formatDate = (dateString) => {

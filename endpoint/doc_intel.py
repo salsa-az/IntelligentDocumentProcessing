@@ -16,6 +16,7 @@ document_intelligence_client = DocumentIntelligenceClient(
     endpoint=AZURE_DOC_INTELLIGENCE_ENDPOINT,
     credential=AzureKeyCredential(AZURE_DOC_INTELLIGENCE_KEY)
 )
+
 def get_sas_url(blob_add):
 
     try:
@@ -229,47 +230,110 @@ def report_lab_parser(result) :
             out[idx][name]= str(field.content)
     return out 
 
-def general_doc_parser(result) :
-    extracted_data = {}
+def general_doc_parser(result) -> dict[str, any]:
+    """Parse general document using layout model with Azure best practices"""
+    try:
+        # Input validation following Azure best practices
+        if not result:
+            return {"error": "No result from document analysis", "content": {}}
+        
+        extracted_data = {}
 
-    # Iterate over each page in the result
-    for page in result.pages:
-        page_number = page.page_number
-        extracted_data[page_number] = {
-            "lines": [],
-            "selection_marks": [],
-            "tables": []
+        # Extract content from pages with error resilience
+        pages = getattr(result, 'pages', []) or []
+        if pages:
+            for page in pages:
+                try:
+                    page_number = getattr(page, 'page_number', 0)
+                    extracted_data[page_number] = {
+                        "lines": [],
+                        "selection_marks": [],
+                        "tables": []
+                    }
+
+                    # Extract lines - Azure recommended approach
+                    lines = getattr(page, 'lines', []) or []
+                    for line in lines:
+                        content = getattr(line, 'content', None)
+                        if content:
+                            extracted_data[page_number]["lines"].append(content)
+
+                    # Extract selection marks with confidence scores
+                    selection_marks = getattr(page, 'selection_marks', []) or []
+                    for selection_mark in selection_marks:
+                        state = getattr(selection_mark, 'state', None)
+                        confidence = getattr(selection_mark, 'confidence', 0.0)
+                        if state:
+                            extracted_data[page_number]["selection_marks"].append({
+                                "state": state,
+                                "confidence": confidence
+                            })
+                            
+                except Exception as page_error:
+                    print(f"Error processing page {getattr(page, 'page_number', 'unknown')}: {page_error}")
+                    # Continue processing other pages - Azure resilience pattern
+
+        # Extract tables with enhanced error handling
+        tables = getattr(result, 'tables', []) or []
+        for table_idx, table in enumerate(tables):
+            try:
+                bounding_regions = getattr(table, 'bounding_regions', []) or []
+                for region in bounding_regions:
+                    page_number = getattr(region, 'page_number', 0)
+                    
+                    # Initialize table structure safely
+                    row_count = getattr(table, 'row_count', 0)
+                    column_count = getattr(table, 'column_count', 0)
+                    
+                    # Pre-allocate table structure (more efficient)
+                    table_data = [[None for _ in range(column_count)] for _ in range(row_count)]
+
+                    # Fill table with cell content using Azure best practices
+                    cells = getattr(table, 'cells', []) or []
+                    for cell in cells:
+                        try:
+                            row_index = getattr(cell, 'row_index', 0)
+                            column_index = getattr(cell, 'column_index', 0)
+                            content = getattr(cell, 'content', '')
+                            confidence = getattr(cell, 'confidence', 0.0)
+                            
+                            # Bounds checking to prevent index errors
+                            if (0 <= row_index < row_count and 0 <= column_index < column_count):
+                                table_data[row_index][column_index] = {
+                                    "content": content,
+                                    "confidence": confidence
+                                }
+                        except Exception as cell_error:
+                            print(f"Error processing cell [{getattr(cell, 'row_index', '?')}][{getattr(cell, 'column_index', '?')}]: {cell_error}")
+
+                    # Store table data safely
+                    if page_number not in extracted_data:
+                        extracted_data[page_number] = {"tables": []}
+                    elif "tables" not in extracted_data[page_number]:
+                        extracted_data[page_number]["tables"] = []
+                        
+                    extracted_data[page_number]["tables"].append({
+                        "table_index": table_idx,
+                        "rows": row_count,
+                        "columns": column_count,
+                        "content": table_data,
+                        "caption": getattr(table, 'caption', None)  # Enhanced metadata
+                    })
+                    
+            except Exception as table_error:
+                print(f"Error processing table {table_idx}: {table_error}")
+                # Continue processing other tables
+
+        # Return with consistent structure following Azure patterns
+        return extracted_data if extracted_data else {
+            "error": "No content extracted from document", 
+            "content": {}
         }
-
-        # Extract lines content from the page
-        for line in page.lines:
-            extracted_data[page_number]["lines"].append(line.content)
-
-        # Extract selection marks content (state of the mark)
-        for selection_mark in page.selection_marks:
-            extracted_data[page_number]["selection_marks"].append(selection_mark.state)
-
-    # Extract table layout and content
-    for table_idx, table in enumerate(result.tables):
-        for region in table.bounding_regions:
-            page_number = region.page_number
-            table_data = []
-
-            for cell in table.cells:
-                # Organize cell content by row and column
-                if cell.row_index >= len(table_data):
-                    table_data.append([None] * table.column_count)
-                table_data[cell.row_index][cell.column_index] = cell.content
-
-            # Store table layout (rows and columns) content
-            extracted_data.setdefault(page_number, {"tables": []})["tables"].append({
-                "table_index": table_idx,
-                "rows": table.row_count,
-                "columns": table.column_count,
-                "content": table_data
-            })
-
-    return extracted_data
+        
+    except Exception as e:
+        print(f"Error in general_doc_parser: {e}")
+        return {"error": str(e), "content": {}}
+    
 def get_result(sas_url_dokumen, model_name) :
     print(f"Memproses dokumen dengan model: {model_name}")
     poller = document_intelligence_client.begin_analyze_document(
@@ -277,6 +341,20 @@ def get_result(sas_url_dokumen, model_name) :
         body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
     )
     result = poller.result()
+    return result
+
+def get_additional_doc_result(sas_url_dokumen) :
+    model_name = "prebuilt-layout"
+    print(f"Memproses dokumen dengan model: {model_name}")
+    poller = document_intelligence_client.begin_analyze_document(
+        model_id=model_name,
+        body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
+    )
+    result = poller.result()
+    # for kv in result.key_value_pairs:
+    #     key = kv.key.content if kv.key else None
+    #     value = kv.value.content if kv.value else None
+    #     print(f"Key: {key} | Value: {value}")
     return result
 
 def analize_doc(blob_add : str, document_type :str) :
@@ -291,8 +369,9 @@ def analize_doc(blob_add : str, document_type :str) :
     elif document_type == "report lab" :
         result_doc = get_result(sas_url_dokumen, "report_lab")
         extracted = report_lab_parser(result_doc)
-    elif document_type == "additional document" :
-        result_doc = get_result(sas_url_dokumen, "prebuilt-layout")
+    elif document_type == "additional doc" :
+        result_doc = get_additional_doc_result(sas_url_dokumen)
+        print("Done Extracting additional doc")
         extracted = general_doc_parser(result_doc)
     print("Done Extracting format")
     return extracted

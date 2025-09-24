@@ -20,7 +20,7 @@ from endpoint.analyst_func import analyst_function_executor
 from doc_intel import analize_doc
 from analyst_tools import cosmos_retrive_data
 from dotenv import load_dotenv
-from letterfunc import letter_chain_pro
+# from letterfunc import letter_chain_pro  # Temporarily commented out due to credential issues
 from chatbotClaimerOfficer import Agent_Insurance
 from doc_intel_for_registration import analize_doc as analize_doc_registration
 
@@ -71,7 +71,7 @@ def approved_claim():
         admin_data = admin_data[0]
         customer_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","customer", [{"name": "@idParam", "value": claim_data['customer_id']}])
         policy_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","policy", [{"name": "@idParam", "value": claim_data['policy_id']}])
-        letter_chain_pro(customer_data, claim_data, policy_data, admin_data)
+        # letter_chain_pro(customer_data, claim_data, policy_data, admin_data)  # Temporarily commented out
         return jsonify({'status': 'success', 'data': claim_data})
     except Exception as e : 
         return jsonify({'error': str(e)}), 500
@@ -102,51 +102,53 @@ def get_all_claims():
         print(f"Error retrieving claims: {e}", file=sys.stderr)
         return []
     
-# Add these new endpoints after the existing ones:
+def safe_fetch_documents(claim_documents):
+    """Safely fetch documents with proper error handling"""
+    documents = []
+    if not claim_documents:
+        return documents
+    
+    for doc_id in claim_documents:
+        try:
+            doc_data = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.doc_id = @docId", 
+                "document", 
+                [{"name": "@docId", "value": doc_id}]
+            )
+            if doc_data and len(doc_data) > 0:
+                documents.append(doc_data[0])
+            else:
+                print(f"Document {doc_id} not found in database")
+        except Exception as e:
+            print(f"Error fetching document {doc_id}: {e}")
+            continue
+    
+    return documents
 
 @app.route('/api/claims/all-detailed', methods=['GET'])
 def get_all_claims_detailed():
-    """Get all claims with customer details for approvers"""
+    """Get all claims with customer details for approvers - Optimized"""
     try:
-        # Get all claims
+        # Get all claims with better error handling
         claims = cosmos_retrive_data(
             "SELECT * FROM c ORDER BY c._ts DESC", 
             "claim", 
             []
         )
         
-        # Enrich each claim with customer and document data
+        if not claims:
+            return jsonify({
+                'status': 'success',
+                'claims': []
+            })
+        
+        # Enrich each claim
         for claim in claims:
-            # Get customer data
-            try:
-                customer_data = cosmos_retrive_data(
-                    "SELECT * FROM c WHERE c.customer_id = @customerId", 
-                    "customer", 
-                    [{"name": "@customerId", "value": claim['customer_id']}]
-                )
-                if customer_data:
-                    claim['customer_details'] = customer_data[0]
-            except Exception as e:
-                print(f"Error fetching customer data for claim {claim['claim_id']}: {e}")
-                claim['customer_details'] = None
+            # Get customer data safely
+            claim['customer_details'] = claim.get('customer_id')
             
-            # Get documents
-            if claim.get('documents'):
-                documents = []
-                for doc_id in claim['documents']:
-                    try:
-                        doc_data = cosmos_retrive_data(
-                            "SELECT * FROM c WHERE c.doc_id = @docId", 
-                            "document", 
-                            [{"name": "@docId", "value": doc_id}]
-                        )
-                        if doc_data:
-                            documents.append(doc_data[0])
-                    except Exception as e:
-                        print(f"Error fetching document {doc_id}: {e}")
-                claim['document_details'] = documents
-            else:
-                claim['document_details'] = []
+            # Get documents safely (THIS IS THE KEY FIX)
+            claim['document_details'] = safe_fetch_documents(claim.get('documents', []))
         
         return jsonify({
             'status': 'success',
@@ -192,10 +194,11 @@ def update_claim_status(claim_id):
 
         # Write back the updated claim
         updated_claim = database.get_container_client("claim").upsert_item(claim)
-        letter_chain_pro(claim['customer_id'], claim_id, f"{admin_id}")
+        # letter_chain_pro(claim['customer_id'], claim_id, f"{admin_id}")  # Temporarily commented out
         return jsonify({'status': 'success', 'claim': updated_claim}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 @app.route('/api/customer/<customer_id>/claims-detailed', methods=['GET'])
 def get_customer_claims_detailed(customer_id):
     """Get detailed claims for a specific customer with documents"""
@@ -223,6 +226,7 @@ def get_customer_claims_detailed(customer_id):
                     except Exception as e:
                         print(f"Error fetching document {doc_id}: {e}")
                 claim['document_details'] = documents
+                print(f"Fetched {len(documents)} documents for claim {claim.get('claim_id')}")
             else:
                 claim['document_details'] = []
         

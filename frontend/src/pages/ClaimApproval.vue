@@ -249,7 +249,7 @@ export default {
           name = 'Form Medis Dokter'
           break
         case 'report lab':
-          name = 'Hasil Pemeriksaan Laboratorium'
+          name = 'Hasil Laboratorium'
           break
         case 'additional doc':
           name = 'Dokumen Tambahan'
@@ -261,11 +261,12 @@ export default {
       
       return {
         id: doc.doc_id,
-        name: `${name}.pdf`,
+        name: `${name}_${doc.claim_id}.pdf`,
         size: '1.2 MB',
         type: 'PDF',
         url: `/api/documents/${doc.doc_id}`,
-        doc_type: doc.doc_type
+        doc_type: doc.doc_type,
+        doc_contents: doc.doc_contents || {}
       }
     })
   }

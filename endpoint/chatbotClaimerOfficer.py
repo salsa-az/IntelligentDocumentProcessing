@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool, Tool
 from langchain_community.utilities import SerpAPIWrapper
+from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent, AgentType
 load_dotenv()
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")
@@ -129,66 +130,23 @@ search_tool = Tool(
 
 # Tool for ICD API 
 @tool("get_dieses_info")
-def get_dieses_info(search_key, min_score=0.5) :
+def get_dieses_info(search_key) :
     """search for dieses information from WHO ICD API, to verify the diagnosa"""
-
-    token_endpoint = 'https://icdaccessmanagement.who.int/connect/token'
-    client_id = 'ef108bbc-154c-401a-b7ba-15758a60c878_1bd261be-3e0f-495a-ae9d-1f8c0967ed04'
-    client_secret = '2gmDnJPBN5CxYl8HxOgS720MtPTWyIb3M0az0Kf/bUI='
-    scope = 'icdapi_access'
-    grant_type = 'client_credentials'
-    # set data to post
-    payload = {'client_id': client_id, 
-            'client_secret': client_secret, 
-            'scope': scope, 
-            'grant_type': grant_type}
-            
-    # make request
-    r = requests.post(token_endpoint, data=payload, verify=False).json()
-    token = r['access_token']
-
-    # access ICD API
-
-
-    # HTTP header fields to set
-    headers = {'Authorization':  'Bearer '+token, 
-            'Accept': 'application/json', 
-            'Accept-Language': 'en',
-        'API-Version': 'v2'}
-    uri = f'https://id.who.int/icd/entity/search?q={search_key}'
-
-    # make request
-    searchData = requests.get(uri, headers=headers, verify=False)
-    searchData = searchData.json()
-    finalData = {}
-    # Memastikan respons berisi daftar entitas yang diharapkan
-    if "destinationEntities" in searchData and isinstance(searchData["destinationEntities"], list):
-
-        for i, entity in enumerate(searchData["destinationEntities"]):
-            score = entity.get("score", 0)
-            print(entity)
-            if score >= min_score:
-                # Mendapatkan data utama dari setiap entitas
-                title = entity.get("title", "Tidak tersedia").replace("<em>", "").replace("</em>", "")
-                entity_id = entity.get("id", "Tidak tersedia")
-                score = entity.get("score", "Tidak tersedia")
-                response = requests.get(entity_id, headers=headers, verify=False)
-                response.raise_for_status()
-                response = response.json()
-                detail = response.get('definition') 
-                if detail:
-                    # Menghapus tag HTML dari definisi
-                    detail = detail.get('@value', 'Tidak tersedia')
-                else:
-                    detail = "Tidak tersedia"
-                finalData[i] = {
-                        "title": title.replace("<em class='found'>", "").replace("</em>", ""),
-                        "id": entity_id,
-                        "score": score,
-                        "details": detail
-                }
-    return finalData
-
+    url = "https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search"
+    params = {
+        "sf": "code,name",
+        "terms": search_key
+    }
+    
+    response = requests.get(url, params=params)
+    
+    if response.status_code == 200:
+        data = response.json()
+        # data[3] biasanya berisi hasil list kode & deskripsi
+        results = [{"Code": code, "Description": desc} for code, desc in data[3]]
+        return results
+    else:
+        return {"error": response.status_code, "message": response.text}
 # tool for  rag : 
 
 # tool to do web search
@@ -208,14 +166,15 @@ llm = AzureChatOpenAI(
 )
 
 tools = [cosmos_select_tool, get_db_details, search_tool, get_dieses_info]
-
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 # Initialize agent
 Agent_Insurance = initialize_agent(
     tools,   
     llm,
     agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
+    memory=memory,
     prefix=system_prompt 
 )
-print("Agent siap digunakan")
+print("Chatbot siap digunakan")
 

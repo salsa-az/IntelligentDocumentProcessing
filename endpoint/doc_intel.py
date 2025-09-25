@@ -1,11 +1,90 @@
 import json
+import re
 import os
 from datetime import datetime, timedelta,timezone 
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.storage.blob import BlobServiceClient, BlobSasPermissions, generate_blob_sas
+from azure.ai.formrecognizer import DocumentAnalysisClient
 from dotenv import load_dotenv
+
+def normalize_key(k: str, keep_colon: bool=False) -> str:
+    s = k.replace('\n', ' ').strip()
+    s = re.sub(r'\s+', ' ', s)
+    s = re.sub(r'\s*:\s*$', '', s)
+    return s + ' :' if keep_colon else s
+
+def clean_simple_value(key: str, v):
+    if not isinstance(v, str):
+        return v
+    s = v.replace('\n', ' ').strip()
+    s = re.sub(r'\s+', ' ', s)
+    if 'nip' in key.lower():
+        digits = re.sub(r'\D', '', s)
+        return digits
+    s = re.sub(r'\s*([.,:;()\-\/])\s*', r'\1 ', s).strip()
+    s = re.sub(r'\s+([%.\,])', r'\1', s)
+    return s
+
+def clean_all_content(all_content: dict, top_field_values: list):
+    cleaned_pages = {}
+    top_tokens = [re.sub(r'\s+', '', str(tv)).lower() for tv in top_field_values if isinstance(tv, str)]
+    for page_idx, page in all_content.items():
+        lines = page.get('lines', [])
+        cleaned_lines = []
+        for line in lines:
+            if not isinstance(line, str):
+                continue
+            l = line.replace('\n', ' ').strip()
+            l = re.sub(r'\s+', ' ', l)
+            if not l:
+                continue
+            if re.fullmatch(r'\d+', l):
+                continue
+            if re.fullmatch(r'^[\W_]+$', l):
+                continue
+            l_token = re.sub(r'\s+', '', l).lower()
+            skip = False
+            for tk in top_tokens:
+                if l_token == tk or l_token in tk or tk in l_token:
+                    skip = True
+                    break
+            if skip:
+                continue
+            if 'nip' in l.lower():
+                digits = re.sub(r'\D', '', l)
+                if digits:
+                    l = f'NIP : {digits}'
+            l = re.sub(r'\s*([.,()])\s*', r'\1 ', l).strip()
+            l = re.sub(r'\s*:\s*$', '', l)
+            cleaned_lines.append(l)
+        deduped = []
+        for item in cleaned_lines:
+            if not deduped or item != deduped[-1]:
+                deduped.append(item)
+        full_text = ' '.join(deduped).strip()
+        cleaned_pages[page_idx] = {
+            'cleaned_lines': deduped,
+            'full_text': full_text
+        }
+    return cleaned_pages
+
+def clean_document(data: dict):
+    top_fields = {}
+    for k, v in data.items():
+        if k == 'All content':
+            continue
+        nk = normalize_key(k, keep_colon=False)
+        top_fields[nk] = clean_simple_value(nk, v) if isinstance(v, str) else v
+    top_vals = list(top_fields.values())
+    allc = data.get('All content', {})
+    cleaned_all = clean_all_content(allc, top_vals)
+    return {
+        'fields': top_fields,
+        'all_content': cleaned_all
+    }
+
 load_dotenv()
 # Azure Document Intelligence setup
 AZURE_DOC_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_DOC_INTELLIGENCE_ENDPOINT")
@@ -15,6 +94,9 @@ CUSTOM_MODEL_ID = os.getenv("CUSTOM_MODEL_ID")
 document_intelligence_client = DocumentIntelligenceClient(
     endpoint=AZURE_DOC_INTELLIGENCE_ENDPOINT,
     credential=AzureKeyCredential(AZURE_DOC_INTELLIGENCE_KEY)
+)
+document_analysis_client = DocumentAnalysisClient(
+        endpoint=AZURE_DOC_INTELLIGENCE_ENDPOINT, credential=AzureKeyCredential(AZURE_DOC_INTELLIGENCE_KEY)
 )
 def get_sas_url(blob_add):
 
@@ -225,13 +307,32 @@ def report_lab_parser(result) :
     out = {}
     for idx, document in enumerate(result.documents):
         for name, field in document.fields.items():
+<<<<<<< Updated upstream
             print("......found field of type '{}' with value '{}' and with confidence {}".format(field.type, field.content, field.confidence))
             out[idx][name]= str(field.content)
+=======
+            if name == "Result test" : 
+                table = field.value_array
+                table_data = []
+                for item in table:
+                    item_data = {}
+                    for sub_name, sub_field in item.value_object.items():
+                        item_data[sub_name] = str(sub_field.content)
+                    table_data.append(item_data)
+                out[idx][name] = table_data
+            else :
+                out[idx][name]= str(field.content)
+>>>>>>> Stashed changes
     return out 
 
 def general_doc_parser(result) :
+    all_result = {}
     extracted_data = {}
-
+    for kv_pair in result.key_value_pairs:
+        if kv_pair.key and kv_pair.value:
+            all_result[kv_pair.key.content] = kv_pair.value.content
+        else:
+            all_result[kv_pair.key.content] = "-"
     # Iterate over each page in the result
     for page in result.pages:
         page_number = page.page_number
@@ -268,14 +369,28 @@ def general_doc_parser(result) :
                 "columns": table.column_count,
                 "content": table_data
             })
-
-    return extracted_data
+    all_result = clean_document(all_result)
+    all_result["All content"] = extracted_data
+    return all_result
 def get_result(sas_url_dokumen, model_name) :
+<<<<<<< Updated upstream
     poller = document_intelligence_client.begin_analyze_document(
         model_id=model_name,
         body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
     )
     result = poller.result()
+=======
+    print(f"Memproses dokumen dengan model: {model_name}")
+    if model_name == "prebuilt-document" :
+        poller = document_analysis_client.begin_analyze_document_from_url("prebuilt-document", sas_url_dokumen)
+        result = poller.result()    
+    else : 
+        poller = document_intelligence_client.begin_analyze_document(
+            model_id=model_name,
+            body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
+        )
+        result = poller.result()
+>>>>>>> Stashed changes
     return result
 
 def analize_doc(blob_add : str, document_type :str) :
@@ -292,6 +407,10 @@ def analize_doc(blob_add : str, document_type :str) :
         extracted = doctor_form_parser(result_doc) 
     elif document_type == "additional document" :
         result_doc = get_result(sas_url_dokumen, "prebuilt-document")
+<<<<<<< Updated upstream
         extracted = general_doc_parser()
+=======
+        extracted = general_doc_parser(result_doc)
+>>>>>>> Stashed changes
     print("Done Extracting format")
     return extracted

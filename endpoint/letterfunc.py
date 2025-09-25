@@ -34,9 +34,15 @@ from langchain_google_community.gmail.utils import (
 )
 
 credentials = get_gmail_credentials(
+<<<<<<< Updated upstream
     token_file="token.json",
     scopes=["https://mail.google.com/"],
     client_secrets_file=".\Dev0.2\App\Backend\IntelegentDocumentProcecing\credentials.json",
+=======
+    token_file= "token.json",
+    scopes=["https://mail.google.com/"],
+    client_secrets_file= "credentials.json",
+>>>>>>> Stashed changes
 )
 pdf_buffer = io.BytesIO()
 toolkit = GmailToolkit()

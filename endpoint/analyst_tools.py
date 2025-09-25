@@ -132,61 +132,25 @@ search_tool = Tool(
     func=search.run,
 )
 
+# Tool for ICD API 
 @tool("get_disease_info")
-def get_disease_info(search_key : str):
-    """search for disease information from WHO ICD XI API, to verify the diagnosa. given the diagnosis in english not the diagnosis code and tool will return the information. if it return empty dict it means there is no info in there """
-    try : 
-        token_endpoint = 'https://icdaccessmanagement.who.int/connect/token'
-        client_id = 'ef108bbc-154c-401a-b7ba-15758a60c878_1bd261be-3e0f-495a-ae9d-1f8c0967ed04'
-        client_secret = '2gmDnJPBN5CxYl8HxOgS720MtPTWyIb3M0az0Kf/bUI='
-        scope = 'icdapi_access'
-        grant_type = 'client_credentials'
-        
-        payload = {'client_id': client_id, 
-                'client_secret': client_secret, 
-                'scope': scope, 
-                'grant_type': grant_type}
-                
-        r = requests.post(token_endpoint, data=payload, verify=False).json()
-        token = r['access_token']
-
-        headers = {'Authorization':  'Bearer '+token, 
-                'Accept': 'application/json', 
-                'Accept-Language': 'en',
-            'API-Version': 'v2'}
-        uri = f'https://id.who.int/icd/entity/search?q={search_key}'
-
-        searchData = requests.get(uri, headers=headers, verify=False)
-        searchData = searchData.json()
-        finalData = {}
-        
-        if "destinationEntities" in searchData and isinstance(searchData["destinationEntities"], list):
-            for i, entity in enumerate(searchData["destinationEntities"]):
-                score = entity.get("score", 0)
-                if score >= 0.8:
-                    title = entity.get("title", "Tidak tersedia").replace("<em>", "").replace("</em>", "")
-                    entity_id = entity.get("id", "Tidak tersedia")
-                    score = entity.get("score", "Tidak tersedia")
-                    response = requests.get(entity_id, headers=headers, verify=False)
-                    response.raise_for_status()
-                    response = response.json()
-                    detail = response.get('definition') 
-                    if detail:
-                        detail = detail.get('@value', 'Tidak tersedia')
-                    else:
-                        detail = "Tidak tersedia"
-                    finalData[i] = {
-                            "title": title.replace("<em class='found'>", "").replace("</em>", ""),
-                            "id": entity_id,
-                            "score": score,
-                            "details": detail
-                    }
-        if finalData == {} : 
-            return "there is no information about the claim"
-        return finalData
-    except : 
-        print("eror")
-        return "there is no information"
+def get_disease_info(search_key) :
+    """search for dieses information from WHO ICD API, to verify the diagnosa, please input in english"""
+    url = "https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search"
+    params = {
+        "sf": "code,name",
+        "terms": search_key
+    }
+    
+    response = requests.get(url, params=params)
+    
+    if response.status_code == 200:
+        data = response.json()
+        # data[3] biasanya berisi hasil list kode & deskripsi
+        results = [{"Code": code, "Description": desc} for code, desc in data[3]]
+        return results
+    else:
+        return {"error": response.status_code, "message": response.text}
 
 @tool('update_claim_and_document')
 def update_claim_and_document(claim_id: str, ai_suggestion_status: str, ai_reasoning: str, summary: str) -> str:

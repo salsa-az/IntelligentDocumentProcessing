@@ -307,10 +307,6 @@ def report_lab_parser(result) :
     out = {}
     for idx, document in enumerate(result.documents):
         for name, field in document.fields.items():
-<<<<<<< Updated upstream
-            print("......found field of type '{}' with value '{}' and with confidence {}".format(field.type, field.content, field.confidence))
-            out[idx][name]= str(field.content)
-=======
             if name == "Result test" : 
                 table = field.value_array
                 table_data = []
@@ -322,7 +318,6 @@ def report_lab_parser(result) :
                 out[idx][name] = table_data
             else :
                 out[idx][name]= str(field.content)
->>>>>>> Stashed changes
     return out 
 
 def general_doc_parser(result) :
@@ -373,13 +368,6 @@ def general_doc_parser(result) :
     all_result["All content"] = extracted_data
     return all_result
 def get_result(sas_url_dokumen, model_name) :
-<<<<<<< Updated upstream
-    poller = document_intelligence_client.begin_analyze_document(
-        model_id=model_name,
-        body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
-    )
-    result = poller.result()
-=======
     print(f"Memproses dokumen dengan model: {model_name}")
     if model_name == "prebuilt-document" :
         poller = document_analysis_client.begin_analyze_document_from_url("prebuilt-document", sas_url_dokumen)
@@ -390,7 +378,6 @@ def get_result(sas_url_dokumen, model_name) :
             body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
         )
         result = poller.result()
->>>>>>> Stashed changes
     return result
 
 def analize_doc(blob_add : str, document_type :str) :
@@ -407,10 +394,6 @@ def analize_doc(blob_add : str, document_type :str) :
         extracted = doctor_form_parser(result_doc) 
     elif document_type == "additional document" :
         result_doc = get_result(sas_url_dokumen, "prebuilt-document")
-<<<<<<< Updated upstream
-        extracted = general_doc_parser()
-=======
         extracted = general_doc_parser(result_doc)
->>>>>>> Stashed changes
     print("Done Extracting format")
     return extracted

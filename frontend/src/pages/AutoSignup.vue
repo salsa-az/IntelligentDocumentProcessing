@@ -494,60 +494,59 @@ export default {
       }
     },
     async processDocuments() {
-      this.currentStep = 1;
-      this.processingProgress = 0;
-      this.processingStatus = 'Uploading documents...';
-      
-      const steps = [
-        { progress: 20, status: 'Uploading documents...' },
-        { progress: 40, status: 'Analyzing insurance card...' },
-        { progress: 60, status: 'Analyzing ID card...' },
-        { progress: 80, status: 'Extracting information...' },
+    this.currentStep = 1;
+    this.processingProgress = 0;
+    this.processingStatus = 'Uploading documents...';
+    
+    const steps = [
+        { progress: 25, status: 'Uploading documents...' },
+        { progress: 50, status: 'Processing insurance card...' },
+        { progress: 75, status: 'Analyzing ID card...' },
         { progress: 100, status: 'Processing complete!' }
-      ];
+    ];
 
-      try {
+    try {
         const formData = new FormData();
         if (this.uploadedFiles.insuranceCard) {
-          formData.append('insurance_card', this.uploadedFiles.insuranceCard);
+        formData.append('insurance_card', this.uploadedFiles.insuranceCard);
         }
         if (this.uploadedFiles.idCard) {
-          formData.append('id_card', this.uploadedFiles.idCard);
+        formData.append('id_card', this.uploadedFiles.idCard);
         }
 
         // Simulate processing progress
         for (let step of steps) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          this.processingProgress = step.progress;
-          this.processingStatus = step.status;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        this.processingProgress = step.progress;
+        this.processingStatus = step.status;
         }
 
         const response = await fetch('http://localhost:5000/api/extract-registration-info', {
-          method: 'POST',
-          body: formData
+        method: 'POST',
+        body: formData
         });
 
         if (response.ok) {
-          const result = await response.json();
-          if (result.status === 'success') {
+        const result = await response.json();
+        if (result.status === 'success') {
             this.applyExtractedData(result.data);
-          }
-          
-          setTimeout(() => {
+        }
+        
+        setTimeout(() => {
             this.currentStep = 2;
-          }, 1000);
+        }, 1000);
         } else {
-          throw new Error('Failed to process documents');
+        throw new Error('Failed to process documents');
         }
 
-      } catch (error) {
+    } catch (error) {
         console.error('Error processing documents:', error);
         this.processingStatus = 'Processing failed. Please try again.';
         
         setTimeout(() => {
-          this.currentStep = 2;
+        this.currentStep = 2;
         }, 2000);
-      }
+    }
     },
     applyExtractedData(data) {
       this.extractedData = data;

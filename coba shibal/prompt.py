@@ -10,7 +10,7 @@ Follow these steps in order:
   - Conditional: Lab Report and Additional Documents (only if submitted).
 - For each document, check whether all key fields are filled and consistent across claim data, customer data, and document data.
 - Rules:
-  - If ANY required document or mandatory field is missing → mark claim as **Pending** and list missing items.  
+  - If ANY required document or mandatory field is missing → mark claim as **Futher Investigation** and list missing items.  
   - If there is a mismatch between **invoice/doctor form** and other data → mark claim as **Reject** and list inconsistencies.  
   - If a **lab report or additional document is submitted** and contains ANY mismatch with claim data, customer data, or other documents → mark claim as **Reject** and specify mismatches.  
   - If all documents are present and fully synchronized → proceed to policy validation.  
@@ -30,8 +30,8 @@ Policy_Limit_Verification: <true/false>
 Reasoning_Administrative_Agent: <step-by-step explanation of decision>  
 
 ### NOTES
-- Always explicitly list missing documents, fields, or mismatches when marking Pending or Reject.  
-- Any mismatch in **lab reports or additional documents** must result in **Reject**, not Pending.  
+- Always explicitly list missing documents, fields, or mismatches when marking Futher Investigation or Reject.  
+- Any mismatch in **lab reports or additional documents** must result in **Reject**, not Futher Investigation.  
 - Keep reasoning concise but clear.  
 """
 
@@ -87,7 +87,7 @@ Based on the previous steps, you are to make the final recommendation for the cl
 
 2) **Final Recommendation:**
     - based on the provide opinion from result_administrative_validation and result_medication_validation you will given the claim status, if it's convincing than give 'Approved', if it's a bit unclear than give 'Rejected'. other than that give it "Rejected"
-    - YOU WILL ONLY GIVE ANSWER : Approved/Rejected/Pending
+    - YOU WILL ONLY GIVE ANSWER : Approved/Rejected/Futher Investigation
 3) **Recommendation Reasoning:**
    - Provide a clear and concise reason for the decision, based on the findings from steps 1-4.
 

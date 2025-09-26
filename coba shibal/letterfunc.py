@@ -1,5 +1,6 @@
 from langchain.tools import tool
 import os
+from pathlib import Path
 from pydantic import BaseModel, Field
 from langchain_openai import AzureChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -32,14 +33,22 @@ from langchain_google_community.gmail.utils import (
     build_resource_service,
     get_gmail_credentials,
 )
+from dotenv import load_dotenv
+from analyst_tools import cosmos_retrive_data
+load_dotenv()
+
+PROJECT_ROOT = Path(__file__).parent.parent
 
 credentials = get_gmail_credentials(
-    token_file= "token.json",
+    token_file="token.json", #PROJECT_ROOT/
     scopes=["https://mail.google.com/"],
-    client_secrets_file= "credentials.json",
+    client_secrets_file="credentials.json", #PROJECT_ROOT/
+    
 )
+
 pdf_buffer = io.BytesIO()
 toolkit = GmailToolkit()
+
 api_resource = build_resource_service(credentials=credentials)
 load_dotenv()
 class ClaimLetter(BaseModel):
@@ -48,7 +57,10 @@ class ClaimLetter(BaseModel):
     isi_surat: str = Field(description="Main content of the approval/rejection letter, only needs to include the reason for rejection, suggested action, and other information that needs to be conveyed. DO NOT INCLUDE YTH, DENGAN HORMAT OR TERIMA KASIH AS IT IS NOT PART OF THE DESIRED CONTENT OF THE LETTER")
     tanda_tangan: str = Field(description="Name of the approver")
     customer_email: str = Field(description="Customer email")
-    input_data: Dict[str, Any] = Field(description="All input data contain the customer, claim, approval name, and policy data into a single dictionary, not dictionary inside dictionary and the variables name must be the same as the input variable")
+    input_data_customer_data : Dict[str, Any] = Field(description="All input data contain the customer data into a single dictionary, not dictionary inside dictionary and the variables name must be the same as the input variable")
+    input_data_claim_data : Dict[str, Any] = Field(description="All input data contain the claim data into a single dictionary, not dictionary inside dictionary and the variables name must be the same as the input variable")
+    input_data_policy_data : Dict[str, Any] = Field(description="All input data contain the policy data into a single dictionary, not dictionary inside dictionary and the variables name must be the same as the input variable")
+    input_data_approval_data : Dict[str, Any] = Field(description="All input data contain the approval data into a single dictionary, not dictionary inside dictionary and the variables name must be the same as the input variable")
     
     
 # Create chain
@@ -80,21 +92,21 @@ def send_email(claimletter : ClaimLetter) -> str:
     message = MIMEMultipart()
     message["to"] = claimletter.customer_email
     message["from"] = "me"
-    message["subject"] = f"Notification of Insurance Claim Decision - {claimletter.input_data['name']} - {claimletter.input_data['claim_id']}"
+    message["subject"] = f"Notification of Insurance Claim Decision - {claimletter.input_data_customer_data['name']} - {claimletter.input_data_claim_data['claim_id']}"
     body = f"""
     <html>
     <body>
-        <p>Yth {claimletter.input_data['name']},</p>
+        <p>Yth {claimletter.input_data_customer_data['name']},</p>
 
         <p>Kami ingin memberitahukan bahwa klaim asuransi dengan data:</p>
         <ul>
-            <li><b>Claim ID:</b> {claimletter.input_data['claim_id']}</li>
-            <li><b>Nama Pemohon:</b> {claimletter.input_data['name']}</li>
-            <li><b>Tanggal Pengajuan:</b> {claimletter.input_data['claim_date']}</li>
-            <li><b>Jenis Klaim:</b> {claimletter.input_data['claim_type']}</li>
+            <li><b>Claim ID:</b> {claimletter.input_data_claim_data['claim_id']}</li>
+            <li><b>Nama Pemohon:</b> {claimletter.input_data_customer_data['name']}</li>
+            <li><b>Tanggal Pengajuan:</b> {claimletter.input_data_claim_data['claim_date']}</li>
+            <li><b>Jenis Klaim:</b> {claimletter.input_data_claim_data['claim_type']}</li>
         </ul>
 
-        <p>Telah kami proses dan dengan pertimbangan yang matang, kami sampaikan bahwa klaim Anda telah <b>{claimletter.input_data['claim_status']}</b>.</p>
+        <p>Telah kami proses dan dengan pertimbangan yang matang, kami sampaikan bahwa klaim Anda telah <b>{claimletter.input_data_claim_data['claim_status']}</b>.</p>
         
         <p>Untuk informasi lebih lanjut, Anda dapat memeriksa surat keputusan klaim yang terlampir pada email ini atau mengunjungi <a href="https://www.websiteasuransi.com">website kami</a>.</p>
 
@@ -109,7 +121,7 @@ def send_email(claimletter : ClaimLetter) -> str:
     # Attach PDF
     pdf_buffer.seek(0)
     pdf_attachment = MIMEApplication(pdf_buffer.read(), _subtype="pdf")
-    pdf_attachment.add_header("Content-Disposition", "attachment", filename=f"surat_klaim_{claimletter.input_data['claim_id']}.pdf")
+    pdf_attachment.add_header("Content-Disposition", "attachment", filename=f"surat_klaim_{claimletter.input_data_claim_data['claim_id']}.pdf")
     message.attach(pdf_attachment)
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
     create_message = {"raw": raw_message}
@@ -157,7 +169,7 @@ def generate_pdf(data: ClaimLetter) -> str :
 
     # Kepada
     content.append(Paragraph("Kepada Yth,", style_normal))
-    content.append(Paragraph(data.input_data["name"], style_normal))
+    content.append(Paragraph(data.input_data_customer_data["name"], style_normal))
     content.append(Spacer(1, 20))
 
     # Perihal (rata tengah biar lebih formal)
@@ -166,9 +178,9 @@ def generate_pdf(data: ClaimLetter) -> str :
     # Isi surat (justify)
     isi = f"""
     Dengan hormat,<br/><br/>
-    Merujuk pada pengajuan klaim asuransi yang Saudara <b>{data.input_data["name"]}</b> ajukan,
+    Merujuk pada pengajuan klaim asuransi yang Saudara <b>{data.input_data_customer_data["name"]}</b> ajukan,
     dengan ini kami memberitahukan bahwa permohonan klaim asuransi Saudara telah
-    <b>{data.input_data["claim_status"]}</b>.<br/><br/>
+    <b>{data.input_data_claim_data["claim_status"]}</b>.<br/><br/>
     {data.isi_surat}<br/><br/>
     Demikian surat pemberitahuan ini kami sampaikan. Atas perhatian dan kerja sama Saudara,
     kami ucapkan terima kasih.
@@ -184,7 +196,7 @@ def generate_pdf(data: ClaimLetter) -> str :
     container_name = "intelegent-document-processing-st"
     # Build PDF
     doc.build(content)
-    blob_name = f"Surat_PDF/surat_klaim_{data.input_data['claim_id']}.pdf"
+    blob_name = f"Surat_PDF/surat_klaim_{data.input_data_claim_data['claim_id']}.pdf"
     blob_url = upload_stream_to_blob(pdf_buffer, blob_name, connection_string, container_name)
     print(f"Done upload to Blob, URL: {blob_url}")
     return data
@@ -228,10 +240,36 @@ sendemail = RunnableLambda(send_email)
 
 letter_chain = prompt_letter | llm | parser_claim_letter | pdf_result | sendemail
 
-def letter_chain_pro(customer_data, claim_data, policy_data, approval_data):
+def letter_chain_pro(customer_id, claim_id,approver_id):
+    
+    customer_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.customer_id= @customeridParam", "customer", parameters=[{
+        "name" : "@customeridParam",
+        "value" : customer_id
+    }] )
+    print("customer")
+    customer_data = customer_data[0]
+    claim_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.claim_id= @idParam", "claim", parameters=[{
+        "name" : "@idParam",
+        "value" : claim_id
+    }] )
+    print("claim")
+    claim_data = claim_data[0]
+    policy_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.policy_id= @idParam", "policy", parameters=[{
+        "name" : "@idParam",
+        "value" : claim_data["policy_id"]
+    }] )
+    policy_data = policy_data[0]
+    print("policy")
+    approver_data = cosmos_retrive_data(f"SELECT * FROM c WHERE c.admin_id= @idParam", "insurance_admin", parameters=[{
+        "name" : "@idParam",
+        "value" : approver_id
+    }] )
+    approver_data = approver_data[0]
+    print("approver")
+    
     return letter_chain.invoke({
         "customer_data": customer_data,
         "claim_data": claim_data,
         "policy_data": policy_data,
-        "approval_data": approval_data
+        "approval_data": approver_data
     })

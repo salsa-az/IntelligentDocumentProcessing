@@ -509,7 +509,7 @@ def extract_registration_info():
     try:
         extracted_data = {}
         
-        # Still upload insurance card but don't process it
+        # Upload insurance card but provide mock data
         if 'insurance_card' in request.files:
             file = request.files['insurance_card']
             if file.filename:
@@ -528,7 +528,7 @@ def extract_registration_info():
                     'plan_name': 'Platinum Health'
                 })
         
-        # Process ID card only
+        # Process ID card with Azure Document Intelligence
         if 'id_card' in request.files:
             file = request.files['id_card']
             if file.filename:
@@ -537,38 +537,19 @@ def extract_registration_info():
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                 blob_client.upload_blob(file.read(), overwrite=True)
                 
-                try:
-                    # Extract using existing function
-                    id_data = analize_doc_registration(blob_name, "id card")
-                    
-                    # Map ID card data
-                    if id_data:
-                        extracted_data.update({
-                            'nik': id_data.get('NIK', ''),
-                            'full_name': id_data.get('Nama', ''),
-                            'birth_date': id_data.get('Tanggal lahir', ''),
-                            'gender': id_data.get('Jenis kelamin', ''),
-                            'marital_status': id_data.get('Status perkawinan', ''),
-                            'address': id_data.get('Alamat', ''),
-                            'rt_rw': id_data.get('RT/RW', ''),
-                            'kelurahan': id_data.get('Kel/Desa', ''),
-                            'kecamatan': id_data.get('Kecamatan', '')
-                        })
-                except Exception as e:
-                    print(f"ID card processing failed: {e}")
-                    # Provide mock data for ID card if processing fails
+                # Extract using Azure Document Intelligence
+                id_data = analize_doc_registration(blob_name, "id card")
+                
+                # Map ID card data
+                if id_data:
                     extracted_data.update({
-                        'nik': '3201234567890123',
-                        'full_name': 'BUDI SANTOSO',
-                        'birth_date': '15-05-1985',
-                        'gender': 'LAKI-LAKI',
-                        'marital_status': 'KAWIN',
-                        'address': 'JL. MERDEKA NO. 123',
-                        'rt_rw': '001/002',
-                        'kelurahan': 'SUMBER JAYA',
-                        'kecamatan': 'KEMAYORAN'
+                        'nik': id_data.get('NIK', ''),
+                        'full_name': id_data.get('Nama', ''),
+                        'birth_date': id_data.get('Tanggal lahir', ''),
+                        'gender': id_data.get('Jenis kelamin', ''),
+                        'marital_status': id_data.get('Status perkawinan', ''),
                     })
-        
+
         return jsonify({
             'status': 'success',
             'data': extracted_data

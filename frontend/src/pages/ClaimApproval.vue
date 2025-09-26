@@ -168,7 +168,7 @@ export default {
             patientName: claim.customer_details?.name || claim.name || 'Unknown Patient',
             policyNumber: claim.policy_id,
             hospitalName: claim.insurance_company || 'Hospital Name',
-            type: mapClaimType(claim.claim_type),
+            type: claim.claim_type,
             amount: claim.claim_amount,
             checkIn: extractDate(claim.claim_date),
             checkOut: extractDate(claim.claim_date, 1),
@@ -184,8 +184,12 @@ export default {
                   finding: 'Documents uploaded and processed' 
                 },
                 { 
-                  category: 'AI Analysis', 
+                  category: 'AI Reasoning', 
                   finding: claim.AI_reasoning || 'In progress' 
+                },
+                {
+                  category: 'Summary',
+                  finding: claim.summary || 'N/A'
                 }
               ]
             },
@@ -200,17 +204,6 @@ export default {
       } finally {
         loading.value = false
       }
-    }
-
-    const mapClaimType = (claimType) => {
-      const typeMap = {
-        'Medical Claim': 'rawat-inap',
-        'Outpatient': 'rawat-jalan',
-        'Emergency': 'penyakit-kritis',
-        'Dental': 'gigi',
-        'Maternity': 'kehamilan-melahirkan'
-      }
-      return typeMap[claimType] || 'lainnya'
     }
 
     const mapStatus = (status) => {
@@ -314,7 +307,6 @@ export default {
         const result = await response.json()
         
         if (result.status === 'success') {
-          // Update local claim status
           const claimIndex = claims.value.findIndex(c => c.id === selectedClaim.value.id)
           if (claimIndex !== -1) {
             claims.value[claimIndex].status = 'approved'
@@ -322,8 +314,6 @@ export default {
           
           alert('Claim has been approved successfully!')
           closeDetailModal()
-          
-          // Refresh claims list
           await fetchAllClaims()
         } else {
           alert(`Error: ${result.error}`)
@@ -356,7 +346,6 @@ export default {
         const result = await response.json()
         
         if (result.status === 'success') {
-          // Update local claim status
           const claimIndex = claims.value.findIndex(c => c.id === selectedClaim.value.id)
           if (claimIndex !== -1) {
             claims.value[claimIndex].status = 'rejected'
@@ -364,8 +353,6 @@ export default {
           
           alert('Claim has been rejected.')
           closeDetailModal()
-          
-          // Refresh claims list
           await fetchAllClaims()
         } else {
           alert(`Error: ${result.error}`)

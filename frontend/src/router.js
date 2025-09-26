@@ -9,6 +9,7 @@ import ResetPassword from './pages/ResetPassword.vue'
 import MyAccount from './pages/MyAccount.vue'
 import ClaimApproval from './pages/ClaimApproval.vue'
 import AlertDemo from './pages/AlertDemo.vue'
+import AutoSignup from './pages/AutoSignup.vue'
 
 const routerHistory = createWebHistory()
 
@@ -66,6 +67,10 @@ const router = createRouter({
       path: '/alert-demo',
       component: AlertDemo
     },
+    {
+      path: '/auto-signup',
+      component: AutoSignup
+    }
   ]
 })
 

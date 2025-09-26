@@ -202,7 +202,7 @@
                       <div v-if="doc.doc_contents['Invoice #1']['Items']">
                         <strong>Rincian Biaya:</strong> {{ doc.doc_contents['Invoice #1']['Items'].length }} item(s) terdaftar
                         <div v-for="(item, index) in doc.doc_contents['Invoice #1']['Items']" :key="index" class="ml-2 mt-1">
-                        • {{ item.Description || 'Deskripsi tidak tersedia' }} : <em>Rp {{ formatCurrency(item.Amount || 0) }}</em>
+                        • {{ item.Description || 'Deskripsi tidak tersedia' }} [{{ formattedInt(item.Quantity || 0) }}] : <em>Rp {{ formatCurrency(item.Amount || 0) }}</em>
                         </div>
                       </div>
                       <div v-if="doc.doc_contents['Invoice #1']['Invoice Total']">
@@ -339,40 +339,9 @@
                 <div v-else-if="doc.doc_type === 'additional doc' && doc.doc_contents">
                   <h6 class="font-semibold mb-2 text-green-600">Dokumen Tambahan</h6>
                   <div class="space-y-3">
-                    <!-- Handle additional document - could be key-value pairs or other structure -->
-                    <div v-if="doc.doc_contents.Nama || doc.doc_contents.Umur">
-                      <strong class="text-gray-700 dark:text-gray-300">Data Pasien:</strong>
-                      <div class="ml-2 mt-1 space-y-1">
-                        <div v-if="doc.doc_contents.Nama">
-                          <strong>Nama:</strong> {{ doc.doc_contents.Nama }}
-                        </div>
-                        <div v-if="doc.doc_contents.Umur">
-                          <strong>Umur:</strong> {{ doc.doc_contents.Umur }}
-                        </div>
-                        <div v-if="doc.doc_contents['Jenis Kelamin']">
-                          <strong>Jenis Kelamin:</strong> {{ doc.doc_contents['Jenis Kelamin'] }}
-                        </div>
-                        <div v-if="doc.doc_contents.Pekerjaan">
-                          <strong>Pekerjaan:</strong> {{ doc.doc_contents.Pekerjaan }}
-                        </div>
-                        <div v-if="doc.doc_contents.Alamat">
-                          <strong>Alamat:</strong> {{ doc.doc_contents.Alamat }}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <!-- Show extracted text content if available -->
-                    <div v-if="doc.doc_contents._metadata && doc.doc_contents._metadata.pages">
-                      <strong class="text-gray-700 dark:text-gray-300">Isi Dokumen:</strong>
-                      <div class="ml-2 mt-1">
-                        <div class="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded max-h-32 overflow-y-auto">
-                          <div v-for="line in doc.doc_contents._metadata.pages['1'].lines.slice(0, 10)" :key="line">
-                            {{ line }}
-                          </div>
-                          <div v-if="doc.doc_contents._metadata.pages['1'].lines.length > 10" class="text-gray-500 italic">
-                            ... dan {{ doc.doc_contents._metadata.pages['1'].lines.length - 10 }} baris lainnya
-                          </div>
-                        </div>
+                    <div v-for="(value, key) in doc.doc_contents['1']" :key="key" class="text-sm text-gray-700 dark:text-gray-300">
+                      <div v-if="value && value !== 'None'">
+                        <strong>{{ key }}:</strong> {{ value }}
                       </div>
                     </div>
                   </div>
@@ -431,7 +400,19 @@
       <!-- Admin Decision -->
       <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
         <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wide">Approver Decision</h4>
-        <div class="space-y-4">
+        
+        <!-- Show if already processed -->
+        <div v-if="claim?.status === 'approved' || claim?.status === 'rejected'" class="mb-4 p-3 rounded-lg" :class="claim?.status === 'approved' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'">
+          <p class="text-sm font-medium" :class="claim?.status === 'approved' ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'">
+            {{ claim?.status === 'approved' ? 'Claim Approved' : 'Claim Rejected' }}
+          </p>
+          <p class="text-xs mt-1" :class="claim?.status === 'approved' ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'">
+            Previous decision notes: {{ claim?.rawData?.admin_notes || 'No notes provided' }}
+          </p>
+        </div>
+        
+        <!-- Show decision buttons only for pending claims or resubmitted claims -->
+        <div v-if="claim?.status === 'proses' || claim?.rawData?.resubmitted" class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decision Notes</label>
             <textarea v-model="notes" rows="3" class="form-textarea w-full" placeholder="Add your review notes..."></textarea>
@@ -458,6 +439,7 @@
 
 <script>
 import { ref, watch } from 'vue'
+import { formatValue } from '../utils/Utils'
 
 export default {
   name: 'ClaimDetail',
@@ -469,6 +451,7 @@ export default {
   setup(props, { emit }) {
     const notes = ref('')
     const expandedDocs = ref(new Set())
+    
 
     watch(() => props.show, (newVal) => {
       if (newVal) {
@@ -553,6 +536,13 @@ export default {
       })
     }
 
+    const formattedInt = (value) => {
+      if (!value) return '0'
+      // Handle both string and number inputs, extract number and format as integer
+      const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^\d.-]/g, '')) : value
+      return Math.floor(numValue).toString()
+    }
+
     return {
       notes,
       expandedDocs,
@@ -562,7 +552,8 @@ export default {
       getStatusText,
       getClaimTypeText,
       formatCurrency,
-      formatDate
+      formatDate,
+      formattedInt
     }
   }
 }

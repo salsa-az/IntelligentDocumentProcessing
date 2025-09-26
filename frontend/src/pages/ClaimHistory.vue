@@ -214,14 +214,14 @@
               Download All
             </button>
             <!-- Edit Form Submit -->
-             <div class="ctq43">
+             <!-- <div class="ctq43">
                  <button @click="submitClaim" class="btn bg-white border-gray-200 text-gray-800">
                    <svg width="16" height="16" viewBox="0 0 16 16">
                    <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z"></path>
                      </svg>
                      <span>Edit Claim</span>
                  </button>
-             </div>
+             </div> -->
           </div>
         </div>
 
@@ -258,6 +258,12 @@ export default {
     const expandedClaims = ref(new Set())
     const showModal = ref(false)
     const selectedClaim = ref(null)
+    const loading = ref(false)
+    const error = ref(null)
+
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+    console.log(currentUser)
+
 
     // Mock data
     const mockClaims = [
@@ -430,6 +436,159 @@ export default {
       return typeMap[type] || 'Lainnya'
     }
 
+    const mapStatus = (status) => {
+      const statusMap = {
+        'Prosses': 'proses',
+        'Proses' : 'proses',
+        'Pending': 'pengajuan',
+        'Approved': 'approved',
+        'Rejected': 'rejected'
+      }
+      return statusMap[status] || 'pengajuan'
+    }
+
+    const parseCosmosDate = (dateString) => {
+      if (!dateString) return new Date().toISOString()
+      
+      if (dateString.includes('T')) return dateString
+      
+      const parts = dateString.split('/')
+      if (parts.length === 3) {
+        const [day, month, year] = parts
+        return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`).toISOString()
+      }
+      
+      return new Date(dateString).toISOString()
+    }
+
+    const generateProgressSteps = (status, claimDate, adminNotes, approvalDate) => {
+      const steps = [
+        { 
+          title: 'Pengajuan', 
+          status: 'completed', 
+          date: claimDate, 
+          notes: 'Dokumen diterima dan divalidasi' 
+        }
+      ]
+      
+      if (status === 'proses') {
+        steps.push({ 
+          title: 'Proses', 
+          status: 'active', 
+          date: claimDate, 
+          notes: `Sedang dalam tahap verifikasi`
+        })
+        steps.push({ 
+          title: 'Keputusan', 
+          status: 'pending', 
+          date: null, 
+          notes: null 
+        })
+      } else if (status === 'approved') {
+        steps.push({ 
+          title: 'Proses', 
+          status: 'completed', 
+          date: claimDate, 
+          notes: 'Verifikasi selesai' 
+        })
+        steps.push({ 
+          title: 'Keputusan', 
+          status: 'completed', 
+          date: approvalDate, 
+          notes: adminNotes || 'Klaim disetujui. Dana akan ditransfer dalam 3-5 hari kerja.' 
+        })
+      } else if (status === 'rejected') {
+        steps.push({ 
+          title: 'Proses', 
+          status: 'completed', 
+          date: claimDate, 
+          notes: 'Verifikasi selesai.'
+        })
+        steps.push({ 
+          title: 'Keputusan', 
+          status: 'completed', 
+          date: approvalDate, 
+          notes: adminNotes || 'Klaim ditolak. Silakan hubungi customer service untuk informasi lebih lanjut.' 
+        })
+      }
+      
+      return steps
+    }
+
+    claims.value = []
+
+    const fetchClaimHistory = async () => {
+      loading.value = true
+      error.value = null
+      
+      try {
+        console.log('Fetching claims for customer:', currentUser.id)
+        
+        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        console.log('API Response:', result)
+        
+        if (result.status === 'success' && result.claims) {
+          // Map Cosmos DB data to frontend format with admin_notes integration
+          claims.value = result.claims.map(claim => {
+            const mappedStatus = mapStatus(claim.claim_status)
+            const claimDate = parseCosmosDate(claim.claim_date)
+            const approvalDate = parseCosmosDate(claim.approved_date)
+            
+            return {
+              id: claim.claim_id,
+              claimNumber: claim.claim_id,
+              policyNumber: claim.policy_id,
+              hospitalName: claim.hospital_name || claim.hospitalName || claim.insurance_company || 'Unknown Hospital',
+              type: claim.claim_type,
+              amount: typeof claim.claim_amount === 'string' ? 
+                parseInt(claim.claim_amount.replace(/[^\d]/g, '')) : 
+                claim.claim_amount || 0,
+              checkIn: claimDate,
+              checkOut: claimDate,
+              status: mappedStatus,
+              submittedDate: claimDate,
+              progress: generateProgressSteps(
+                mappedStatus, 
+                claimDate,
+                claim.admin_notes,
+                approvalDate
+              ),
+              documents: claim.documents || [],
+              customer_id: claim.customer_id,
+              admin_id: claim.admin_id,
+              adminNotes: claim.admin_notes,
+              summary: claim.summary,
+              rawData: claim
+            }
+          })
+          
+          console.log('Transformed claims:', claims.value)
+        } else {
+          console.warn('No claims found or invalid response format')
+          claims.value = mockClaims
+        }
+        
+      } catch (error) {
+        console.error('Error fetching claim history:', error)
+        error.value = error.message
+        claims.value = mockClaims
+      } finally {
+        loading.value = false
+      }
+    } 
+
+
     const formatCurrency = (amount) => {
       return new Intl.NumberFormat('id-ID').format(amount)
     }
@@ -491,8 +650,14 @@ export default {
     }
 
     onMounted(() => {
-      claims.value = mockClaims
+      console.log(currentUser)
+      // {id: 'CU001', fullName: 'Feri Hussen', email: 'customer@example.com', role: 'customer', phone: '+62 812-3456-7890', …} address : "Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10220" avatar : "../images/user-avatar-32.png" birthDate : "1985-04-12" email : "customer@example.com" fullName : "Feri Hussen" id : "CU001" insuranceComp : "PT XYZ Asuransi" participantNumber : "PA001" phone : "+62 812-3456-7890" policyNumber : "P001" policyType : "Asuransi Kesehatan Platinum" role : "customer"
+
+      mockClaims.forEach(claim => claims.value.push(claim))
+      console.log('claim type:', claims.value[3].id === 'C2' ? claims.value[3].type : 'not found')
+      fetchClaimHistory()
     })
+
 
     return {
       sidebarOpen,
@@ -516,7 +681,8 @@ export default {
       closeModal,
       downloadDocument,
       downloadAllDocuments,
-      editClaim
+      editClaim,
+      fetchClaimHistory
     }
   }
 }

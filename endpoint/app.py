@@ -16,15 +16,18 @@ from azure.cosmos import CosmosClient
 from endpoint.analyst_func import analyst_function_executor
 
 # Langchain Functions
-from endpoint.analyst_func import analyst_function_executor
 from doc_intel import analize_doc
 from analyst_tools import cosmos_retrive_data
 from dotenv import load_dotenv
-# from letterfunc import letter_chain_pro  # Temporarily commented out due to credential issues
+from letterfunc import letter_chain_pro
 from chatbotClaimerOfficer import Agent_Insurance
 from doc_intel_for_registration import analize_doc as analize_doc_registration
 
 load_dotenv()
+
+# Initialize Flask app once
+app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"]}})
 
 # Azure setup
 blob_connection_string = os.getenv("BLOB_STRING_CONECTION")
@@ -36,8 +39,28 @@ container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
 cosmos_client = CosmosClient(os.getenv("COSMOS_DB_URI"), credential=os.getenv("COSMOS_DB_KEY"))
 database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE_NAME"))
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend
+# File validation for localhost
+ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
+
+def validate_file(file):
+    """Basic file validation"""
+    if not file or not file.filename:
+        return False, "No file provided"
+    
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        return False, f"File type {file_ext} not allowed"
+    
+    return True, "Valid file"
+
+def run_analysis_async(customer_id, claim_id):
+    """Run analysis asynchronously"""
+    def target():
+        try:
+            analyst_function_executor(customer_id, claim_id)
+        except Exception as e:
+            print(f"Error in analyst_function_executor: {e}", file=sys.stderr)
+    threading.Thread(target=target, daemon=True).start()
 
 @app.route('/api/analyze-claim', methods=['POST'])
 def analyze_claim():
@@ -50,44 +73,30 @@ def analyze_claim():
         if not customer_id or not claim_id:
             return jsonify({'error': 'customer_id and claim_id required'}), 400
         
-        # Run analysis
-        analyst_function_executor(customer_id, claim_id)
+        # Run analysis asynchronously
+        run_analysis_async(customer_id, claim_id)
         
-        return jsonify({'status': 'success', 'message': 'Analysis completed'})
+        return jsonify({'status': 'success', 'message': 'Analysis started'})
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/approved-claim', methods=['GET'])
-def approved_claim():
-    """Approved all the claim that the user need"""
-    try:
-        claim_id = request.form.get('claim_id')
-        admin_id = request.form.get('admin_id')
-        claim_data = cosmos_retrive_data("SELECT * FROM c WHERE c.claim_id=@idParam","claim", [{"name": "@idParam", "value": claim_id}])
-        claim_data = claim_data[0]
-        admin_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","insurance_admin", [{"name": "@idParam", "value": admin_id}])
-        admin_data = admin_data[0]
-        customer_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","customer", [{"name": "@idParam", "value": claim_data['customer_id']}])
-        policy_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","policy", [{"name": "@idParam", "value": claim_data['policy_id']}])
-        # letter_chain_pro(customer_data, claim_data, policy_data, admin_data)  # Temporarily commented out
-        return jsonify({'status': 'success', 'data': claim_data})
-    except Exception as e : 
-        return jsonify({'error': str(e)}), 500
-    
-
+        print(f"Error in analyze_claim: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/query', methods=['GET'])
-def query_from_cosmosDB() : 
-    """Query all the data that needed from cosmosDB"""
-    try : 
-        query = request.form.get('query')
-        container = request.form.get('container')
-        parameter = request.form.get('parameter')
+def query_from_cosmosDB():
+    """Query data from cosmosDB - Fixed parameter access"""
+    try:
+        query = request.args.get('query')  # Fixed: use args for GET
+        container = request.args.get('container')
+        parameter = request.args.get('parameter')
+        
+        if not query or not container:
+            return jsonify({'error': 'query and container required'}), 400
+            
         return cosmos_retrive_data(query, container, parameter)
-    except Exception as e : 
-        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Error in query: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/claims', methods=['GET'])
 def get_all_claims():
@@ -101,7 +110,7 @@ def get_all_claims():
     except Exception as e:
         print(f"Error retrieving claims: {e}", file=sys.stderr)
         return []
-    
+
 def safe_fetch_documents(claim_documents):
     """Safely fetch documents with proper error handling"""
     documents = []
@@ -115,7 +124,7 @@ def safe_fetch_documents(claim_documents):
                 "document", 
                 [{"name": "@docId", "value": doc_id}]
             )
-            if doc_data and len(doc_data) > 0:
+            if doc_data:
                 documents.append(doc_data[0])
             else:
                 print(f"Document {doc_id} not found in database")
@@ -127,9 +136,8 @@ def safe_fetch_documents(claim_documents):
 
 @app.route('/api/claims/all-detailed', methods=['GET'])
 def get_all_claims_detailed():
-    """Get all claims with customer details for approvers - Optimized"""
+    """Get all claims with customer details for approvers"""
     try:
-        # Get all claims with better error handling
         claims = cosmos_retrive_data(
             "SELECT * FROM c ORDER BY c._ts DESC", 
             "claim", 
@@ -144,10 +152,7 @@ def get_all_claims_detailed():
         
         # Enrich each claim
         for claim in claims:
-            # Get customer data safely
             claim['customer_details'] = claim.get('customer_id')
-            
-            # Get documents safely (THIS IS THE KEY FIX)
             claim['document_details'] = safe_fetch_documents(claim.get('documents', []))
         
         return jsonify({
@@ -157,19 +162,12 @@ def get_all_claims_detailed():
         
     except Exception as e:
         print(f"Error in get_all_claims_detailed: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/api/claims/<claim_id>/update-status', methods=['POST'])
-def update_claim_status(claim_id):
+@app.route('/api/claims/<claim_id>', methods=['GET'])
+def get_claim_details(claim_id):
+    """Get claim details for editing"""
     try:
-        data = request.json
-        status = data.get('status')
-        admin_id = data.get('admin_id')
-        notes = data.get('notes', '')
-        if not status or not admin_id:
-            return jsonify({'error': 'status and admin_id required'}), 400
-
-        # Read the existing claim
         claim_data = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.claim_id = @claimId",
             "claim",
@@ -179,11 +177,45 @@ def update_claim_status(claim_id):
             return jsonify({'error': 'Claim not found'}), 404
 
         claim = claim_data[0]
-        # Update only the status and related fields
+        claim['document_details'] = safe_fetch_documents(claim.get('documents', []))
+        
+        return jsonify({'status': 'success', 'claim': claim})
+        
+    except Exception as e:
+        print(f"Error getting claim details: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/claims/<claim_id>/update-status', methods=['POST'])
+def update_claim_status(claim_id):
+    try:
+        data = request.json
+        status = data.get('status')
+        admin_id = data.get('admin_id')
+        notes = data.get('notes', '')
+        
+        if not status or not admin_id:
+            return jsonify({'error': 'status and admin_id required'}), 400
+
+        claim_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.claim_id = @claimId",
+            "claim",
+            [{"name": "@claimId", "value": claim_id}]
+        )
+        if not claim_data:
+            return jsonify({'error': 'Claim not found'}), 404
+
+        claim = claim_data[0]
+        
+        # Check if already processed and not resubmitted
+        if claim.get('claim_status') in ['Approved', 'Rejected'] and not claim.get('resubmitted'):
+            return jsonify({'error': 'Claim already processed'}), 400
+        
         claim['claim_status'] = status
         claim['admin_id'] = admin_id
         claim['admin_notes'] = notes
         claim['processed_date'] = datetime.now().isoformat()
+        claim['resubmitted'] = False  # Reset resubmission flag
+        
         if status == 'Approved':
             claim['approved_by'] = admin_id
             claim['approved_date'] = datetime.now().isoformat()
@@ -192,43 +224,31 @@ def update_claim_status(claim_id):
             claim['rejected_date'] = datetime.now().isoformat()
             claim['rejection_reason'] = notes
 
-        # Write back the updated claim
         updated_claim = database.get_container_client("claim").upsert_item(claim)
-        # letter_chain_pro(claim['customer_id'], claim_id, f"{admin_id}")  # Temporarily commented out
-        return jsonify({'status': 'success', 'claim': updated_claim}), 200
+        
+        try:
+            letter_chain_pro(claim['customer_id'], claim_id, f"{admin_id}")
+        except Exception as e:
+            print(f"Letter generation error: {e}")
+            
+        return jsonify({'status': 'success', 'claim': updated_claim})
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
+        print(f"Error updating claim status: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/api/customer/<customer_id>/claims-detailed', methods=['GET'])
 def get_customer_claims_detailed(customer_id):
     """Get detailed claims for a specific customer with documents"""
     try:
-        # Get claims for customer
         claims = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId ORDER BY c._ts DESC", 
             "claim", 
             [{"name": "@customerId", "value": customer_id}]
         )
         
-        # For each claim, get documents
         for claim in claims:
-            if claim.get('documents'):
-                documents = []
-                for doc_id in claim['documents']:
-                    try:
-                        doc_data = cosmos_retrive_data(
-                            "SELECT * FROM c WHERE c.doc_id = @docId", 
-                            "document", 
-                            [{"name": "@docId", "value": doc_id}]
-                        )
-                        if doc_data:
-                            documents.append(doc_data[0])
-                    except Exception as e:
-                        print(f"Error fetching document {doc_id}: {e}")
-                claim['document_details'] = documents
-                print(f"Fetched {len(documents)} documents for claim {claim.get('claim_id')}")
-            else:
-                claim['document_details'] = []
+            claim['document_details'] = safe_fetch_documents(claim.get('documents', []))
         
         return jsonify({
             'status': 'success',
@@ -237,7 +257,7 @@ def get_customer_claims_detailed(customer_id):
         
     except Exception as e:
         print(f"Error in get_customer_claims_detailed: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
 def validate_customer_data(form_data, customer_data):
     """Validate form data against database customer record"""
@@ -245,14 +265,9 @@ def validate_customer_data(form_data, customer_data):
         return False, "Customer not found in database"
     
     customer = customer_data[0]
-    
-    # Check if form data matches database
     form_customer_id = form_data.get('customerId')
     form_policy_id = form_data.get('policyId')
     
-    print(f"Validating customer_id: {form_customer_id} with database customer_id: {customer['customer_id']}")
-    print(f"Validating policy_id: {form_policy_id} with database policy_id: {customer['policy_id']}")
-
     if customer['customer_id'] != form_customer_id:
         return False, "Customer ID mismatch"
     
@@ -261,151 +276,171 @@ def validate_customer_data(form_data, customer_data):
     
     return True, "Valid customer"
 
+@app.route('/api/customer-claim-history/<customer_id>', methods=['GET'])
+def get_customer_claim_history(customer_id):
+    """Get claim history for a specific customer with hospital names from invoices"""
+    try:
+        claims = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId ORDER BY c._ts DESC", 
+            "claim", 
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        for claim in claims:
+            hospital_name = "Unknown Hospital"
+            
+            if claim.get('documents'):
+                for doc_id in claim['documents']:
+                    try:
+                        doc_data = cosmos_retrive_data(
+                            "SELECT * FROM c WHERE c.doc_id = @docId AND c.doc_type = 'invoice'", 
+                            "document", 
+                            [{"name": "@docId", "value": doc_id}]
+                        )
+                        
+                        if doc_data:
+                            doc = doc_data[0]
+                            if doc.get('doc_contents'):
+                                if doc['doc_contents'].get('Invoice #1'):
+                                    vendor_name = doc['doc_contents']['Invoice #1'].get('Vendor Name')
+                                    if vendor_name:
+                                        hospital_name = vendor_name.replace('\n', ' ').strip()
+                                        break
+                    except Exception as doc_error:
+                        print(f"Error fetching document {doc_id}: {doc_error}")
+                        continue
+            
+            claim['hospitalName'] = hospital_name
+        
+        return jsonify({
+            'status': 'success',
+            'claims': claims
+        })
+        
+    except Exception as e:
+        print(f"Error in get_customer_claim_history: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/api/submit-claim', methods=['POST'])
 def submit_claim():
-    """Submit claim form with file uploads"""
+    """Submit or update claim form with file uploads"""
     try:
+        # Check if this is an edit
+        is_edit = request.form.get('isEdit') == 'true'
+        existing_claim_id = request.form.get('claimId') if is_edit else None
+        
         # Get form data
         claim_type = request.form.get('claimType')
         claim_amount = request.form.get('claimAmount')
         currency = request.form.get('currency')
         customer_id = request.form.get('customerId')
         policy_id = request.form.get('policyId')
+        date_checkin = request.form.get('treatmentStartDate')
+        date_checkout = request.form.get('treatmentEndDate')
+        insurance_company = request.form.get('insuranceCompany')
         
-        # Get customer data from database
+        # Validate claim amount
+        try:
+            claim_amount_float = float(claim_amount) if claim_amount else 0
+            if claim_amount_float <= 0:
+                return jsonify({'error': 'Invalid claim amount'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid claim amount format'}), 400
+        
+        # Get customer data
         customer_data = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId", 
             "customer", 
             [{"name": "@customerId", "value": customer_id}]
         )
         
-        # Validate customer exists and data matches
         is_valid, message = validate_customer_data(request.form, customer_data)
         if not is_valid:
             return jsonify({'error': message}), 400
         
-        # Get Claim ID
-        claim_id = f"C{uuid.uuid4().hex[:8].upper()}"
+        if is_edit:
+            # Get existing claim
+            claim_data = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.claim_id = @claimId",
+                "claim",
+                [{"name": "@claimId", "value": existing_claim_id}]
+            )
+            if not claim_data or claim_data[0]['claim_status'] != 'Rejected':
+                return jsonify({'error': 'Can only edit rejected claims'}), 400
+            
+            claim = claim_data[0]
+            claim_id = existing_claim_id
+            uploaded_docs = claim.get('documents', [])
+        else:
+            claim_id = f"C{uuid.uuid4().hex[:8].upper()}"
+            uploaded_docs = []
         
-        # Upload files ke Blob Storage
-        uploaded_docs = []
+        # Process file uploads with validation
+        file_mappings = {
+            'hospitalInvoice': ('invoice', 'Input_document/invoice/'),
+            'doctorForm': ('doctor form', 'Input_document/Docform/'),
+            'reportLab': ('report lab', 'Input_document/lab_results/'),
+            'additionalDoc': ('additional doc', 'Input_document/additional_docs/')
+        }
         
-        # Hospital invoice
-        if 'hospitalInvoice' in request.files:
-            file = request.files['hospitalInvoice']
-            if file.filename:
-                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"Input_document/invoice/{doc_id}_{file.filename}"
-                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                blob_client.upload_blob(file.read(), overwrite=True)
-                # Save document to CosmosDB
-                doc_data = {
-                    "id": doc_id,
-                    "doc_id": doc_id,
-                    "claim_id": claim_id,
-                    "doc_type": "invoice",
-                    "doc_blob_address": blob_name,
-                    "upload_date": datetime.now().isoformat()
-                }
-                database.get_container_client("document").create_item(doc_data)
-                uploaded_docs.append(doc_id)
-        # Doctor form
-        if 'doctorForm' in request.files:
-            file = request.files['doctorForm']
-            if file.filename:
-                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"Input_document/Docform/{doc_id}_{file.filename}"
-                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                blob_client.upload_blob(file.read(), overwrite=True)
-                # Save document ke CosmosDB
-                doc_data = {
-                    "id": doc_id,
-                    "doc_id": doc_id,
-                    "claim_id": claim_id,
-                    "doc_type": "doctor form",
-                    "doc_blob_address": blob_name,
-                    "upload_date": datetime.now().isoformat()
-                }
-                database.get_container_client("document").create_item(doc_data)
-                uploaded_docs.append(doc_id)
-        # Report Lab
-        if 'reportLab' in request.files:
-            file = request.files['reportLab']
-            if file.filename:
-                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"Input_document/lab_results/{doc_id}_{file.filename}"
-                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                blob_client.upload_blob(file.read(), overwrite=True)
-                # Save document ke CosmosDB
-                doc_data = {
-                    "id": doc_id,
-                    "doc_id": doc_id,
-                    "claim_id": claim_id,
-                    "doc_type": "report lab",
-                    "doc_blob_address": blob_name,
-                    "upload_date": datetime.now().isoformat()
-                }
-                database.get_container_client("document").create_item(doc_data)
-                uploaded_docs.append(doc_id)
-        # Additional Document
-        if 'additionalDoc' in request.files:
-            file = request.files['additionalDoc']
-            if file.filename:
-                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"Input_document/additional_docs/{doc_id}_{file.filename}"
-                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                blob_client.upload_blob(file.read(), overwrite=True)
-                # Save document ke CosmosDB
-                doc_data = {
-                    "id": doc_id,
-                    "doc_id": doc_id,
-                    "claim_id": claim_id,
-                    "doc_type": "additional doc",
-                    "doc_blob_address": blob_name,
-                    "upload_date": datetime.now().isoformat()
-                }
-                database.get_container_client("document").create_item(doc_data)
-                uploaded_docs.append(doc_id)
+        for form_field, (doc_type, blob_path) in file_mappings.items():
+            if form_field in request.files:
+                file = request.files[form_field]
+                if file.filename:
+                    # Validate file
+                    is_valid, message = validate_file(file)
+                    if not is_valid:
+                        return jsonify({'error': f'{form_field}: {message}'}), 400
+                    
+                    doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
+                    blob_name = f"{blob_path}{doc_id}_{file.filename}"
+                    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+                    blob_client.upload_blob(file.read(), overwrite=True)
+                    
+                    doc_data = {
+                        "id": doc_id,
+                        "doc_id": doc_id,
+                        "claim_id": claim_id,
+                        "doc_type": doc_type,
+                        "doc_blob_address": blob_name,
+                        "upload_date": datetime.now().isoformat()
+                    }
+                    database.get_container_client("document").create_item(doc_data)
+                    uploaded_docs.append(doc_id)
         
-        # Save claim ke CosmosDB
+        # Save or update claim
         claim_data = {
             "id": claim_id,
             "claim_id": claim_id,
             "customer_id": customer_data[0]['customer_id'],
             "name": customer_data[0]['name'],
             "policy_id": customer_data[0]['policy_id'], 
-            "claim_type": claim_type[0]['claim_type'] if isinstance(claim_type, list) else claim_type,
-            "claim_amount": float(claim_amount) if claim_amount else 0,
-            "currency" : currency, 
-            "claim_date": datetime.now().strftime("%d/%m/%Y"),
+            "claim_type": claim_type,
+            "claim_amount": claim_amount_float,
+            "currency": currency, 
+            "claim_date": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             "claim_status": "Proses",
             "documents": uploaded_docs,
-            "insurance_company": "XYZ Insurance",
-            
+            "insurance_company": insurance_company,
+            "date_checkin": date_checkin,
+            "date_checkout": date_checkout,
+            "resubmitted": is_edit  # Mark as resubmitted if editing
         }
         
-        database.get_container_client("claim").create_item(claim_data)
-        
-        def run_analysis_async(customer_id, claim_id):
-            def target():
-                try:
-                    analyst_function_executor(customer_id, claim_id)
-                except Exception as e:
-                    print(f"Error in analyst_function_executor: {e}", file=sys.stderr)
-            threading.Thread(target=target).start()
+        database.get_container_client("claim").upsert_item(claim_data)
         run_analysis_async(customer_id, claim_id)
         
         return jsonify({
             'status': 'success', 
-            'message': 'Claim submitted successfully',
+            'message': 'Claim updated successfully' if is_edit else 'Claim submitted successfully',
             'claim_id': claim_id,
             'documents_uploaded': len(uploaded_docs)
         })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
-    
+        print(f"Error submitting claim: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/api/chatbot', methods=['POST'])
 def chatbot_api():
     """Chatbot endpoint for insurance claim officer"""
@@ -417,28 +452,119 @@ def chatbot_api():
         
         try:
             response = Agent_Insurance.run({'input': user_message})
-            
-            # Extract action_input from JSON response if present
-            try:
-                import json
-                if '"action_input":' in response:
-                    # Find the action_input value
-                    start = response.find('"action_input": "') + len('"action_input": "')
-                    end = response.find('"', start)
-                    while response[end-1] == '\\':
-                        end = response.find('"', end + 1)
-                    clean_response = response[start:end].replace('\\"', '"')
-                    return jsonify({'response': clean_response})
-            except:
-                pass
-                
             return jsonify({'response': response})
         except Exception as agent_error:
             print(f"Agent error: {agent_error}")
             return jsonify({'response': 'Maaf, chatbot sedang mengalami gangguan. Silakan coba lagi nanti.'})
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error in chatbot: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/update-claim', methods=['POST'])
+def update_claim():
+    """Update claim details"""
+    try:
+        data = request.json
+        claim_id = data.get('claim_id')
+        status = data.get('status')
+        admin_id = data.get('admin_id')
+        notes = data.get('notes', '')
+
+        if not claim_id or not status or not admin_id:
+            return jsonify({'error': 'claim_id, status, and admin_id required'}), 400
+
+        claim_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.claim_id = @claimId",
+            "claim",
+            [{"name": "@claimId", "value": claim_id}]
+        )
+        if not claim_data:
+            return jsonify({'error': 'Claim not found'}), 404
+
+        claim = claim_data[0]
+        claim['claim_status'] = status
+        claim['admin_id'] = admin_id
+        claim['admin_notes'] = notes
+        claim['processed_date'] = datetime.now().isoformat()
+
+        if status == 'Rejected':
+            claim['rejected_by'] = admin_id
+            claim['rejected_date'] = datetime.now().isoformat()
+            claim['rejection_reason'] = notes
+        elif status == 'Approved':
+            claim['approved_by'] = admin_id
+            claim['approved_date'] = datetime.now().isoformat()
+
+        updated_claim = database.get_container_client("claim").upsert_item(claim)
+        return jsonify({'status': 'success', 'claim': updated_claim})
+
+    except Exception as e:
+        print(f"Error updating claim: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/extract-registration-info', methods=['POST'])
+def extract_registration_info():
+    """Extract information from uploaded documents for registration"""
+    try:
+        extracted_data = {}
+        
+        # Process insurance card
+        if 'insurance_card' in request.files:
+            file = request.files['insurance_card']
+            if file.filename:
+                doc_id = f"REG{uuid.uuid4().hex[:8].upper()}"
+                blob_name = f"registration/{doc_id}_{file.filename}"
+                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+                blob_client.upload_blob(file.read(), overwrite=True)
+                
+                # Extract using existing function
+                insurance_data = analize_doc_registration(blob_name, "insurance card")
+                
+                # Map insurance card data
+                if insurance_data:
+                    extracted_data.update({
+                        'policy_number': insurance_data.get('IdNumber', {}).get('Number', ''),
+                        'insurance_company': insurance_data.get('Insurer', ''),
+                        'participant_number': insurance_data.get('Member', {}).get('IdNumberSuffix', ''),
+                        'policy_holder_name': insurance_data.get('Member', {}).get('Name', ''),
+                        'plan_name': insurance_data.get('Plan', {}).get('Name', '')
+                    })
+        
+        # Process ID card
+        if 'id_card' in request.files:
+            file = request.files['id_card']
+            if file.filename:
+                doc_id = f"REG{uuid.uuid4().hex[:8].upper()}"
+                blob_name = f"registration/{doc_id}_{file.filename}"
+                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+                blob_client.upload_blob(file.read(), overwrite=True)
+                
+                # Extract using existing function
+                id_data = analize_doc_registration(blob_name, "id card")
+                
+                # Map ID card data
+                if id_data:
+                    extracted_data.update({
+                        'nik': id_data.get('NIK', ''),
+                        'full_name': id_data.get('Nama', ''),
+                        'birth_date': id_data.get('Tanggal lahir', ''),
+                        'gender': id_data.get('Jenis kelamin', ''),
+                        'marital_status': id_data.get('Status perkawinan', ''),
+                        'address': id_data.get('Alamat', ''),
+                        'rt_rw': id_data.get('RT/RW', ''),
+                        'kelurahan': id_data.get('Kel/Desa', ''),
+                        'kecamatan': id_data.get('Kecamatan', '')
+                    })
+        
+        return jsonify({
+            'status': 'success',
+            'data': extracted_data
+        })
+        
+    except Exception as e:
+        print(f"Error in document extraction: {e}")
+        return jsonify({'error': 'Document processing failed'}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():

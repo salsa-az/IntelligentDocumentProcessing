@@ -211,9 +211,6 @@
                       </svg>
                       <span class="max-xs:sr-only">{{ isEditing ? 'Update Klaim' : 'Ajukan Klaim' }}</span>
                   </button>
-                  <!-- <button type="submit" class="btn bg-violet-500 hover:bg-violet-600 text-white shadow-lg transition-all duration-200">
-                    {{ isEditing ? 'Update Klaim' : 'Ajukan Klaim' }}
-                  </button> -->
                 </div>
 
           </form>
@@ -247,6 +244,7 @@ export default {
     const sidebarOpen = ref(false)
     const isEditing = ref(false)
     const existingDocuments = ref([])
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
     
     const form = ref({
       // Auto-filled profile data
@@ -349,48 +347,74 @@ export default {
       }
     ]
 
-    const loadClaimData = () => {
+    const loadClaimData = async () => {
       const editId = route.query.edit
-      console.log('Edit ID:', editId)
+      
       if (editId) {
-        const claim = mockClaims.find(c => c.id == editId)
-        console.log('Found claim:', claim)
-        if (claim) {
-          isEditing.value = true
-          // Load claim data
-          form.value.claimType = claim.type
-          form.value.claimAmount = claim.amount
-          form.value.treatmentStartDate = formatDateForDatepicker(claim.checkIn)
-          form.value.treatmentEndDate = formatDateForDatepicker(claim.checkOut)
-          existingDocuments.value = claim.documents || []
-          // Load profile data
-          if (claim.profile) {
-            Object.assign(form.value, claim.profile)
+        try {
+          const response = await fetch(`http://localhost:5000/api/claims/${editId}`)
+          const result = await response.json()
+          
+          if (result.status === 'success' && result.claim) {
+            const claim = result.claim
+            console.log('Raw claim data from API:', claim)
+            
+            // Only allow editing rejected claims
+            if (claim.claim_status !== 'Rejected') {
+              alert('Only rejected claims can be edited')
+              router.push('/claim-history')
+              return
+            }
+            
+            isEditing.value = true
+            
+
+            // Load claim data with proper mapping
+            form.value.claimType = claim.claim_type || ''
+            form.value.claimAmount = claim.claim_amount || ''
+            form.value.currency = claim.currency || 'IDR'
+            form.value.treatmentStartDate = claim.date_checkin || ''
+            form.value.treatmentEndDate = claim.date_checkout || ''
+            form.value.namaPerusahaan = claim.insurance_company || ''
+            
+            // Load existing documents
+            existingDocuments.value = claim.document_details || []
+            
+            console.log('Loaded claim data:', {
+              claimType: form.value.claimType,
+              claimAmount: form.value.claimAmount,
+              currency: form.value.currency,
+              treatmentStartDate: form.value.treatmentStartDate,
+              treatmentEndDate: form.value.treatmentEndDate,
+              namaPerusahaan: form.value.namaPerusahaan,
+              documents: existingDocuments.value.length
+            })
+            
+            console.log('Existing documents:', existingDocuments.value)
           }
-          console.log('Form loaded with data:', form.value)
+        } catch (error) {
+          console.error('Error fetching claim data:', error)
+          alert('Failed to load claim data')
+          router.push('/claim-history')
         }
       }
     }
 
-    const formatDateForDatepicker = (dateString) => {
-      if (!dateString) return null
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      })
-    }
-
     const getExistingDocument = (type) => {
       if (!existingDocuments.value.length) return null
-      if (type === 'invoice') {
-        return existingDocuments.value.find(doc => doc.name.toLowerCase().includes('invoice'))
+      
+      // Map document types from database to form types
+      const typeMap = {
+        'invoice': ['invoice'],
+        'form': ['doctor form'],
+        'reportLab': ['report lab'],
+        'additionalDoc': ['additional doc']
       }
-      if (type === 'form') {
-        return existingDocuments.value.find(doc => doc.name.toLowerCase().includes('form') || doc.name.toLowerCase().includes('dokter'))
-      }
-      return null
+      
+      const searchTypes = typeMap[type] || []
+      return existingDocuments.value.find(doc => 
+        searchTypes.some(searchType => doc.doc_type === searchType)
+      )
     }
 
     const viewDocument = (document) => {
@@ -407,16 +431,16 @@ export default {
         formData.append('claimType', form.value.claimType)
         formData.append('claimAmount', form.value.claimAmount)
         formData.append('currency', form.value.currency)
-        formData.append('customerId', 'CU001')
+        formData.append('customerId', currentUser.id)
         formData.append('policyId', form.value.nomorPolis)
         formData.append('treatmentStartDate', form.value.treatmentStartDate)
         formData.append('treatmentEndDate', form.value.treatmentEndDate)
+        formData.append('insuranceCompany', form.value.namaPerusahaan)
         
         if (isEditing.value) {
           formData.append('claimId', route.query.edit)
           formData.append('isEdit', 'true')
         }
-        
         
         // Add files
         if (form.value.hospitalInvoice) {
@@ -432,8 +456,7 @@ export default {
           formData.append('additionalDoc', form.value.additionalDoc)
         }
         
-        const endpoint = isEditing.value ? 'http://localhost:5000/api/update-claim' : 'http://localhost:5000/api/submit-claim'
-        const response = await fetch(endpoint, {
+        const response = await fetch('http://localhost:5000/api/submit-claim', {
           method: 'POST',
           body: formData
         })
@@ -465,7 +488,6 @@ export default {
       }
     }
 
-    // Watch for changes in form dates to update Datepicker
     watch(() => form.value.treatmentStartDate, (newVal) => {
       if (newVal && isEditing.value) {
         console.log('Start date updated:', newVal)
@@ -478,8 +500,8 @@ export default {
       }
     })
 
-    onMounted(() => {
-      loadClaimData()
+    onMounted(async () => {
+      await loadClaimData()
     })
 
     return {

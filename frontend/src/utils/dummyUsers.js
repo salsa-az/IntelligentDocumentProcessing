@@ -1,7 +1,7 @@
 // Dummy users for testing authentication
 export const dummyUsers = [
   {
-    id: 1,
+    id: 'CU001',
     fullName: 'Feri Hussen',
     email: 'customer@example.com',
     password: 'password123',

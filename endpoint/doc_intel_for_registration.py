@@ -155,13 +155,41 @@ def insurance_card_parser(result) -> Dict[str, Any]:
 
 def id_card_parser(result):
     key_value_dict = {}
-    for kv_pair in result.key_value_pairs:
-        if kv_pair.key and kv_pair.value:
-            key_value_dict[kv_pair.key.content] = kv_pair.value.content
-        elif kv_pair.key:
-            key_value_dict[kv_pair.key.content] = None
-        else:
-            continue
+    
+    # Check if key_value_pairs exists and is not None
+    if hasattr(result, 'key_value_pairs') and result.key_value_pairs:
+        for kv_pair in result.key_value_pairs:
+            if kv_pair.key and kv_pair.value:
+                key_value_dict[kv_pair.key.content] = kv_pair.value.content
+            elif kv_pair.key:
+                key_value_dict[kv_pair.key.content] = None
+    
+    # Extract from content if available
+    if hasattr(result, 'content'):
+        content = result.content
+        lines = content.split('\n')
+        
+        # Fields to extract
+        fields = ['NIK', 'Nama', 'Tempat/Tgl Lahir', 'Jenis Kelamin', 'Alamat', 'RT/RW', 'Kel/Desa', 'Kecamatan', 'Status Perkawinan', 'Pekerjaan']
+        
+        for line in lines:
+            line = line.strip()
+            # Special parsing for Status Perkawinan and Pekerjaan on same line
+            if 'Status Perkawinan' in line and 'Pekerjaan' in line:
+                parts = line.split('Pekerjaan')
+                if len(parts) == 2:
+                    status_part = parts[0].replace('Status Perkawinan', '').strip()
+                    pekerjaan_part = parts[1].replace(':', '').strip()
+                    key_value_dict['Status Perkawinan'] = status_part
+                    key_value_dict['Pekerjaan'] = pekerjaan_part
+            else:
+                for field in fields:
+                    if field in line:
+                        if ':' in line:
+                            key_value_dict[field] = line.split(':', 1)[1].strip()
+                        elif field == 'NIK' and line.replace(' ', '').isdigit():
+                            key_value_dict[field] = line
+    
     return key_value_dict
 
 
@@ -186,11 +214,16 @@ def analize_doc(blob_add : str, document_type :str) :
         except Exception as e:
             print(f"ID card processing failed: {e}")
             return {
-                'nik': '1234567890123456',
-                'full_name': 'BUDI SANTOSO',
-                'birth_date': '01-01-1990',
-                'gender': 'LAKI-LAKI',
-                'marital_status': 'BELUM KAWIN'
+                # 'NIK': '1234567890123456',
+                # 'Nama': 'BUDI SANTOSO',
+                # 'Tempat/Tgl Lahir': 'JAKARTA, 01-01-1990',
+                # 'Jenis Kelamin': 'LAKI-LAKI',
+                # 'Alamat': 'JL. PASTI CEPAT A7/66',
+                # 'RT/RW': '007/008',
+                # 'Kel/Desa': 'PEGADUNGAN',
+                # 'Kecamatan': 'KALIDERES',
+                # 'Status Perkawinan': 'BELUM KAWIN',
+                # 'Pekerjaan': 'KARYAWAN SWASTA'
             }
     else:
         return {}

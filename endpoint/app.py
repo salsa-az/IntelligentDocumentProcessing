@@ -18,11 +18,12 @@ from azure.cosmos import CosmosClient
 
 from funcHelperApp import cosmos_retrive_data, function_triger
 from dotenv import load_dotenv
-from chatbotClaimerOfficer import Agent_Insurance
+from chatbotClaimerOfficer import agent 
 from doc_intel_for_registration import analize_doc as analize_doc_registration
 
 load_dotenv()
-
+thread_id = uuid.uuid4()
+config = {"configurable": {"thread_id": thread_id}}
 # Initialize Flask app once
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"]}})
@@ -440,6 +441,8 @@ def submit_claim():
         print(f"Error submitting claim: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+import json
+
 @app.route('/api/chatbot', methods=['POST'])
 def chatbot_api():
     """Chatbot endpoint for insurance claim officer"""
@@ -448,17 +451,34 @@ def chatbot_api():
         user_message = data.get('message')
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
-        
+
+        # Ensure user_message is a valid string
+        user_message = str(user_message)
+
+        print(f"User message: {user_message}")
+
+        # Ensure that the message is in the correct format
+        formatted_input = {
+            "messages": [{"role": "user", "content": user_message}]
+        }
+
         try:
-            response = Agent_Insurance.run({'input': user_message})
+            response = ''
+            for chunk in agent.stream(input=formatted_input, config=config, stream_mode="values"):
+                response = chunk['messages'][-1].content   # i just want the AI Final answer
+                print(f"AI response: {response}")
+                response = str(response)
             return jsonify({'response': response})
         except Exception as agent_error:
             print(f"Agent error: {agent_error}")
-            return jsonify({'response': 'Maaf, chatbot sedang mengalami gangguan. Silakan coba lagi nanti.'})
-            
+            return jsonify({'response': 'Maaf, chatbot sedang mengalami gangguan. Silakan coba lagi nanti.'}), 500
+
     except Exception as e:
         print(f"Error in chatbot: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+
+
 
 @app.route('/api/update-claim', methods=['POST'])
 def update_claim():

@@ -8,7 +8,15 @@ from typing import List, Dict, Any, Optional
 from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool, Tool
 from langchain_community.utilities import SerpAPIWrapper
-from langchain.agents import initialize_agent, AgentType
+from langchain.memory import ConversationBufferMemory
+from langchain.schema import SystemMessage
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.prompts.chat import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
+)
 load_dotenv()
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")
 cosmos_db_key = os.getenv("COSMOS_DB_KEY")
@@ -31,7 +39,7 @@ class QueryInput(BaseModel):
 # --- Tool SELECT ---
 @tool("get_DB_details")
 def get_db_details() -> str:
-    """get the metadata of the Cosmos DB"""
+    """get the metadata of the Cosmos DB, please call this tool first before using cosmos_select tool"""
     details = f"""
     here is the format of the Cosmos DB: 
     {'-'*5} item in database {'-'*5}
@@ -122,72 +130,30 @@ def cosmos_select_tool(query: str, container: str, parameters: list = None) -> L
 # tool for web search 
 search = SerpAPIWrapper()
 search_tool = Tool(
-    name="web search",
+    name="web_search",
     description="Search the web for information, useful for when you need to find current information or look up specific details online.(e.g. berapa harga rata-rata pengobatan untuk penyakit X di Indonesia?)",
     func=search.run,
 )
 
 # Tool for ICD API 
 @tool("get_dieses_info")
-def get_dieses_info(search_key, min_score=0.5) :
+def get_dieses_info(search_key) :
     """search for dieses information from WHO ICD API, to verify the diagnosa"""
-
-    token_endpoint = 'https://icdaccessmanagement.who.int/connect/token'
-    client_id = 'ef108bbc-154c-401a-b7ba-15758a60c878_1bd261be-3e0f-495a-ae9d-1f8c0967ed04'
-    client_secret = '2gmDnJPBN5CxYl8HxOgS720MtPTWyIb3M0az0Kf/bUI='
-    scope = 'icdapi_access'
-    grant_type = 'client_credentials'
-    # set data to post
-    payload = {'client_id': client_id, 
-            'client_secret': client_secret, 
-            'scope': scope, 
-            'grant_type': grant_type}
-            
-    # make request
-    r = requests.post(token_endpoint, data=payload, verify=False).json()
-    token = r['access_token']
-
-    # access ICD API
-
-
-    # HTTP header fields to set
-    headers = {'Authorization':  'Bearer '+token, 
-            'Accept': 'application/json', 
-            'Accept-Language': 'en',
-        'API-Version': 'v2'}
-    uri = f'https://id.who.int/icd/entity/search?q={search_key}'
-
-    # make request
-    searchData = requests.get(uri, headers=headers, verify=False)
-    searchData = searchData.json()
-    finalData = {}
-    # Memastikan respons berisi daftar entitas yang diharapkan
-    if "destinationEntities" in searchData and isinstance(searchData["destinationEntities"], list):
-
-        for i, entity in enumerate(searchData["destinationEntities"]):
-            score = entity.get("score", 0)
-            print(entity)
-            if score >= min_score:
-                # Mendapatkan data utama dari setiap entitas
-                title = entity.get("title", "Tidak tersedia").replace("<em>", "").replace("</em>", "")
-                entity_id = entity.get("id", "Tidak tersedia")
-                score = entity.get("score", "Tidak tersedia")
-                response = requests.get(entity_id, headers=headers, verify=False)
-                response.raise_for_status()
-                response = response.json()
-                detail = response.get('definition') 
-                if detail:
-                    # Menghapus tag HTML dari definisi
-                    detail = detail.get('@value', 'Tidak tersedia')
-                else:
-                    detail = "Tidak tersedia"
-                finalData[i] = {
-                        "title": title.replace("<em class='found'>", "").replace("</em>", ""),
-                        "id": entity_id,
-                        "score": score,
-                        "details": detail
-                }
-    return finalData
+    url = "https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search"
+    params = {
+        "sf": "code,name",
+        "terms": search_key
+    }
+    
+    response = requests.get(url, params=params)
+    
+    if response.status_code == 200:
+        data = response.json()
+        # data[3] biasanya berisi hasil list kode & deskripsi
+        results = [{"Code": code, "Description": desc} for code, desc in data[3]]
+        return results
+    else:
+        return {"error": response.status_code, "message": response.text}
 
 # tool for  rag : 
 
@@ -208,14 +174,8 @@ llm = AzureChatOpenAI(
 )
 
 tools = [cosmos_select_tool, get_db_details, search_tool, get_dieses_info]
-
+memory = MemorySaver()
 # Initialize agent
-Agent_Insurance = initialize_agent(
-    tools,   
-    llm,
-    agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True,
-    prefix=system_prompt 
-)
-print("Agent siap digunakan")
+agent = create_react_agent(llm, tools, checkpointer=memory, prompt=system_prompt)
+print("Chatbot siap digunakan")
 

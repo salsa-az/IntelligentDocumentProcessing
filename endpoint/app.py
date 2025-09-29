@@ -508,7 +508,7 @@ def extract_registration_info():
     try:
         extracted_data = {}
         
-        # Upload insurance card but provide mock data
+        # Process insurance card - upload
         if 'insurance_card' in request.files:
             file = request.files['insurance_card']
             if file.filename:
@@ -518,14 +518,9 @@ def extract_registration_info():
                 blob_client.upload_blob(file.read(), overwrite=True)
                 print(f"Insurance card uploaded: {blob_name}")
                 
-                # Provide mock insurance data
-                extracted_data.update({
-                    'policy_number': 'POL123456789',
-                    'insurance_company': 'PT Asuransi Sehat Indonesia',
-                    'participant_number': 'PA987654321',
-                    'policy_holder_name': 'BUDI SANTOSO',
-                    'plan_name': 'Platinum Health'
-                })
+                # Get mock insurance data from the updated function
+                # insurance_data = analize_doc_registration(blob_name, "insurance card")
+                # extracted_data.update(insurance_data)
         
         # Process ID card with Azure Document Intelligence
         if 'id_card' in request.files:
@@ -536,24 +531,28 @@ def extract_registration_info():
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                 blob_client.upload_blob(file.read(), overwrite=True)
                 
-                # Extract using Azure Document Intelligence
+                # Extract using Azure Document Intelligence with fallback
                 id_data = analize_doc_registration(blob_name, "id card")
                 
-                # Map ID card data
+                # Map ID card data to expected format
                 if id_data:
                     extracted_data.update({
                         'nik': id_data.get('NIK', ''),
                         'full_name': id_data.get('Nama', ''),
-                        'birth_date': id_data.get('Tanggal lahir', ''),
-                        'gender': id_data.get('Jenis kelamin', ''),
-                        'marital_status': id_data.get('Status perkawinan', ''),
+                        'birth_date': id_data.get('Tempat/Tgl Lahir', ''),
+                        'gender': id_data.get('Jenis Kelamin', ''),
+                        'address': id_data.get('Alamat', ''),
+                        'rt_rw': id_data.get('RT/RW', ''),
+                        'kelurahan': id_data.get('Kel/Desa', ''),
+                        'kecamatan': id_data.get('Kecamatan', ''),
+                        'marital_status': id_data.get('Status Perkawinan', ''),
+                        'occupation': id_data.get('Pekerjaan', '')
                     })
-
         return jsonify({
             'status': 'success',
             'data': extracted_data
         })
-        
+    
     except Exception as e:
         print(f"Error in document extraction: {e}")
         return jsonify({'error': 'Document processing failed'}), 500

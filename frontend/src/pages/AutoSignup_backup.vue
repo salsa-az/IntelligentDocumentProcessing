@@ -13,7 +13,7 @@
             </div>
 
             <div class="flex justify-center mb-8">
-              <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Smart Registration</h1>
+              <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Registration</h1>
             </div>
 
             <!-- Progress Steps -->

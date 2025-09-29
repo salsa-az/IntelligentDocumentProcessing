@@ -13,7 +13,7 @@
             </div>
 
             <div class="flex justify-center mb-8">
-              <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Smart Registration</h1>
+              <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Registration</h1>
             </div>
 
             <!-- Progress Steps -->
@@ -136,18 +136,6 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
                   We're extracting information from your documents. This may take a few moments...
                 </p>
-                <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                  <div class="flex justify-between text-sm mb-2">
-                    <span>Processing progress</span>
-                    <span>{{ processingProgress }}%</span>
-                  </div>
-                  <div class="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-2">
-                    <div class="bg-violet-500 h-2 rounded-full transition-all duration-500" :style="`width: ${processingProgress}%`"></div>
-                  </div>
-                </div>
-                <div class="mt-6">
-                  <p class="text-sm text-gray-500">{{ processingStatus }}</p>
-                </div>
               </div>
             </div>
 
@@ -560,11 +548,10 @@ export default {
         'namaPemegang': data.policy_holder_name,
         'namaPeserta': data.policy_holder_name,
         'nik': data.nik,
-        'tanggalLahir': this.formatDate(data.birth_date),
+        'tanggalLahir': this.formatBirthDate(data.birth_date),
         'jenisKelamin': this.mapGender(data.gender),
         'statusPernikahan': this.mapMaritalStatus(data.marital_status),
-        'alamat': this.buildAddress(data),
-        'nomorTelepon': data.phone
+        'alamat': this.buildAddress(data)
       };
 
       // Apply extracted data to form and track auto-filled fields
@@ -576,11 +563,15 @@ export default {
       }
     },
     
-    formatDate(dateStr) {
+    formatBirthDate(dateStr) {
       if (!dateStr) return '';
-      // Convert various date formats to YYYY-MM-DD
-      const date = new Date(dateStr);
-      return date.toISOString().split('T')[0];
+      // Extract date from "JAKARTA, 18-02-1986" format
+      const match = dateStr.match(/(\d{2}-\d{2}-\d{4})/);
+      if (match) {
+        const [day, month, year] = match[1].split('-');
+        return `${year}-${month}-${day}`;
+      }
+      return '';
     },
     
     mapGender(gender) {
@@ -601,7 +592,11 @@ export default {
     },
     
     buildAddress(data) {
-      const parts = [data.address, data.rt_rw, data.kelurahan, data.kecamatan].filter(Boolean);
+      const parts = [];
+      if (data.address) parts.push(data.address);
+      if (data.rt_rw) parts.push(`RT/RW ${data.rt_rw}`);
+      if (data.kelurahan) parts.push(data.kelurahan);
+      if (data.kecamatan) parts.push(data.kecamatan);
       return parts.join(', ');
     },
     proceedToFinalStep() {

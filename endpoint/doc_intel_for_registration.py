@@ -1,10 +1,11 @@
 import json
-import os
+import os, re
 from datetime import datetime, timedelta,timezone 
 from azure.core.credentials import AzureKeyCredential
 from typing import Dict, Any
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
+from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.storage.blob import BlobServiceClient, BlobSasPermissions, generate_blob_sas
 from dotenv import load_dotenv
 load_dotenv()
@@ -17,6 +18,36 @@ document_intelligence_client = DocumentIntelligenceClient(
     endpoint=AZURE_DOC_INTELLIGENCE_ENDPOINT,
     credential=AzureKeyCredential(AZURE_DOC_INTELLIGENCE_KEY)
 )
+document_analysis_client = DocumentAnalysisClient(
+        endpoint=AZURE_DOC_INTELLIGENCE_ENDPOINT, credential=AzureKeyCredential(AZURE_DOC_INTELLIGENCE_KEY)
+)
+def normalize_key(k: str, keep_colon: bool=False) -> str:
+    s = k.replace('\n', ' ').strip()
+    s = re.sub(r'\s+', ' ', s)
+    s = re.sub(r'\s*:\s*$', '', s)
+    return s + ' :' if keep_colon else s
+
+def clean_simple_value(key: str, v):
+    if not isinstance(v, str):
+        return v
+    s = v.replace('\n', ' ').strip()
+    s = re.sub(r'\s+', ' ', s)
+    if 'nip' in key.lower():
+        digits = re.sub(r'\D', '', s)
+        return digits
+    s = re.sub(r'\s*([.,:;()\-\/])\s*', r'\1 ', s).strip()
+    s = re.sub(r'\s+([%.\,])', r'\1', s)
+    return s
+
+def clean_document(data: dict):
+    top_fields = {}
+    for k, v in data.items():
+        if k == 'All content':
+            continue
+        nk = normalize_key(k, keep_colon=False)
+        top_fields[nk] = clean_simple_value(nk, v) if isinstance(v, str) else v
+    top_vals = list(top_fields.values())
+    return top_fields
 def get_sas_url(blob_add):
 
     try:
@@ -52,145 +83,55 @@ def get_sas_url(blob_add):
         return f"error : Environment variable tidak ditemukan: {e}"
 
 
-def get_result(sas_url_dokumen, model_name) :
-    poller = document_intelligence_client.begin_analyze_document(
-        model_id=model_name,
-        body=AnalyzeDocumentRequest(url_source=sas_url_dokumen)
-    )
-    result = poller.result()
+def get_result(sas_url_dokumen, document_type) :
+    """Analyze the document using the specified model."""
+    print(f"Memproses dokumen dengan model: {document_type}")
+    try :
+        poller = document_analysis_client.begin_analyze_document_from_url("prebuilt-document", sas_url_dokumen)
+        result = poller.result()  
+    except Exception as e :
+        print(f"Error during document analysis: {e}")
+        return {"error" : str(e)}
     return result
-
-
-def insurance_card_parser(result) -> Dict[str, Any]:
-    extracted_info = {}
-
-    for idx, document in enumerate(result.documents):
-        doc_type = document.doc_type
-        if doc_type:
-            extracted_info['DocumentType'] = doc_type
-
-        # Extract Insurer
-        insurer = document.fields.get("Insurer")
-        if insurer:
-            extracted_info['Insurer'] = insurer.value_string
-
-        # Extract Group Number
-        group_number = document.fields.get("GroupNumber")
-        if group_number:
-            extracted_info['GroupNumber'] = group_number.value_string
-
-        # Extract ID Number (and Prefix)
-        id_number = document.fields.get("IdNumber")
-        if id_number:
-            id_info = {}
-            number = id_number.value_object.get("Number")
-            if number:
-                id_info['Number'] = number.value_string
-            prefix = id_number.value_object.get("Prefix")
-            if prefix:
-                id_info['Prefix'] = prefix.value_string
-            if id_info:
-                extracted_info['IdNumber'] = id_info
-
-        # Extract Member Information
-        member = document.fields.get("Member")
-        if member:
-            member_info = {}
-            employer = member.value_object.get("Employer")
-            if employer:
-                member_info['Employer'] = employer.value_string
-            id_suffix = member.value_object.get("IdNumberSuffix")
-            if id_suffix:
-                member_info['IdNumberSuffix'] = id_suffix.value_string
-            name = member.value_object.get("Name")
-            if name:
-                member_info['Name'] = name.value_string
-            if member_info:
-                extracted_info['Member'] = member_info
-
-        # Extract Plan Information
-        plan = document.fields.get("Plan")
-        if plan:
-            plan_info = {}
-            plan_number = plan.value_object.get("Number")
-            if plan_number:
-                plan_info['Number'] = plan_number.value_string
-            plan_name = plan.value_object.get("Name")
-            if plan_name:
-                plan_info['Name'] = plan_name.value_string
-            if plan_info:
-                extracted_info['Plan'] = plan_info
-
-        # Extract Copays
-        copays = document.fields.get("Copays")
-        if copays:
-            copay_info = []
-            for copay_idx, copay in enumerate(copays.value_array):
-                copay_data = {}
-                benefit = copay.value_object.get("Benefit")
-                amount = copay.value_object.get("Amount")
-                if benefit and amount:
-                    copay_data['Benefit'] = benefit.value_string
-                    copay_data['Amount'] = amount.value_number
-                if copay_data:
-                    copay_info.append(copay_data)
-            if copay_info:
-                extracted_info['Copays'] = copay_info
-
-        # Extract Prescription Info
-        prescription_info = document.fields.get("PrescriptionInfo")
-        if prescription_info:
-            prescription_data = {}
-            rx_bin = prescription_info.value_object.get("RxBIN")
-            if rx_bin:
-                prescription_data['RxBIN'] = rx_bin.value_string
-            rx_grp = prescription_info.value_object.get("RxGrp")
-            if rx_grp:
-                prescription_data['RxGrp'] = rx_grp.value_string
-            if prescription_data:
-                extracted_info['PrescriptionInfo'] = prescription_data
-
-    return extracted_info
-
-
-def id_card_parser(result):
-    key_value_dict = {}
+# parser function
+def card_parser(result) :
+    """Parse the document analysis result."""
+    all_result = {}
     for kv_pair in result.key_value_pairs:
         if kv_pair.key and kv_pair.value:
-            key_value_dict[kv_pair.key.content] = kv_pair.value.content
-        elif kv_pair.key:
-            key_value_dict[kv_pair.key.content] = None
+            all_result[kv_pair.key.content] = kv_pair.value.content
         else:
-            continue
-    return key_value_dict
+            all_result[kv_pair.key.content] = "-"
+    all_result = clean_document(all_result)
+    return all_result
 
+def map_insurance_and_id_card(card, document_type):
+    """Map fields from insurance card and ID card according to the specified criteria."""
+    if document_type=="insuranceCard":
+        # Extract relevant fields from insurance card
+        mapped_insurance = {
+            "No. Kartu": card.get("No. Kartu", ""),
+            "No. Polis": card.get("No. Polis", ""),
+            "No. Peserta": card.get("No. Peserta", "")
+        }
+        return mapped_insurance
+    elif document_type=="idCard":
+        # Extract all fields from ID card except "Berlaku Hingga"
+        mapped_id_card = {key: value for key, value in card.items() if key != "Berlaku Hingga"}
+        return mapped_id_card
+    return {}
 
 def analize_doc(blob_add : str, document_type :str) :
-    if document_type == "insurance card":
-        # Return mock data for insurance card
-        return {
-            'policy_number': 'POL123456789',
-            'insurance_company': 'PT Asuransi Sehat Indonesia',
-            'participant_number': 'PA987654321',
-            'policy_holder_name': 'BUDI SANTOSO',
-            'plan_name': 'Platinum Health'
-        }
-    elif document_type == "id card":
-        try:
-            sas_url_dokumen = get_sas_url(blob_add)
-            print("Memanggil Document Intelligence...")
-            content = get_result(sas_url_dokumen, "prebuilt-layout")
-            extracted = id_card_parser(content)
-            print("Done Extracting format")
-            return extracted
-        except Exception as e:
-            print(f"ID card processing failed: {e}")
-            return {
-                'nik': '1234567890123456',
-                'full_name': 'BUDI SANTOSO',
-                'birth_date': '01-01-1990',
-                'gender': 'LAKI-LAKI',
-                'marital_status': 'BELUM KAWIN'
-            }
-    else:
-        return {}
+    try : 
+        sas_url_dokumen = get_sas_url(blob_add)
+        print(f"SAS URL generated")
+        result = get_result(sas_url_dokumen, document_type)
+        print(f"Document analyzed successfully.")
+        parsed = card_parser(result)
+        print(f"Document parsed successfully.")
+        mapout = map_insurance_and_id_card(parsed, document_type)
+        print(f"Document mapped successfully.")
+        return mapout
+    except Exception as e :
+        print(f"Error during document analysis: {e}")
+        return {"error" : str(e)}

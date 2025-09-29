@@ -13,13 +13,11 @@ from flask_cors import CORS
 # Azure
 from azure.storage.blob import BlobServiceClient
 from azure.cosmos import CosmosClient
-from endpoint.analyst_func import analyst_function_executor
 
 # Langchain Functions
-from doc_intel import analize_doc
-from analyst_tools import cosmos_retrive_data
+
+from funcHelperApp import cosmos_retrive_data, function_triger
 from dotenv import load_dotenv
-from letterfunc import letter_chain_pro
 from chatbotClaimerOfficer import Agent_Insurance
 from doc_intel_for_registration import analize_doc as analize_doc_registration
 
@@ -57,7 +55,7 @@ def run_analysis_async(customer_id, claim_id):
     """Run analysis asynchronously"""
     def target():
         try:
-            analyst_function_executor(customer_id, claim_id)
+            function_triger(customer_id, claim_id)
         except Exception as e:
             print(f"Error in analyst_function_executor: {e}", file=sys.stderr)
     threading.Thread(target=target, daemon=True).start()
@@ -212,7 +210,10 @@ def update_claim_status(claim_id):
         
         claim['claim_status'] = status
         claim['admin_id'] = admin_id
-        claim['admin_notes'] = notes
+        if notes == "" :
+            claim['admin_notes'] = claim["AI_reasoning"]
+        else :
+            claim['admin_notes'] = notes
         claim['processed_date'] = datetime.now().isoformat()
         claim['resubmitted'] = False  # Reset resubmission flag
         
@@ -222,15 +223,13 @@ def update_claim_status(claim_id):
         elif status == 'Rejected':
             claim['rejected_by'] = admin_id
             claim['rejected_date'] = datetime.now().isoformat()
-            claim['rejection_reason'] = notes
-
         updated_claim = database.get_container_client("claim").upsert_item(claim)
         
         try:
-            letter_chain_pro(claim['customer_id'], claim_id, f"{admin_id}")
+            function_triger(claim['customer_id'], claim_id, admin_id)
         except Exception as e:
-            print(f"Letter generation error: {e}")
-            
+            print(f"Function trigger error: {e}")
+
         return jsonify({'status': 'success', 'claim': updated_claim})
         
     except Exception as e:

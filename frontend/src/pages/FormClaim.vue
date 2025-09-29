@@ -408,7 +408,7 @@ export default {
         'invoice': ['invoice'],
         'form': ['doctor form'],
         'reportLab': ['report lab'],
-        'additionalDoc': ['additional doc']
+        'additionalDoc': ['additional document']
       }
       
       const searchTypes = typeMap[type] || []

@@ -13,43 +13,25 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib.units import cm
-from google.oauth2.credentials import Credentials
-from google.oauth2 import service_account
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+from azure.communication.email import EmailClient
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 import base64
 from azure.storage.blob import BlobServiceClient
-from langchain_core.runnables import RunnableParallel, RunnableLambda
+from langchain_core.runnables import RunnableLambda
 import io 
 from azure.cosmos import CosmosClient
 import random
 from typing import Dict, Any
 from dotenv import load_dotenv
-from langchain_google_community import GmailToolkit
-from langchain_google_community.gmail.utils import (
-    build_resource_service,
-    get_gmail_credentials,
-)
 from dotenv import load_dotenv
 from analyst_tools import cosmos_retrive_data
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
-credentials = get_gmail_credentials(
-    token_file="token.json", #PROJECT_ROOT/
-    scopes=["https://mail.google.com/"],
-    client_secrets_file="credentials.json", #PROJECT_ROOT/
-    
-)
-
 pdf_buffer = io.BytesIO()
-toolkit = GmailToolkit()
-
-api_resource = build_resource_service(credentials=credentials)
 load_dotenv()
 class ClaimLetter(BaseModel):
     nomor_surat: str = Field(description="Number for the letter, which contain SK-(customer_id and claim_id)/type_claim/DDMM/YYYY")
@@ -64,76 +46,6 @@ class ClaimLetter(BaseModel):
     
     
 # Create chain
-def upload_stream_to_blob(data_stream: io.BytesIO, blob_name: str, connection_string: str, container_name: str) -> str:
-    
-    try:
-        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-        container_client = blob_service_client.get_container_client(container_name)
-        
-        if not container_client.exists():
-            container_client.create_container()
-
-        blob_client = container_client.get_blob_client(blob_name)
-        
-        # Penting: reset posisi stream ke awal sebelum mengunggah
-        data_stream.seek(0)
-        
-        blob_client.upload_blob(data_stream, overwrite=True)
-        
-        print(f"Stream data '{blob_name}' berhasil diunggah ke Blob Storage.")
-        return blob_client.url
-        
-    except Exception as ex:
-        print(f"Terjadi kesalahan saat mengunggah ke Blob Storage: {ex}")
-        return None
-# === Email Sender (with PDF attachment) ===
-def send_email(claimletter : ClaimLetter) -> str:
-    """Send email Gmail API"""
-    message = MIMEMultipart()
-    message["to"] = claimletter.customer_email
-    message["from"] = "me"
-    message["subject"] = f"Notification of Insurance Claim Decision - {claimletter.input_data_customer_data['name']} - {claimletter.input_data_claim_data['claim_id']}"
-    body = f"""
-    <html>
-    <body>
-        <p>Yth {claimletter.input_data_customer_data['name']},</p>
-
-        <p>Kami ingin memberitahukan bahwa klaim asuransi dengan data:</p>
-        <ul>
-            <li><b>Claim ID:</b> {claimletter.input_data_claim_data['claim_id']}</li>
-            <li><b>Nama Pemohon:</b> {claimletter.input_data_customer_data['name']}</li>
-            <li><b>Tanggal Pengajuan:</b> {claimletter.input_data_claim_data['claim_date']}</li>
-            <li><b>Jenis Klaim:</b> {claimletter.input_data_claim_data['claim_type']}</li>
-        </ul>
-
-        <p>Telah kami proses dan dengan pertimbangan yang matang, kami sampaikan bahwa klaim Anda telah <b>{claimletter.input_data_claim_data['claim_status']}</b>.</p>
-        
-        <p>Untuk informasi lebih lanjut, Anda dapat memeriksa surat keputusan klaim yang terlampir pada email ini atau mengunjungi <a href="https://www.websiteasuransi.com">website kami</a>.</p>
-
-        <p>Terima kasih,<br> {claimletter.tanda_tangan}, <br>Tim Asuransi Anda</p>
-    </body>
-    </html>
-    """
-
-    # Jangan lupa untuk tetap menggunakan "html"
-    message.attach(MIMEText(body, "html"))
-
-    # Attach PDF
-    pdf_buffer.seek(0)
-    pdf_attachment = MIMEApplication(pdf_buffer.read(), _subtype="pdf")
-    pdf_attachment.add_header("Content-Disposition", "attachment", filename=f"surat_klaim_{claimletter.input_data_claim_data['claim_id']}.pdf")
-    message.attach(pdf_attachment)
-    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
-    create_message = {"raw": raw_message}
-
-    sent = (
-        api_resource.users()
-        .messages()
-        .send(userId="me", body=create_message)
-        .execute()
-    )
-    print(f"✅ Email sent! Message ID: {sent['id']}")
-    pdf_buffer.close()
 
 def generate_pdf(data: ClaimLetter) -> str :
     """
@@ -192,14 +104,91 @@ def generate_pdf(data: ClaimLetter) -> str :
     content.append(Paragraph("Hormat kami,", style_normal))
     content.append(Spacer(1, 40))
     content.append(Paragraph(f"<b>{data.tanda_tangan}</b>", style_normal))
-    connection_string = os.getenv("BLOB_STRING_CONECTION")
-    container_name = "intelegent-document-processing-st"
     # Build PDF
     doc.build(content)
-    blob_name = f"Surat_PDF/surat_klaim_{data.input_data_claim_data['claim_id']}.pdf"
-    blob_url = upload_stream_to_blob(pdf_buffer, blob_name, connection_string, container_name)
-    print(f"Done upload to Blob, URL: {blob_url}")
     return data
+# === Email Sender (with PDF attachment) ===
+def send_email_and_upload_pdf(claimletter: ClaimLetter) -> str:
+    # --- Build HTML body (same as before) ---
+    body = f"""
+    <html>
+    <body>
+        <p>Yth {claimletter.input_data_customer_data['name']},</p>
+
+        <p>Kami ingin memberitahukan bahwa klaim asuransi dengan data:</p>
+        <ul>
+            <li><b>Claim ID:</b> {claimletter.input_data_claim_data['claim_id']}</li>
+            <li><b>Nama Pemohon:</b> {claimletter.input_data_customer_data['name']}</li>
+            <li><b>Tanggal Pengajuan:</b> {claimletter.input_data_claim_data['claim_date']}</li>
+            <li><b>Jenis Klaim:</b> {claimletter.input_data_claim_data['claim_type']}</li>
+        </ul>
+
+        <p>Telah kami proses dan dengan pertimbangan yang matang, kami sampaikan bahwa klaim Anda telah
+           <b>{claimletter.input_data_claim_data['claim_status']}</b>.</p>
+
+        <p>Untuk informasi lebih lanjut, Anda dapat memeriksa surat keputusan klaim yang terlampir pada email ini
+           atau mengunjungi <a href="{os.getenv('website_kami')}">website kami</a>.</p>
+
+        <p>Terima kasih,<br> {claimletter.tanda_tangan}, <br>Tim Asuransi Anda</p>
+    </body>
+    </html>
+    """
+
+    # --- Prepare attachment from pdf_buffer ---
+    pdf_buffer.seek(0)  # make sure we read from the beginning
+    pdf_b64 = base64.b64encode(pdf_buffer.read()).decode("utf-8")
+    attachment_name = f"surat_klaim_{claimletter.input_data_claim_data['claim_id']}.pdf"
+
+    # --- Send via ACS Email ---
+    acs_conn = os.getenv("ACS_EMAIL_CONNECTION_STRING")
+    acs_sender = os.getenv("ACS_SENDER_ADDRESS")
+    if not acs_conn or not acs_sender:
+        raise RuntimeError("ACS_EMAIL_CONNECTION_STRING / ACS_SENDER_ADDRESS is not set.")
+
+    email_client = EmailClient.from_connection_string(acs_conn)
+
+    email_message = {
+        "senderAddress": acs_sender,
+        "recipients": { "to": [ { "address": claimletter.customer_email } ] },
+        "content": {
+            "subject": f"Notification of Insurance Claim Decision - {claimletter.input_data_customer_data['name']} - {claimletter.input_data_claim_data['claim_id']}",
+            "html": body
+        },
+        "attachments": [{
+            "name": attachment_name,
+            "contentType": "application/pdf",
+            "contentInBase64": pdf_b64
+        }]
+    }
+
+    poller = email_client.begin_send(email_message)
+    result = poller.result()  # will raise if sending failed
+    msg_id = getattr(result, "message_id", None)
+    print(f"✅ ACS Email sent! Message ID: {msg_id}")
+
+    # --- Upload the same PDF to Blob ---
+    container_name = "intelegent-document-processing-st"
+    connection_string = os.getenv("BLOB_STRING_CONNECTION")
+    if not connection_string:
+        raise RuntimeError("BLOB_STRING_CONNECTION is not set.")
+
+    blob_name = f"Surat_PDF/{attachment_name}"
+    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+    container_client = blob_service_client.get_container_client(container_name)
+    try:
+        container_client.create_container()
+    except Exception:
+        pass  # ignore if already exists
+
+    blob_client = container_client.get_blob_client(blob_name)
+
+    # IMPORTANT: reset buffer AFTER using it for the email attachment
+    pdf_buffer.seek(0)
+    blob_client.upload_blob(pdf_buffer, overwrite=True)
+    print(f"Stream data '{blob_name}' successfully uploaded to Blob Storage.")
+
+    pdf_buffer.close()
+    return "Email sent via ACS and PDF uploaded to Blob."
 
 parser_claim_letter = PydanticOutputParser(pydantic_object=ClaimLetter)
 llm = AzureChatOpenAI(
@@ -236,7 +225,7 @@ prompt_letter = PromptTemplate(
         partial_variables={"format_output": parser_claim_letter.get_format_instructions()},
         )
 pdf_result = RunnableLambda(generate_pdf)
-sendemail = RunnableLambda(send_email)
+sendemail = RunnableLambda(send_email_and_upload_pdf)
 
 letter_chain = prompt_letter | llm | parser_claim_letter | pdf_result | sendemail
 

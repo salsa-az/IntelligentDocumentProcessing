@@ -8,11 +8,8 @@ import uuid
 from datetime import datetime
 from azure.storage.blob import BlobServiceClient
 from azure.cosmos import CosmosClient
-from IntelegentDocumentProcecing.endpoint.analyst_func import analyst_function_executor
-from doc_intel import analize_doc
-from analyst_tools import cosmos_retrive_data
+from funcHelpApp import cosmos_retrive_data, function_triger
 from dotenv import load_dotenv
-from letterfunc import letter_chain_pro
 
 load_dotenv()
 
@@ -41,7 +38,7 @@ def analyze_claim():
             return jsonify({'error': 'customer_id and claim_id required'}), 400
         
         # Run analysis
-        analyst_function_executor(customer_id, claim_id)
+        function_triger(customer_id, claim_id)
         
         return jsonify({'status': 'success', 'message': 'Analysis completed'})
     
@@ -55,13 +52,9 @@ def approved_claim():
     try:
         claim_id = request.form.get('claim_id')
         admin_id = request.form.get('admin_id')
-        claim_data = cosmos_retrive_data("SELECT * FROM c WHERE c.claim_id=@idParam","claim", [{"name": "@idParam", "value": claim_id}])
+        claim_data = cosmos_retrive_data("SELECT c.customer_id FROM c WHERE c.claim_id=@idParam","claim", [{"name": "@idParam", "value": claim_id}])
         claim_data = claim_data[0]
-        admin_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","insurance_admin", [{"name": "@idParam", "value": admin_id}])
-        admin_data = admin_data[0]
-        customer_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","customer", [{"name": "@idParam", "value": claim_data['customer_id']}])
-        policy_data = cosmos_retrive_data("SELECT * FROM c WHERE c.admin_id=@idParam","policy", [{"name": "@idParam", "value": claim_data['policy_id']}])
-        letter_chain_pro(customer_data, claim_data, policy_data, admin_data)
+        function_triger(claim_data['customer_id'], claim_id, admin_id)
         return jsonify({'status': 'success', 'data': claim_data})
     except Exception as e : 
         return jsonify({'error': str(e)}), 500

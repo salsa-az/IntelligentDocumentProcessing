@@ -8,6 +8,7 @@ pydantic==2.11.7
 pydantic-settings==2.10.1
 pydantic_core==2.33.2
 azure-ai-formrecognizer==3.3.3
+azure-communication-email
 azure-ai-documentintelligence==1.0.2
 azure-common==1.1.28
 azure-core==1.35.0

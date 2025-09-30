@@ -73,7 +73,7 @@ def get_sas_url(blob_add):
             blob_name=blob_add,
             account_key=account_key, # Gunakan account key
             permission=BlobSasPermissions(read=True),
-            expiry=datetime.now(timezone.utc) + timedelta(minutes=1)
+            expiry=datetime.now(timezone.utc) + timedelta(minutes=10)
         )
 
         sas_url = f"https://{account_name}.blob.core.windows.net/{container_name}/{blob_add}?{sas_token}"

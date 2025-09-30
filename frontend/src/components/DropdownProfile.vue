@@ -7,7 +7,7 @@
       @click.prevent="dropdownOpen = !dropdownOpen"
       :aria-expanded="dropdownOpen"
     >
-      <img class="w-8 h-8 rounded-full" :src="currentUser?.avatar || UserAvatar" width="32" height="32" alt="User" />
+      <img class="w-8 h-8 rounded-full" :src="profilePicture || UserAvatar" width="32" height="32" alt="User" />
       <div class="flex items-center truncate">
         <span class="truncate ml-2 text-sm font-medium text-gray-600 dark:text-gray-100 group-hover:text-gray-800 dark:group-hover:text-white">{{ currentUser?.fullName || 'User' }}</span>
         <svg class="w-3 h-3 shrink-0 ml-1 fill-current text-gray-400 dark:text-gray-500" viewBox="0 0 12 12">

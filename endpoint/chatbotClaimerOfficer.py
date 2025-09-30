@@ -43,14 +43,16 @@ def get_db_details() -> str:
     details = f"""
     here is the format of the Cosmos DB: 
     {'-'*5} item in database {'-'*5}
-    container :
-    1. "document" : container where all the document's detail is stored
+    container : 
+    1. container name =  "document" 
+     container where all the document's detail is stored
     PK: "doc_id" : unique identifier for each document
     FK: "claim_id"
     Attributes:
         "doc_type" : determine the type of document ( invoice, Doctor form)
-        "document_content" : the actual content of the document (contain of extracted document from pedf)
-    2. "claim" : 
+        "document_content" : the actual content of the document (contain of extracted document from pdf)
+    2. container name = "claim" not "claims"
+    where all the claim data is store 
     PK: "claim_id" : unique identifier for each claim
     FKs:
         "customer_id"
@@ -61,18 +63,18 @@ def get_db_details() -> str:
         "claim_date" : time of claim issue 
         "documents" : list of documents related to the claim
         "claim_form" : 
-        "claim_status" : claim status that were given by the insurance claim officer (the only option are "Approved", "Rejected", "Pending", "Prosses")
-        "claim_reason" :  claim status reason why were accepted/rejected by insurance claim officer
+        "claim_status" : claim status that were given by the INSURANCE CLAIM OFFICER APPROVAL (the only option are "Approved", "Rejected", "Pending", "Prosses") YOU SHOULD LEAVE THIS EMPTY
+        "admin_notes" :  claim status reason why were accepted/rejected by INSURANCE CLAIM OFFICER APPROVAL YOU SHOULD LEAVE THIS EMPTY 
         "summary" : the summary of the claim 
-        "AI_suggestion" : the suggestion by system for the claim 
-        "AI_reasoning" : the reasoning behind the system's suggestion
+        "AI_suggestion" : the suggestion by system for the claim by AI Agent
+        "AI_reasoning" : the reasoning behind the system's suggestion by AI Agent
 
-    3. "customer"
-    PK: "customer_id" : unique identifier for each customer
+    3. container name =  "customer"
+    PK: "customer_id" : unique identifier for each customer NOT NAME
     FK: "policy_id"
     Attributes:
         "customer_no" : the customer number
-        "name" : the name of the customer
+        "name" : the name of the customer in lower case
         "dob" : the date of birth
         "age" : the age
         "gender" : the gender
@@ -85,7 +87,7 @@ def get_db_details() -> str:
         "income" : the income
         "claim_history" : the history of claims made by the customer 
 
-    4. "policy"
+    4. container name =  "policy"
     PK: "policy_id" : unique identifier for each policy
     FK: "user_id"
     Attributes:
@@ -97,7 +99,7 @@ def get_db_details() -> str:
         "insurance_plan_type" : the type of insurance plan
         "total_claim_limit" : the total claim limit for the policy
 
-    5. "Insurance Administrator"
+    5. container name = "Insurance Administrator"
     PK: "admin_id" : unique identifier for each insurance administrator
     Attributes:
         "username" : the username of the insurance administrator
@@ -109,18 +111,28 @@ def get_db_details() -> str:
     Claim → Insurance Administrator: Many-to-One (admin_id)
     Customer → Policy: Many-to-One (policy_id)
     Policy → Customer: One-to-Many (reverse relation)
+    DO NOT USE JOIN BECAUSE IT IS NOT SUPPORTED IN COSMOS DB, INSTEAD, DO MULTIPLE SIMPLE QUERY TO GET THE DATA YOU NEED. PLEASE REMEBER TO
+    STAY CONSISTENT WITH ALL NAME FROM COLUMN TO CONTAINER NAME
     """
     return details
 
 @tool("cosmos_select")
 def cosmos_select_tool(query: str, container: str, parameters: list = None) -> List[Dict[str, Any]]:
-    """Run a Cosmos DB select query."""
+    """Run a Cosmos DB select query. MAKE SURE TO CALL get_db_details TOOL FIRST TO GET THE METADATA OF THE DATABASE. PLEASE REMEBER TO STAY CONSISTENT WITH THE NAME OF CONTAINER AND THE COLUMNS NAME. ALSO THIS IS NOT SQL BUT COSMOS SQL, SO THE SYNTAX IS A BIT DIFFERENT."""
     try:
         container_client = database.get_container_client(container)
-        items = list(container_client.query_items(
-            query=query,
-            enable_cross_partition_query=True
-        ))
+        print(f"Executing query on container '{container}': {query} with parameters: {parameters}")
+        if parameters:
+            items = list(container_client.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ))
+        else:
+            items = list(container_client.query_items(
+                query=query,
+                enable_cross_partition_query=True
+            ))
         print(f"Query executed successfully. Retrieved {len(items)} items.")
         return items
     except Exception as e:
@@ -163,10 +175,11 @@ system_prompt = """
     you will also be able to search on cosmos db in documentdb and search for relevant documents.
     RULES 
     1. ANSWER IN THE INDONESIAN LANGUAGE
-    2. if you want to use cosmos_select_tool, you MUST to access get_db_details tool before.
-    3. WHEN GET THE DB DETAILS, YOU MUST STAY CONSISTANT WITH THE NAME OF CONTAINER AND THE COLUMNS NAME.
-    4. ANSWER IN A CLEAR AND CONCISE MANNER, AND DO NOT USE THIRD-PERSON PERSPECTIVE.
-    5. if user ask about something that you don't know and don't have the information in database, you may start with using web search tools
+    2. BEFORE ANSWERING ANY QUESTION, YOU MUST ALWAYS SEEK FOR THE RELEVANT INFORMATION BY USING TOOLS. IF THE TOOL IS GIVE YOU INFORMATION THAT YOU WANT THEN YOU MUST USE IT. DO NOT HESETITE TO USE THE TOOLS.
+    3. if you want to use cosmos_select_tool, you MUST to access get_db_details tool before. if the query is a bit complex, you may break it down into several simpler queries, and use this tool sequentially.
+    4. WHEN GET THE DB DETAILS, YOU MUST STAY CONSISTANT WITH THE NAME OF CONTAINER AND THE COLUMNS NAME.
+    5. ANSWER IN A CLEAR AND CONCISE MANNER, AND DO NOT USE THIRD-PERSON PERSPECTIVE.
+    6. if user ask about something that you don't know and don't have the information in database, you may start with using web search tools
 """
 llm = AzureChatOpenAI(
     azure_deployment="gpt-4.1",

@@ -28,7 +28,7 @@
                 <div class="col-span-12 xl:col-span-4">
                   <div class="text-center">
                     <div class="inline-flex mb-4">
-                      <img class="w-20 h-20 rounded-full" :src="currentUser?.avatar || '../images/user-avatar-32.png'" width="80" height="80" alt="User" />
+                      <img class="w-20 h-20 rounded-full" :src="currentUser?.avatar || '/src/images/user-avatar-32.png'" width="80" height="80" alt="User" />
                     </div>
                     <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">{{ currentUser?.fullName || 'User' }}</h2>
                     <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ currentUser?.policyType || 'Pemegang Polis' }}</div>

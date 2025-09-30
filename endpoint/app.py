@@ -16,10 +16,10 @@ from azure.cosmos import CosmosClient
 
 # Langchain Functions
 
-from funcHelperApp import cosmos_retrive_data, function_triger
+from funcHelperApp import cosmos_retrive_data, function_triger, download_blob
 from dotenv import load_dotenv
 from chatbotClaimerOfficer import agent 
-from doc_intel_for_registration import analize_doc as analize_doc_registration
+from doc_intel_for_registration import analize_doc as analize_doc_registration, get_sas_url
 
 load_dotenv()
 thread_id = uuid.uuid4()
@@ -217,13 +217,8 @@ def update_claim_status(claim_id):
             claim['admin_notes'] = notes
         claim['processed_date'] = datetime.now().isoformat()
         claim['resubmitted'] = False  # Reset resubmission flag
-        
-        if status == 'Approved':
-            claim['approved_by'] = admin_id
-            claim['approved_date'] = datetime.now().isoformat()
-        elif status == 'Rejected':
-            claim['rejected_by'] = admin_id
-            claim['rejected_date'] = datetime.now().isoformat()
+        claim['approved_by'] = admin_id
+        claim['approved_date'] = datetime.now().isoformat()
         updated_claim = database.get_container_client("claim").upsert_item(claim)
         
         try:
@@ -465,9 +460,10 @@ def chatbot_api():
         try:
             response = ''
             for chunk in agent.stream(input=formatted_input, config=config, stream_mode="values"):
-                response = chunk['messages'][-1].content   # i just want the AI Final answer
+                response = chunk   # i just want the AI Final answer
                 print(f"AI response: {response}")
-                response = str(response)
+            response = response['messages'][-1].content  
+            response = str(response)
             return jsonify({'response': response})
         except Exception as agent_error:
             print(f"Agent error: {agent_error}")
@@ -506,11 +502,10 @@ def update_claim():
         claim['admin_id'] = admin_id
         claim['admin_notes'] = notes
         claim['processed_date'] = datetime.now().isoformat()
-
+        
         if status == 'Rejected':
             claim['rejected_by'] = admin_id
             claim['rejected_date'] = datetime.now().isoformat()
-            claim['rejection_reason'] = notes
         elif status == 'Approved':
             claim['approved_by'] = admin_id
             claim['approved_date'] = datetime.now().isoformat()
@@ -581,6 +576,25 @@ def extract_registration_info():
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy'})
+
+@app.route('/api/documents/<doc_id>', methods=['GET'])
+def get_document_metadata(doc_id):
+    try:
+        # Query Cosmos DB for document metadata
+        query = f"SELECT * FROM c WHERE c.doc_id = @docId"
+        items = cosmos_retrive_data(query, "document",[{"name": "@docId", "value": doc_id}])
+        if not items:
+            return jsonify({"error": "Document not found"}), 404
+        document = items[0]
+        # Construct the full URL for the document
+        blob_path = document['doc_blob_address']
+        document_url = get_sas_url(blob_path)
+        # Add the document URL to the response
+        document['doc_url'] = document_url
+        print(document_url)
+        return jsonify(document)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

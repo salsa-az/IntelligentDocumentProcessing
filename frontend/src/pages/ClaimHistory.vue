@@ -127,7 +127,7 @@
                     <div class="flex items-center justify-between mb-4">
                       <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Progress Status</h4>
                       <button @click="showDocumentModal(claim.id)" class="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
-                        Unduh Dokumen
+                        All Dokumen
                       </button>
                     </div>
                     <div :class="{ 'is-last-step': true }">
@@ -180,7 +180,7 @@
         <div class="absolute inset-0 bg-black/50" @click="closeModal"></div>
         <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full mx-4">
           <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Unduh Dokumen</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Dokumen</h3>
             <button @click="closeModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -196,12 +196,14 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                   </svg>
                   <div>
-                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ doc.name }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ doc.size }} • {{ doc.type }}</p>
+                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ doc}}</p>
                   </div>
                 </div>
-                <button @click="downloadDocument(doc)" class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                  Download
+                <button
+                  @click="reviewDocument(doc)"
+                  class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Review Document
                 </button>
               </div>
             </div>
@@ -209,9 +211,6 @@
           <div class="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
             <button @click="closeModal" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
               Cancel
-            </button>
-            <button @click="downloadAllDocuments" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-              Download All
             </button>
             <!-- Edit Form Submit -->
              <!-- <div class="ctq43">
@@ -231,6 +230,14 @@
 
     </div>
   </div>
+  <Teleport to="body">
+    <DocumentReview
+      v-if="showDocumentReview"
+      :doc-id="selectedDocId"
+      :show="showDocumentReview"
+      @close="showDocumentReview = false"
+    />
+  </Teleport>
 </template>
 
 <script>
@@ -239,13 +246,14 @@ import { useRouter } from 'vue-router'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
 import Banner from '../partials/Chatbot.vue'
-
+import DocumentReview from '../partials/DocumentReview.vue'
 export default {
   name: 'ClaimHistory',
   components: {
     Sidebar,
     Header,
     Banner,
+    DocumentReview,
   },
   setup() {
     const router = useRouter()
@@ -260,94 +268,11 @@ export default {
     const selectedClaim = ref(null)
     const loading = ref(false)
     const error = ref(null)
-
+    const showDocumentReview = ref(false);
+    const selectedDocId = ref('');
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
     console.log(currentUser)
 
-
-    // Mock data
-    const mockClaims = [
-      {
-        id: 1,
-        claimNumber: 'CLM-2024-001',
-        hospitalName: 'RS Siloam Kebon Jeruk',
-        type: 'rawat-inap',
-        amount: 15000000,
-        checkIn: '2024-01-15',
-        checkOut: '2024-01-18',
-        status: 'approved',
-        submittedDate: '2024-01-19T10:30:00',
-        progress: [
-          { title: 'Pengajuan', status: 'completed', date: '2024-01-19T10:30:00', notes: 'Dokumen lengkap diterima' },
-          { title: 'Proses', status: 'completed', date: '2024-01-20T14:15:00', notes: 'Verifikasi dokumen selesai' },
-          { title: 'Keputusan', status: 'completed', date: '2024-01-22T09:45:00', notes: 'Klaim disetujui. Dana akan ditransfer dalam 3-5 hari kerja.' }
-        ],
-        documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '1.8 MB', type: 'PDF', url: '/form/invoice-1.pdf' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '2.4 MB', type: 'PDF', url: '/form/dokter form-1.pdf' }
-        ]
-      },
-      {
-        id: 2,
-        claimNumber: 'CLM-2024-002',
-        hospitalName: 'RSUD Fatmawati',
-        type: 'pra-pasca-rawat-inap',
-        amount: 8500000,
-        checkIn: '2024-02-01',
-        checkOut: '2024-02-02',
-        status: 'proses',
-        submittedDate: '2024-02-03T16:20:00',
-        progress: [
-          { title: 'Pengajuan', status: 'completed', date: '2024-02-03T16:20:00', notes: 'Dokumen diterima' },
-          { title: 'Proses', status: 'active', date: '2024-02-04T11:00:00', notes: 'Sedang dalam tahap verifikasi medis' },
-          { title: 'Keputusan', status: 'pending', date: null, notes: null }
-        ],
-        documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '890 KB', type: 'PDF', url: '/form/invoice-2.pdf' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.2 MB', type: 'PDF', url: '/form/dokter form-2.pdf' }
-        ]
-      },
-      {
-        id: 3,
-        claimNumber: 'CLM-2024-003',
-        hospitalName: 'RS Pondok Indah',
-        type: 'rawat-jalan',
-        amount: 2500000,
-        checkIn: '2024-02-10',
-        checkOut: '2024-02-10',
-        status: 'rejected',
-        submittedDate: '2024-02-11T08:15:00',
-        progress: [
-          { title: 'Pengajuan', status: 'completed', date: '2024-02-11T08:15:00', notes: 'Dokumen diterima' },
-          { title: 'Proses', status: 'completed', date: '2024-02-12T13:30:00', notes: 'Verifikasi selesai' },
-          { title: 'Keputusan', status: 'completed', date: '2024-02-13T10:20:00', notes: 'Klaim ditolak. Diagnosis tidak sesuai dengan polis. Silakan hubungi customer service untuk informasi lebih lanjut.' }
-        ],
-        documents: [
-          { id: 1, name: 'Invoice Rumah Sakit.pdf', size: '456 KB', type: 'PDF', url: '/form/invoice-3.pdf' },
-          { id: 2, name: 'Form Medis Dokter.pdf', size: '1.5 MB', type: 'PDF', url: '/form/dokter form-3.pdf' }
-        ]
-      },
-      {
-        id: 4,
-        claimNumber: 'CLM-2024-004',
-        hospitalName: 'RS Mayapada',
-        type: 'kehamilan-melahirkan',
-        amount: 12000000,
-        checkIn: '2024-02-15',
-        checkOut: '2024-02-17',
-        status: 'rejected',
-        submittedDate: '2024-02-18T14:45:00',
-        progress: [
-          { title: 'Pengajuan', status: 'completed', date: '2024-02-18T14:45:00', notes: 'Dokumen diterima' },
-          { title: 'Proses', status: 'completed', date: '2024-02-19T10:30:00', notes: 'Verifikasi dokumen selesai' },
-          { title: 'Keputusan', status: 'completed', date: '2024-02-20T15:20:00', notes: 'Klaim ditolak. Dokumen tidak lengkap - Invoice tidak sesuai format dan form medis tidak memiliki tanda tangan dokter yang valid.' }
-        ],
-        documents: [
-          { id: 1, name: 'Invoice Siloam.pdf', size: '2.2 MB', type: 'PDF', url: '/form/invoice_siloam.pdf' },
-          { id: 2, name: 'Dokter Form Siloam.pdf', size: '3.1 MB', type: 'PDF', url: '/form/dokter_form_siloam.pdf' }
-        ]
-      }
-    ]
 
     const filteredClaims = computed(() => {
       let filtered = claims.value
@@ -576,13 +501,13 @@ export default {
           console.log('Transformed claims:', claims.value)
         } else {
           console.warn('No claims found or invalid response format')
-          claims.value = mockClaims
+          claims.value = []
         }
         
       } catch (error) {
         console.error('Error fetching claim history:', error)
         error.value = error.message
-        claims.value = mockClaims
+        claims.value = []
       } finally {
         loading.value = false
       }
@@ -623,6 +548,12 @@ export default {
       selectedClaim.value = claims.value.find(claim => claim.id === claimId)
       showModal.value = true
     }
+    
+
+    const reviewDocument = (docId) => {
+      selectedDocId.value = docId;
+      showDocumentReview.value = true;
+    };
 
     const closeModal = () => {
       showModal.value = false
@@ -653,13 +584,16 @@ export default {
       console.log(currentUser)
       // {id: 'CU001', fullName: 'Feri Hussen', email: 'customer@example.com', role: 'customer', phone: '+62 812-3456-7890', …} address : "Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10220" avatar : "../images/user-avatar-32.png" birthDate : "1985-04-12" email : "customer@example.com" fullName : "Feri Hussen" id : "CU001" insuranceComp : "PT XYZ Asuransi" participantNumber : "PA001" phone : "+62 812-3456-7890" policyNumber : "P001" policyType : "Asuransi Kesehatan Platinum" role : "customer"
 
-      mockClaims.forEach(claim => claims.value.push(claim))
-      console.log('claim type:', claims.value[3].id === 'C2' ? claims.value[3].type : 'not found')
+      // mockClaims.forEach(claim => claims.value.push(claim))
+      // console.log('claim type:', claims.value[3].id === 'C2' ? claims.value[3].type : 'not found')
       fetchClaimHistory()
     })
 
 
     return {
+      showDocumentReview,
+      selectedDocId,
+      reviewDocument,
       sidebarOpen,
       searchQuery,
       statusFilter,

@@ -3,8 +3,11 @@ import requests
 from dotenv import load_dotenv
 from typing import List, Dict, Any
 from azure.cosmos import CosmosClient
+from azure.storage.blob import BlobServiceClient
+from urllib.parse import urlparse
 
 load_dotenv()
+# --- Ganti nilai di bawah ini dengan informasi Anda ---
 cosmos_db_uri = os.getenv("COSMOS_DB_URI")
 cosmos_db_key = os.getenv("COSMOS_DB_KEY")
 database_name = os.getenv("COSMOS_DB_DATABASE_NAME")
@@ -12,6 +15,8 @@ client = CosmosClient(cosmos_db_uri, credential=cosmos_db_key)
 database = client.get_database_client("dokumenI-intelejen-db")
 analyst_triger_url = os.getenv("analyst_function_url")
 notify_triger_url = os.getenv("notify_function_url")
+blob_service_client = BlobServiceClient.from_connection_string(os.getenv("BLOB_STRING_CONECTION"))
+container_name_blob = "intelegent-document-processing-st"
 def cosmos_retrive_data(query: str, container: str, parameters: list = None) -> List[Dict[str, Any]]:
     """Run a Cosmos DB select query."""
     try:
@@ -59,3 +64,29 @@ def function_triger(customer_id, claim_id, approval_id = None):
     except Exception as e:
         print(f"Error triggering analyst function: {e}")
         return None
+
+
+
+def download_blob(blob_path: str, download_path: str) -> bool:
+    """Download a file from Azure Blob Storage given a blob path in the container."""
+    try:
+        # Initialize the BlobServiceClient
+        blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
+
+        # Get the container name from environment variable
+        container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
+        if not container_name:
+            raise ValueError("Container name is not set in the environment variables.")
+
+        # Get the blob client
+        blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_path)
+
+        # Download the blob to the specified path
+        with open(download_path, "wb") as download_file:
+            download_file.write(blob_client.download_blob().readall())
+
+        print(f"Blob downloaded successfully to {download_path}")
+        return True
+    except Exception as e:
+        print(f"Error downloading blob: {e}")
+        return False

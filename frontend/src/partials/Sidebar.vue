@@ -27,10 +27,9 @@
           </svg>
         </button>
         <!-- Logo -->
-        <router-link class="block" to="/">
-          <svg class="fill-violet-500" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-            <path d="M31.956 14.8C31.372 6.92 25.08.628 17.2.044V5.76a9.04 9.04 0 0 0 9.04 9.04h5.716ZM14.8 26.24v5.716C6.92 31.372.63 25.08.044 17.2H5.76a9.04 9.04 0 0 1 9.04 9.04Zm11.44-9.04h5.716c-.584 7.88-6.876 14.172-14.756 14.756V26.24a9.04 9.04 0 0 1 9.04-9.04ZM.044 14.8C.63 6.92 6.92.628 14.8.044V5.76a9.04 9.04 0 0 1-9.04 9.04H.044Z" />
-          </svg>
+        <router-link class="block flex items-center" to="/">
+          <img src="/src/images/logo.svg" alt="App Logo" class="w-8 h-8 lg:w-10 lg:h-10" />
+          <span class="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-100 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Nexclaim</span>
         </router-link>
       </div>
 
@@ -60,11 +59,11 @@
             </router-link>
 
             <!-- Claims Section - Only for customers -->
-            <SidebarLinkGroup v-if="isCustomer" v-slot="parentLink">
+            <SidebarLinkGroup v-if="isCustomer" v-slot="parentLink" :class="{ 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]': currentRoute.path.startsWith('/claim') }">
               <a class="block text-gray-800 dark:text-gray-100 truncate transition" :class="parentLink.expanded ? '' : 'hover:text-gray-900 dark:hover:text-white'" href="#0" @click.prevent="parentLink.handleClick(); sidebarExpanded = true">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
-                    <svg class="shrink-0 fill-current text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                    <svg class="shrink-0 fill-current" :class="currentRoute.path.startsWith('/claim') ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
                       <path d="M14.5 2h-13C.7 2 0 2.7 0 3.5v9c0 .8.7 1.5 1.5 1.5h13c.8 0 1.5-.7 1.5-1.5v-9c0-.8-.7-1.5-1.5-1.5zM2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h10v1H2v-1z" />
                     </svg>
                     <span class="text-sm font-medium ml-4 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Claims</span>
@@ -79,16 +78,16 @@
               </a>
               <div class="lg:hidden lg:sidebar-expanded:block 2xl:block">
                 <ul class="pl-8 mt-1" :class="!parentLink.expanded && 'hidden'">
-                  <router-link to="/claim-form" custom v-slot="{ href, navigate }">
-                    <li class="mb-1 last:mb-0">
-                      <a class="block text-gray-500/90 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition truncate" :href="href" @click="navigate">
+                  <router-link to="/claim-form" custom v-slot="{ href, navigate, isExactActive }">
+                    <li class="mb-1 last:mb-0" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
+                      <a class="block text-gray-500/90 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition truncate" :class="isExactActive && 'font-bold'" :href="href" @click="navigate">
                         <span class="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Submit Claim</span>
                       </a>
                     </li>
                   </router-link>
-                  <router-link to="/claim-history" custom v-slot="{ href, navigate }">
-                    <li class="mb-1 last:mb-0">
-                      <a class="block text-gray-500/90 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition truncate" :href="href" @click="navigate">
+                  <router-link to="/claim-history" custom v-slot="{ href, navigate, isExactActive }">
+                    <li class="mb-1 last:mb-0" :class="isExactActive && 'from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'">
+                      <a class="block text-gray-500/90 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition truncate" :class="isExactActive && 'font-bold'" :href="href" @click="navigate">
                         <span class="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Claim History</span>
                       </a>
                     </li>

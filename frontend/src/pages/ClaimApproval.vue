@@ -35,7 +35,7 @@
                   v-model="statusFilter"
                   class="px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-32"
                 >
-                  <option value="">All Status</option>
+                  <option value="">All Status</option>  
                   <option value="proses">Proses</option>
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
@@ -76,8 +76,14 @@
             </div>
           </div>
 
+          <!-- Loading State -->
+          <div v-if="loading" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mb-4"></div>
+            <p class="text-gray-600 dark:text-gray-400">Loading claims data...</p>
+          </div>
+
           <!-- Claims List -->
-          <div class="space-y-4">
+          <div v-else class="space-y-4">
             <div v-for="claim in filteredClaims" :key="claim.id" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-6">
               <!-- Claim Summary -->
               <div class="flex items-center justify-between">
@@ -104,8 +110,12 @@
           </div>
           
           <!-- Empty State -->
-          <div v-if="filteredClaims.length === 0" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
+          <div v-if="!loading && filteredClaims.length === 0" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
+            <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
             <p class="text-gray-500 dark:text-gray-400">No claims found matching your criteria.</p>
+            <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">Try adjusting your filters or search terms.</p>
           </div>
         </div>
       </main>
@@ -160,7 +170,6 @@ export default {
         const result = await response.json()
         
         if (result.status === 'success') {
-          // Transform Cosmos DB data to match frontend format
           claims.value = result.claims.map(claim => ({
             id: claim.claim_id,
             claimNumber: claim.claim_id,
@@ -195,11 +204,13 @@ export default {
             customer_id: claim.customer_id,
             rawData: claim
           }))
+        } else {
+          console.error('Error fetching claims:', result.error)
+          claims.value = []
         }
       } catch (error) {
         console.error('Error fetching claims:', error)
-        // Fallback to mock data
-        claims.value = getMockClaimsForApprover()
+        claims.value = []
       } finally {
         loading.value = false
       }
@@ -228,60 +239,38 @@ export default {
       }
     }
 
-  const transformDocuments = (documents) => {
-    return documents.map(doc => {
-      let name = 'Unknown Document'
-      
-      // Map document types to proper names
-      switch (doc.doc_type) {
-        case 'invoice':
-          name = 'Invoice Rumah Sakit'
-          break
-        case 'doctor form':
-          name = 'Form Medis Dokter'
-          break
-        case 'report lab':
-          name = 'Hasil Laboratorium'
-          break
-        case 'additional doc':
-          name = 'Dokumen Tambahan'
-          break
-        default:
-          name = `${doc.doc_type || 'Document'}`
-          break
-      }
-      
-      return {
-        id: doc.doc_id,
-        name: `${name}_${doc.claim_id}.pdf`,
-        size: '1.2 MB',
-        type: 'PDF',
-        url: `/api/documents/${doc.doc_id}`,
-        doc_type: doc.doc_type,
-        doc_contents: doc.doc_contents || {}
-      }
-    })
-  }
-
-    const getMockClaimsForApprover = () => {
-      // Mock data for testing when Cosmos DB is unavailable
-      return [
-        {
-          id: 'C1',
-          claimNumber: 'TEST',
-          patientName: 'Test Patient',
-          policyNumber: 'P001',
-          hospitalName: 'Test Hospital',
-          type: 'rawat-inap',
-          amount: 5000000,
-          status: 'proses',
-          submittedDate: new Date().toISOString(),
-          aiAnalysis: {
-            recommendation: 'Under Review',
-            reasoning: 'Test data for approval system'
-          }
+    const transformDocuments = (documents) => {
+      return documents.map(doc => {
+        let name = 'Unknown Document'
+        
+        switch (doc.doc_type) {
+          case 'invoice':
+            name = 'Invoice Rumah Sakit'
+            break
+          case 'doctor form':
+            name = 'Form Medis Dokter'
+            break
+          case 'report lab':
+            name = 'Hasil Laboratorium'
+            break
+          case 'additional doc':
+            name = 'Dokumen Tambahan'
+            break
+          default:
+            name = `${doc.doc_type || 'Document'}`
+            break
         }
-      ]
+        
+        return {
+          id: doc.doc_id,
+          name: `${name}_${doc.claim_id}.pdf`,
+          size: '1.2 MB',
+          type: 'PDF',
+          url: `/api/documents/${doc.doc_id}`,
+          doc_type: doc.doc_type,
+          doc_contents: doc.doc_contents || {}
+        }
+      })
     }
 
     const approveClaim = async (notes) => {

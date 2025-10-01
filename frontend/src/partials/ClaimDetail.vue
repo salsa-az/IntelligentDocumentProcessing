@@ -358,11 +358,11 @@
               </div>
               
               <div class="mt-3 flex justify-end">
-                <button @click="downloadDocument(doc)" class="flex items-center px-3 py-1 text-xs bg-violet-500 text-white rounded hover:bg-violet-600 transition-colors">
+                <button @click="openRawDocument(doc.id)" class="flex items-center px-3 py-1 text-xs bg-violet-500 text-white rounded hover:bg-violet-600 transition-colors">
                     <svg class="w-3 h-3 mr-2" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M8 12c.3 0 .5-.1.7-.3L14.4 6 13 4.6l-4 4V0H7v8.6l-4-4L1.6 6l5.7 5.7c.2.2.4.3.7.3ZM15 14H1v2h14v-2Z" fill="currentColor"></path>
+                      <path d="M14.5 2h-13C.7 2 0 2.7 0 3.5v9c0 .8.7 1.5 1.5 1.5h13c.8 0 1.5-.7 1.5-1.5v-9c0-.8-.7-1.5-1.5-1.5zM2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h10v1H2v-1z" fill="currentColor"></path>
                     </svg>
-                    Download
+                    Raw Document
                 </button>
               </div>
             </div>
@@ -434,24 +434,46 @@
         </div>
       </div>
     </div>
+    <!-- Add DocumentReview component -->
+    <DocumentReview
+      v-if="showRawDocument"
+      :docId="selectedDocId"
+      :show="showRawDocument"
+      @close="closeRawDocument"
+    />
   </div>
 </template>
 
 <script>
 import { ref, watch } from 'vue'
 import { formatValue } from '../utils/Utils'
+import DocumentReview from './DocumentReview.vue'
 
 export default {
   name: 'ClaimDetail',
+  components: {
+    DocumentReview
+  },
   props: {
     show: Boolean,
     claim: Object
   },
-  emits: ['close', 'approve', 'reject', 'download-document'],
+  emits: ['close', 'approve', 'reject'],
   setup(props, { emit }) {
     const notes = ref('')
     const expandedDocs = ref(new Set())
-    
+    const showRawDocument = ref(false)
+    const selectedDocId = ref(null)
+
+    const openRawDocument = (docId) => {
+      selectedDocId.value = docId
+      showRawDocument.value = true
+    }
+
+    const closeRawDocument = () => {
+      showRawDocument.value = false
+      selectedDocId.value = null
+    }
 
     watch(() => props.show, (newVal) => {
       if (newVal) {
@@ -547,13 +569,16 @@ export default {
       notes,
       expandedDocs,
       toggleDocument,
-      downloadDocument,
       getStatusClass,
       getStatusText,
       getClaimTypeText,
       formatCurrency,
       formatDate,
-      formattedInt
+      formattedInt,
+      showRawDocument,
+      selectedDocId,
+      openRawDocument,
+      closeRawDocument
     }
   }
 }

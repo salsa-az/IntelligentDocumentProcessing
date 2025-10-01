@@ -11,12 +11,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 # Azure
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient,ContentSettings
 from azure.cosmos import CosmosClient
 
 # Langchain Functions
 
-from funcHelperApp import cosmos_retrive_data, function_triger, download_blob
+from funcHelperApp import cosmos_retrive_data, function_triger, get_content_type
 from dotenv import load_dotenv
 from chatbotClaimerOfficer import agent 
 from doc_intel_for_registration import analize_doc as analize_doc_registration, get_sas_url
@@ -390,8 +390,9 @@ def submit_claim():
                     doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
                     blob_name = f"{blob_path}{doc_id}_{file.filename}"
                     blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                    blob_client.upload_blob(file.read(), overwrite=True)
-                    
+                    content_type = get_content_type(file)
+                    blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
+                    print(f"Uploaded {form_field} to {blob_name} with content type {content_type}")
                     doc_data = {
                         "id": doc_id,
                         "doc_id": doc_id,
@@ -591,7 +592,6 @@ def get_document_metadata(doc_id):
         document_url = get_sas_url(blob_path)
         # Add the document URL to the response
         document['doc_url'] = document_url
-        print(document_url)
         return jsonify(document)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

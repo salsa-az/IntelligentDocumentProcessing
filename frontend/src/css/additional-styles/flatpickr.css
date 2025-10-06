@@ -163,6 +163,7 @@
 }
 
 .flatpickr-months {
+    display: flex;
     align-items: center;
     margin-top: -8px;
     margin-bottom: 6px;
@@ -205,22 +206,33 @@
     @apply text-sm font-medium;
     position: static;
     height: auto;
-    width: auto;
+    width: 100%;
     left: auto;
     padding: 0;
+    display: flex;
+    gap: 3px;
+    align-items: center;
 }
 
 .flatpickr-current-month span.cur-month {
-    @apply font-medium m-0;
-}
+    @apply font-medium m-0;}
 
 .flatpickr-current-month span.cur-month:hover {
     background: none;
 }
 
+.flatpickr-current-month .numInputWrapper {
+    flex: 1;
+}
+
 .flatpickr-current-month input.cur-year {
     font-weight: inherit;
     box-shadow: none !important;
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100 rounded px-2;
+}
+
+.flatpickr-monthDropdown-months {
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100 rounded px-2;
 }
 
 .numInputWrapper:hover {
@@ -229,6 +241,20 @@
 
 .numInputWrapper span {
     display: none;
+}
+
+/* Month dropdown styling */
+.flatpickr-monthDropdown-months {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+
+.dark .flatpickr-monthDropdown-months {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%9ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
 }
 
 span.flatpickr-weekday {

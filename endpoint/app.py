@@ -5,6 +5,8 @@ import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import uuid
 from datetime import datetime
+import jwt
+import bcrypt
 
 # Flask
 from flask import Flask, request, jsonify
@@ -27,6 +29,10 @@ config = {"configurable": {"thread_id": thread_id}}
 # Initialize Flask app once
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"]}})
+
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not JWT_SECRET_KEY:
+    raise ValueError("JWT_SECRET_KEY environment variable not set")
 
 # Azure setup
 blob_connection_string = os.getenv("BLOB_STRING_CONECTION")
@@ -109,9 +115,210 @@ def get_all_claims():
     except Exception as e:
         print(f"Error retrieving claims: {e}", file=sys.stderr)
         return []
+    
+@app.route('/api/signup', methods=['POST'])
+def signup():
+    """Customer signup with JWT authentication"""
+    try:
+        data = request.json
+        
+        # Extract registration data
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+        
+        # Check if customer already exists
+        existing_customer = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.email = @email",
+            "customer",
+            [{"name": "@email", "value": email}]
+        )
+        
+        if existing_customer:
+            return jsonify({'error': 'Customer already exists'}), 400
+        
+        # Hash password
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # Generate customer ID
+        customer_id = f"CU{uuid.uuid4().hex[:8].upper()}"
+        
+        # Calculate age from birth date
+        age = None
+        dob = data.get('tanggalLahir', '')
+        if dob:
+            try:
+                birth_date = datetime.strptime(dob, '%Y-%m-%d')
+                age = datetime.now().year - birth_date.year
+                if datetime.now().month < birth_date.month or (datetime.now().month == birth_date.month and datetime.now().day < birth_date.day):
+                    age -= 1
+            except:
+                pass
+        
+        # Map gender
+        gender_map = {'laki-laki': 'Male', 'perempuan': 'Female'}
+        gender = gender_map.get(data.get('jenisKelamin', ''), '')
+        
+        # Map marital status
+        marital_map = {'menikah': 'Married', 'belum-menikah': 'Single', 'cerai': 'Divorced', 'janda-duda': 'Widowed'}
+        marital_status = marital_map.get(data.get('statusPernikahan', ''), '')
+        
+        # Create customer record
+        customer_data = {
+            "id": customer_id,
+            "customer_id": customer_id,
+            "policy_id": data.get('nomorPolis', ''),
+            "customer_no": data.get('nomorPeserta', ''),
+            "card_no": data.get('nomorKartu', ''),
+            "name": data.get('namaPemegang', ''),
+            "dob": dob,
+            "age": age,
+            "gender": gender,
+            "NIK": data.get('nik', ''),
+            "phone": data.get('nomorTelepon', ''),
+            "address": data.get('alamat', ''),
+            "email": email,
+            "password": password_hash,
+            "is_policy_holder": data.get('isPemegangPolis', True),
+            "relation_with_policy_holder": "Self" if data.get('isPemegangPolis', True) else data.get('hubungan', ''),
+            "employment_status": "",
+            "marital_status": marital_status,
+            "income": None,
+            "claim_id": []
+        }
+        
+        # Save to database
+        database.get_container_client("customer").create_item(customer_data)
+        
+        # Generate JWT token
+        token_payload = {
+            'customer_id': customer_id,
+            'email': email,
+            'role': 'customer',
+            'exp': datetime.utcnow().timestamp() + 86400  # 24 hours
+        }
+        
+        token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm='HS256')
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Customer registered successfully',
+            'token': token,
+            'user': {
+                'id': customer_id,
+                'name': customer_data['name'],
+                'email': email,
+                'role': 'customer'
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error in signup: {e}")
+        return jsonify({'error': 'Registration failed'}), 500
+
+@app.route('/api/signin', methods=['POST'])
+def signin():
+    """User login"""
+    data = request.json
+    email = data.get('email', '')
+    password = data.get('password', '')
+
+    if not email or not password:
+        return jsonify({'error': 'Email and password are required'}), 400
+
+    # Check user credentials
+    user = cosmos_retrive_data(
+        "SELECT * FROM c WHERE c.email = @Email",
+        "customer",
+        [{"name": "@Email", "value": email}]
+    )
+
+    if not user:
+        return jsonify({'error': 'Invalid email or password'}), 401
+
+    user = user[0]
+    if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
+        return jsonify({'error': 'Invalid email or password'}), 401
+
+    # Set default role if not present
+    user_role = user.get('role', 'customer')
+    
+    # Generate JWT token
+    token_payload = {
+        'customer_id': user['customer_id'],
+        'email': email,
+        'role': user_role,
+        'exp': datetime.utcnow().timestamp() + 86400  # 24 hours
+    }
+
+    token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm='HS256')
+
+    return jsonify({
+        'status': 'success',
+        'message': 'Login successful',
+        'token': token,
+        'user': {
+            'id': user['customer_id'],
+            'name': user['name'],
+            'email': email,
+            'role': user_role
+        }
+    })
+
+@app.route('/api/documents/<doc_id>/download', methods=['GET'])
+def download_document(doc_id):
+    """Generate secure download URL for document"""
+    try:
+        # Get document metadata
+        doc_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.doc_id = @docId",
+            "document",
+            [{"name": "@docId", "value": doc_id}]
+        )
+        
+        if not doc_data:
+            return jsonify({'error': 'Document not found'}), 404
+        
+        doc = doc_data[0]
+        blob_address = doc.get('doc_blob_address')
+        
+        if not blob_address:
+            return jsonify({'error': 'Document file not found'}), 404
+        
+        # Generate SAS URL for secure download
+        from azure.storage.blob import generate_blob_sas, BlobSasPermissions
+        from datetime import datetime, timedelta, timezone
+        
+        account_name = blob_service_client.account_name
+        account_key = blob_service_client.credential.account_key
+        
+        sas_token = generate_blob_sas(
+            account_name=account_name,
+            container_name=container_name,
+            blob_name=blob_address,
+            account_key=account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.now(timezone.utc) + timedelta(minutes=15)  # 15-minute expiry
+        )
+        
+        download_url = f"https://{account_name}.blob.core.windows.net/{container_name}/{blob_address}?{sas_token}"
+        
+        return jsonify({
+            'status': 'success',
+            'download_url': download_url,
+            'filename': doc.get('doc_type', 'document') + '.pdf',
+            'expires_in': 900  # 15 minutes in seconds
+        })
+        
+    except Exception as e:
+        print(f"Error generating download URL: {e}")
+        return jsonify({'error': 'Failed to generate download URL'}), 500
+
 
 def safe_fetch_documents(claim_documents):
-    """Safely fetch documents with proper error handling"""
+    """Safely fetch documents with download URLs"""
     documents = []
     if not claim_documents:
         return documents
@@ -124,7 +331,10 @@ def safe_fetch_documents(claim_documents):
                 [{"name": "@docId", "value": doc_id}]
             )
             if doc_data:
-                documents.append(doc_data[0])
+                doc = doc_data[0]
+                # Add download URL reference
+                doc['download_url'] = f"/api/documents/{doc_id}/download"
+                documents.append(doc)
             else:
                 print(f"Document {doc_id} not found in database")
         except Exception as e:
@@ -534,9 +744,15 @@ def extract_registration_info():
                 blob_client.upload_blob(file.read(), overwrite=True)
                 print(f"Insurance card uploaded: {blob_name}")
                 
-                # Get mock insurance data from the updated function
-                # insurance_data = analize_doc_registration(blob_name, "insurance card")
-                # extracted_data.update(insurance_data)
+                # Extract insurance card data
+                insurance_data = analize_doc_registration(blob_name, "insuranceCard")
+                print(f"Insurance card extraction result: {insurance_data}")
+                if insurance_data and not insurance_data.get('error'):
+                    extracted_data.update({
+                        'policy_number': insurance_data.get('No. Polis', ''),
+                        'participant_number': insurance_data.get('No. Peserta', ''),
+                        'card_number': insurance_data.get('No. Kartu', '')
+                    })
         
         # Process ID card with Azure Document Intelligence
         if 'id_card' in request.files:
@@ -548,7 +764,8 @@ def extract_registration_info():
                 blob_client.upload_blob(file.read(), overwrite=True)
                 
                 # Extract using Azure Document Intelligence with fallback
-                id_data = analize_doc_registration(blob_name, "id card")
+                id_data = analize_doc_registration(blob_name, "idCard")
+                print(f"ID card extraction result: {id_data}")
                 
                 # Map ID card data to expected format
                 if id_data:

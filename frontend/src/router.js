@@ -26,7 +26,7 @@ const router = createRouter({
     },
     {
       path: '/signup',
-      component: Signup
+      component: AutoSignup
     },
     {
       path: '/reset-password',

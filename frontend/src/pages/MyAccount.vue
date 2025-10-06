@@ -30,8 +30,11 @@
                     <div class="inline-flex mb-4">
                       <img class="w-20 h-20 rounded-full" :src="currentUser?.avatar || '/src/images/user-avatar-32.png'" width="80" height="80" alt="User" />
                     </div>
-                    <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">{{ currentUser?.fullName || 'User' }}</h2>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ currentUser?.policyType || 'Pemegang Polis' }}</div>
+                    <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">{{ currentUser?.name || 'User' }}</h2>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      <span v-if="currentUser?.role === 'customer'">{{ currentUser?.policyType || 'Pemegang Polis' }}</span>
+                      <span v-if="currentUser?.role === 'approver'">{{ currentUser?.jobRole || 'Staff Internal' }}</span>
+                    </div>
                     <button class="btn-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-300">
                       <svg class="w-4 h-4 fill-current opacity-50 shrink-0" viewBox="0 0 16 16">
                         <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" />
@@ -43,6 +46,7 @@
 
                 <!-- Form section -->
                 <div class="col-span-12 xl:col-span-8">
+                  <!-- Profile Form -->
                   <form @submit.prevent="updateAccount">
                     <div class="grid grid-cols-12 gap-6">
                       
@@ -52,8 +56,8 @@
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
-                        <label class="block text-sm font-medium mb-1" for="fullName">Nama Lengkap <span class="text-red-500">*</span></label>
-                        <input id="fullName" v-model="form.fullName" class="form-input w-full" type="text" required />
+                        <label class="block text-sm font-medium mb-1" for="name">Nama Lengkap <span class="text-red-500">*</span></label>
+                        <input id="name" v-model="form.name" class="form-input w-full" type="text" required />
                       </div>
                       
                       <div class="col-span-12 sm:col-span-6">
@@ -71,34 +75,74 @@
                         <input id="birthDate" v-model="form.birthDate" class="form-input w-full" type="date" />
                       </div>
                       
+                      <div class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="nik">NIK</label>
+                        <input id="nik" v-model="form.nik" class="form-input w-full" type="text" />
+                      </div>
+                      
+                      <div class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="jenisKelamin">Jenis Kelamin</label>
+                        <select id="jenisKelamin" v-model="form.jenisKelamin" class="form-select w-full">
+                          <option value="">Pilih Jenis Kelamin</option>
+                          <option value="laki-laki">Laki-laki</option>
+                          <option value="perempuan">Perempuan</option>
+                        </select>
+                      </div>
+                      
+                      <div class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="statusPernikahan">Status Pernikahan</label>
+                        <select id="statusPernikahan" v-model="form.statusPernikahan" class="form-select w-full">
+                          <option value="">Pilih Status</option>
+                          <option value="belum-menikah">Belum Menikah</option>
+                          <option value="menikah">Menikah</option>
+                          <option value="cerai">Cerai</option>
+                          <option value="janda-duda">Janda/Duda</option>
+                        </select>
+                      </div>
+                      
                       <div class="col-span-12">
                         <label class="block text-sm font-medium mb-1" for="address">Alamat</label>
                         <textarea id="address" v-model="form.address" class="form-textarea w-full" rows="3"></textarea>
                       </div>
 
-                      <!-- Policy Information -->
-                      <div class="col-span-12">
+                      <!-- Policy Information - Only show for customers -->
+                      <div v-if="currentUser?.role === 'customer'" class="col-span-12">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-6">Informasi Polis</h3>
                       </div>
                       
-                      <div class="col-span-12 sm:col-span-6">
-                        <label class="block text-sm font-medium mb-1" for="insuranceComp">Nama Perusahan Asuransi</label>
+                      <div v-if="currentUser?.role === 'customer'" class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="nomorPolis">Nomor Polis</label>
+                        <input id="nomorPolis" v-model="form.nomorPolis" class="form-input w-full" type="text" />
+                      </div>
+                      
+                      <div v-if="currentUser?.role === 'customer'" class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="nomorKartu">Nomor Kartu</label>
+                        <input id="nomorKartu" v-model="form.nomorKartu" class="form-input w-full" type="text" />
+                      </div>
+                      
+                      <div v-if="currentUser?.role === 'customer'" class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="nomorPeserta">Nomor Peserta</label>
+                        <input id="nomorPeserta" v-model="form.nomorPeserta" class="form-input w-full" type="text" />
+                      </div>
+                      
+                      <div v-if="currentUser?.role === 'customer'" class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="namaPemegang">Nama Pemegang Polis</label>
+                        <input id="namaPemegang" v-model="form.namaPemegang" class="form-input w-full" type="text" />
+                      </div>
+
+                      <!-- Role Information - Only show for approvers -->
+                      <div v-if="currentUser?.role === 'approver'" class="col-span-12">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-6">Informasi Jabatan</h3>
+                      </div>
+                      
+                      <div v-if="currentUser?.role === 'approver'" class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="jobRole">Jabatan</label>
+                        <input id="jobRole" v-model="form.jobRole" class="form-input w-full" type="text" />
+                      </div>
+                      
+                      <div v-if="currentUser?.role === 'approver'" class="col-span-12 sm:col-span-6">
+                        <label class="block text-sm font-medium mb-1" for="insuranceComp">Perusahaan Asuransi</label>
                         <input id="insuranceComp" v-model="form.insuranceComp" class="form-input w-full" type="text" />
-                      </div>
-                      
-                      <div class="col-span-12 sm:col-span-6">
-                        <label class="block text-sm font-medium mb-1" for="policyType">Jenis Polis</label>
-                        <input id="policyType" v-model="form.policyType" class="form-input w-full" type="text" />
-                      </div>
-                      
-                      <div class="col-span-12 sm:col-span-6">
-                        <label class="block text-sm font-medium mb-1" for="policyNumber">Nomor Polis</label>
-                        <input id="policyNumber" v-model="form.policyNumber" class="form-input w-full" type="text" />
-                      </div>
-                      
-                      <div class="col-span-12 sm:col-span-6">
-                        <label class="block text-sm font-medium mb-1" for="participantNumber">Nomor Peserta</label>
-                        <input id="participantNumber" v-model="form.participantNumber" class="form-input w-full" type="text" />
                       </div>
 
                       <!-- Emergency Contact -->
@@ -142,10 +186,10 @@
                           </svg>
                           <span class="max-xs:sr-only">Simpan Perubahan</span>
                       </button>
-                      <!-- <button class="btn bg-blue-600 hover:bg-blue-700 text-white" type="submit">Simpan Perubahan</button> -->
                     </div>
-                    
                   </form>
+
+
                 </div>
                 
               </div>
@@ -157,6 +201,7 @@
       </main>
 
     </div> 
+
 
   </div>
 </template>
@@ -178,40 +223,83 @@ export default {
     const { currentUser, updateUser } = useAuth()
     
     const form = ref({
-      fullName: '',
+      name: '',
       email: '',
       phone: '',
       birthDate: '',
       address: '',
-      policyNumber: '',
-      participantNumber: '',
+      // Customer-specific fields
+      nomorPolis: '',
+      nomorKartu: '',
+      nomorPeserta: '',
+      namaPemegang: '',
+      nik: '',
+      jenisKelamin: '',
+      statusPernikahan: '',
+      // Approver-specific fields
+      jobRole: '',
       insuranceComp: '',
-      policyType: '',
+      // Common fields
       emergencyName: '',
       emergencyPhone: '',
       currentPassword: '',
       newPassword: ''
     })
 
-    // Initialize form with user data
-    onMounted(() => {
-      if (currentUser.value) {
+    // Fetch fresh user data from API
+    const fetchUserData = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}')
+        if (user.id) {
+          const response = await fetch(`http://localhost:5000/api/query?query=SELECT * FROM c WHERE c.customer_id = "${user.id}"&container=customer`)
+          const userData = await response.json()
+          if (userData && userData.length > 0) {
+            const freshUser = userData[0]
+            // Update localStorage with fresh data
+            localStorage.setItem('user', JSON.stringify({...user, ...freshUser}))
+            initializeForm(freshUser)
+          } else {
+            initializeForm(user)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+        // Fallback to current user data
+        const user = JSON.parse(localStorage.getItem('user') || '{}')
+        initializeForm(user)
+      }
+    }
+
+    const initializeForm = (user) => {
+      if (user) {
         form.value = {
-          fullName: currentUser.value.fullName || '',
-          email: currentUser.value.email || '',
-          phone: currentUser.value.phone || '',
-          birthDate: currentUser.value.birthDate || '',
-          address: currentUser.value.address || '',
-          policyNumber: currentUser.value.policyNumber || '',
-          participantNumber: currentUser.value.participantNumber || '',
-          insuranceComp: currentUser.value.insuranceComp || '',
-          policyType: currentUser.value.policyType || '',
-          emergencyName: currentUser.value.emergencyName || '',
-          emergencyPhone: currentUser.value.emergencyPhone || '',
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          birthDate: user.dob || '',
+          address: user.address || '',
+          // Customer fields
+          nomorPolis: user.policy_id || '',
+          nomorKartu: user.cardNumber || '',
+          nomorPeserta: user.customer_no || '',
+          namaPemegang: user.name || '',
+          nik: user.NIK || user.nik || '',
+          jenisKelamin: user.gender === 'Female' ? 'perempuan' : user.gender === 'Male' ? 'laki-laki' : '',
+          statusPernikahan: user.marital_status === 'Married' ? 'menikah' : user.marital_status === 'Single' ? 'belum-menikah' : user.marital_status === 'Divorced' ? 'cerai' : user.marital_status === 'Widowed' ? 'janda-duda' : '',
+          // Approver fields
+          jobRole: user.jobRole || '',
+          insuranceComp: user.insuranceComp || '',
+          // Common fields
+          emergencyName: user.emergencyName || '',
+          emergencyPhone: user.emergencyPhone || '',
           currentPassword: '',
           newPassword: ''
         }
       }
+    }
+
+    onMounted(() => {
+      fetchUserData()
     })
 
     const updateAccount = () => {
@@ -220,19 +308,29 @@ export default {
         return
       }
       
-      // Update user data (excluding passwords for demo)
+      // Base update data
       const updateData = {
-        fullName: form.value.fullName,
+        name: form.value.name,
         email: form.value.email,
         phone: form.value.phone,
-        birthDate: form.value.birthDate,
+        dob: form.value.birthDate,
         address: form.value.address,
-        policyNumber: form.value.policyNumber,
-        participantNumber: form.value.participantNumber,
-        insuranceComp: form.value.insuranceComp,
-        policyType: form.value.policyType,
         emergencyName: form.value.emergencyName,
         emergencyPhone: form.value.emergencyPhone
+      }
+      
+      // Add role-specific fields
+      if (currentUser.value?.role === 'customer') {
+        updateData.nomorPolis = form.value.nomorPolis
+        updateData.nomorKartu = form.value.nomorKartu
+        updateData.nomorPeserta = form.value.nomorPeserta
+        updateData.namaPemegang = form.value.namaPemegang
+        updateData.nik = form.value.nik
+        updateData.jenisKelamin = form.value.jenisKelamin
+        updateData.statusPernikahan = form.value.statusPernikahan
+      } else if (currentUser.value?.role === 'approver') {
+        updateData.jobRole = form.value.jobRole
+        updateData.insuranceComp = form.value.insuranceComp
       }
       
       updateUser(updateData)

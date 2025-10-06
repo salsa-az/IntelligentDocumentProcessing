@@ -88,25 +88,45 @@ export default {
       this.errorMessage = ''
       
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 500))
+        const response = await fetch('http://localhost:5000/api/signin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: this.form.email,
+            password: this.form.password
+          })
+        })
         
-        const user = authenticateUser(this.form.email, this.form.password)
+        const data = await response.json()
         
-        if (user) {
-          // Store user in localStorage
-          localStorage.setItem('user', JSON.stringify(user))
+        if (response.ok && data.status === 'success') {
+          // Store user and token in localStorage
+          localStorage.setItem('user', JSON.stringify(data.user))
+          localStorage.setItem('token', data.token)
           
           // Redirect based on role
-          if (user.role === 'customer') {
+          if (data.user.role === 'customer') {
             this.$router.push('/customer-dashboard')
-          } else if (user.role === 'approver') {
+          } else if (data.user.role === 'approver') {
             this.$router.push('/claim-approval')
           } else {
             this.$router.push('/dashboard')
           }
         } else {
-          this.errorMessage = 'Email atau password salah. Silakan coba lagi.'
+          // Fallback to dummy users if API fails
+          const dummyUser = authenticateUser(this.form.email, this.form.password)
+          if (dummyUser) {
+            localStorage.setItem('user', JSON.stringify(dummyUser))
+            if (dummyUser.role === 'customer') {
+              this.$router.push('/customer-dashboard')
+            } else if (dummyUser.role === 'approver') {
+              this.$router.push('/claim-approval')
+            }
+          } else {
+            this.errorMessage = data.error || 'Email atau password salah. Silakan coba lagi.'
+          }
         }
       } catch (error) {
         this.errorMessage = 'Terjadi kesalahan. Silakan coba lagi.'

@@ -25,7 +25,7 @@
             <div class="grid grid-flow-col sm:auto-cols-max justify-start sm:justify-end gap-2">
 
               <!-- Filter button -->
-              <FilterButton align="right" />
+              <!-- <FilterButton align="right" /> -->
               <!-- Datepicker built with flatpickr -->
               <Datepicker align="right" />
               <!-- Submit Claim button -->
@@ -51,7 +51,7 @@
           <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 mb-6 text-white">
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-xl font-semibold mb-1">Halo, Feri Hussen</h2>
+                <h2 class="text-xl font-semibold mb-1">Halo, {{ currentUser.name || 'User' }}</h2>
                 <p class="text-blue-100 text-sm">Selamat datang kembali di dashboard asuransi Anda</p>
               </div>
               <div class="flex items-center space-x-4">
@@ -187,31 +187,31 @@
                 <div class="relative" style="width: 200px; height: 200px;">
                   <svg class="w-full h-full transform -rotate-90" viewBox="0 0 42 42">
                     <circle class="text-gray-200 dark:text-gray-700" stroke="currentColor" stroke-width="4" fill="none" cx="21" cy="21" r="15.915"></circle>
-                    <circle class="text-violet-500" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="40 60" stroke-dashoffset="0" cx="21" cy="21" r="15.915"></circle>
-                    <circle class="text-sky-500" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="25 75" stroke-dashoffset="-40" cx="21" cy="21" r="15.915"></circle>
-                    <circle class="text-violet-800" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="20 80" stroke-dashoffset="-65" cx="21" cy="21" r="15.915"></circle>
-                    <circle class="text-gray-400" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="15 85" stroke-dashoffset="-85" cx="21" cy="21" r="15.915"></circle>
+                    <circle 
+                      v-for="(type, index) in coverageByType" 
+                      :key="type.name"
+                      :class="`text-${type.color}`" 
+                      stroke="currentColor" 
+                      stroke-width="4" 
+                      fill="none" 
+                      :stroke-dasharray="`${type.percentage} ${100 - type.percentage}`" 
+                      :stroke-dashoffset="index === 0 ? 0 : `-${coverageByType.slice(0, index).reduce((sum, t) => sum + t.percentage, 0)}`" 
+                      cx="21" 
+                      cy="21" 
+                      r="15.915"
+                    ></circle>
                   </svg>
 
                 </div>
               </div>
               <div class="px-5 pb-5">
                 <div class="grid grid-cols-2 gap-4">
-                  <div class="flex items-center">
-                    <div class="w-3 h-3 bg-violet-500 rounded-full mr-2"></div>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Rawat Inap</span>
-                  </div>
-                  <div class="flex items-center">
-                    <div class="w-3 h-3 bg-sky-500 rounded-full mr-2"></div>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Rawat Jalan</span>
-                  </div>
-                  <div class="flex items-center">
-                    <div class="w-3 h-3 bg-violet-800 rounded-full mr-2"></div>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Penyakit Kritis</span>
-                  </div>
-                  <div class="flex items-center">
-                    <div class="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Medical Checkup</span>
+                  <div v-for="type in coverageByType" :key="type.name" class="flex items-center">
+                    <div :class="`w-3 h-3 bg-${type.color} rounded-full mr-2`"></div>
+                    <div class="flex flex-col">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">{{ type.name }}</span>
+                      <span class="text-xs text-gray-500 dark:text-gray-500">{{ type.count }} klaim</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -272,37 +272,7 @@ export default {
   setup() {
     const sidebarOpen = ref(false)
     const claims = ref([])
-
-    // Mock data from ClaimHistory
-    const mockClaims = [
-      {
-        id: 1,
-        claimNumber: 'CLM-2024-001',
-        hospitalName: 'RS Siloam Kebon Jeruk',
-        type: 'rawat-inap',
-        amount: 15000000,
-        status: 'approved',
-        submittedDate: '2024-01-19T10:30:00'
-      },
-      {
-        id: 2,
-        claimNumber: 'CLM-2024-002',
-        hospitalName: 'RSUD Fatmawati',
-        type: 'pra-pasca-rawat-inap',
-        amount: 8500000,
-        status: 'proses',
-        submittedDate: '2024-02-03T16:20:00'
-      },
-      {
-        id: 3,
-        claimNumber: 'CLM-2024-003',
-        hospitalName: 'RS Pondok Indah',
-        type: 'rawat-jalan',
-        amount: 2500000,
-        status: 'rejected',
-        submittedDate: '2024-02-11T08:15:00'
-      }
-    ]
+    const currentUser = ref(JSON.parse(localStorage.getItem('user') || '{}'))
 
     // Mock policy data from FormClaim
     const policyData = ref({
@@ -352,34 +322,86 @@ export default {
       return rejectedClaims.value.reduce((total, claim) => total + claim.amount, 0)
     })
 
-    const recentActivity = computed(() => [
-      {
-        id: 1,
-        description: 'Klaim CLM-2024-001 telah disetujui',
-        date: '2 hari yang lalu'
-      },
-      {
-        id: 2,
-        description: 'Klaim baru CLM-2024-002 diajukan untuk ditinjau',
-        date: '5 hari yang lalu'
-      },
-      {
-        id: 3,
-        description: 'Pembayaran premi diterima',
-        date: '1 minggu yang lalu'
+    const recentActivity = computed(() => {
+      return claims.value.slice(0, 3).map(claim => ({
+        id: claim.claim_id,
+        description: `Klaim ${claim.claim_id} - ${claim.hospitalName || 'Hospital'} (${getStatusText(claim.status)})`,
+        date: formatDate(claim.claim_date)
+      }))
+    })
+
+    const getStatusText = (status) => {
+      const statusMap = {
+        'approved': 'Disetujui',
+        'rejected': 'Ditolak', 
+        'proses': 'Dalam Proses'
       }
-    ])
+      return statusMap[status] || status
+    }
+
+    const formatDate = (dateStr) => {
+      const date = new Date(dateStr)
+      const now = new Date()
+      const diffTime = Math.abs(now - date)
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      
+      if (diffDays === 1) return '1 hari yang lalu'
+      if (diffDays < 7) return `${diffDays} hari yang lalu`
+      if (diffDays < 30) return `${Math.ceil(diffDays / 7)} minggu yang lalu`
+      return `${Math.ceil(diffDays / 30)} bulan yang lalu`
+    }
+
+    const coverageByType = computed(() => {
+      const typeMap = {
+        'rawat-inap': { name: 'Rawat Inap', color: 'violet-500', amount: 0, count: 0 },
+        'rawat-jalan': { name: 'Rawat Jalan', color: 'sky-500', amount: 0, count: 0 },
+        'penyakit-kritis': { name: 'Penyakit Kritis', color: 'violet-800', amount: 0, count: 0 },
+        'medical-checkup': { name: 'Medical Checkup', color: 'gray-400', amount: 0, count: 0 }
+      }
+      
+      claims.value.forEach(claim => {
+        const type = claim.claim_type || claim.type
+        if (typeMap[type]) {
+          typeMap[type].amount += claim.amount
+          typeMap[type].count += 1
+        }
+      })
+      
+      const total = Object.values(typeMap).reduce((sum, type) => sum + type.amount, 0)
+      
+      return Object.values(typeMap).map(type => ({
+        ...type,
+        percentage: total > 0 ? Math.round((type.amount / total) * 100) : 0
+      }))
+    })
 
     const formatCurrency = (amount) => {
       return new Intl.NumberFormat('id-ID').format(amount)
     }
 
+    const fetchClaims = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.value.id}`)
+        const data = await response.json()
+        if (data.status === 'success') {
+          claims.value = data.claims.map(claim => ({
+            ...claim,
+            amount: claim.claim_amount,
+            status: claim.claim_status.toLowerCase()
+          }))
+        }
+      } catch (error) {
+        console.error('Error fetching claims:', error)
+      }
+    }
+
     onMounted(() => {
-      claims.value = mockClaims
+      fetchClaims()
     })
 
     return {
       sidebarOpen,
+      currentUser,
       totalClaimAmount,
       approvedClaims,
       approvedAmount,
@@ -391,6 +413,7 @@ export default {
       coverageData,
       premiumData,
       recentActivity,
+      coverageByType,
       formatCurrency
     }  
   }

@@ -491,21 +491,25 @@ export default {
 
     const downloadDocument = async (doc) => {
       try {
-        const response = await fetch(doc.url || `/api/documents/${doc.id}`)
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = doc.name
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+        const response = await fetch(`http://localhost:5000/api/documents/${doc.doc_id}/download`)
+        const result = await response.json()
+        
+        if (result.status === 'success') {
+          const link = document.createElement('a')
+          link.href = result.download_url
+          link.download = result.filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        } else {
+          alert('Failed to download document: ' + result.error)
+        }
       } catch (error) {
         console.error('Download failed:', error)
         alert('Failed to download document')
       }
     }
+
 
     const getStatusClass = (status) => {
       const baseClass = 'status-badge '

@@ -156,21 +156,21 @@
                       class="form-input w-full" 
                       type="text" 
                       required 
-                      :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('nomorPolis') }"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('nomorPolis') }"
                     />
                     <p v-if="autoFilledFields.includes('nomorPolis')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                   </div>
                   <div>
-                    <label class="block text-sm font-medium mb-1" for="namaPerusahaan">Nama Perusahaan Asuransi <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium mb-1" for="nomorKartu">Nomor Kartu <span class="text-red-500">*</span></label>
                     <input 
-                      id="namaPerusahaan" 
-                      v-model="form.namaPerusahaan" 
+                      id="nomorKartu" 
+                      v-model="form.nomorKartu" 
                       class="form-input w-full" 
                       type="text" 
                       required 
-                      :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('namaPerusahaan') }"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('nomorKartu') }"
                     />
-                    <p v-if="autoFilledFields.includes('namaPerusahaan')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
+                    <p v-if="autoFilledFields.includes('nomorKartu')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                   </div>
                 </div>
 
@@ -183,7 +183,7 @@
                       class="form-input w-full" 
                       type="text" 
                       required 
-                      :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('nomorPeserta') }"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('nomorPeserta') }"
                     />
                     <p v-if="autoFilledFields.includes('nomorPeserta')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                   </div>
@@ -195,7 +195,7 @@
                       class="form-input w-full" 
                       type="text" 
                       required 
-                      :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('namaPemegang') }"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('namaPemegang') }"
                     />
                     <p v-if="autoFilledFields.includes('namaPemegang')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                   </div>
@@ -216,7 +216,7 @@
                     class="form-input w-full" 
                     type="text" 
                     :required="!isPemegangPolis" 
-                    :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('namaPeserta') }"
+                    :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('namaPeserta') }"
                   />
                   <p v-if="autoFilledFields.includes('namaPeserta')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                 </div>
@@ -252,7 +252,7 @@
                     class="form-input w-full" 
                     type="text" 
                     required 
-                    :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('nik') }"
+                    :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('nik') }"
                   />
                   <p v-if="autoFilledFields.includes('nik')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                 </div>
@@ -260,13 +260,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="block text-sm font-medium mb-1" for="tanggalLahir">Tanggal Lahir <span class="text-red-500">*</span></label>
-                    <input 
-                      id="tanggalLahir" 
-                      v-model="form.tanggalLahir" 
-                      class="form-input w-full" 
-                      type="date" 
-                      required 
-                      :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('tanggalLahir') }"
+                    <Datepicker 
+                      v-model="form.tanggalLahir"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('tanggalLahir') }"
                     />
                     <p v-if="autoFilledFields.includes('tanggalLahir')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                   </div>
@@ -277,7 +273,7 @@
                       v-model="form.jenisKelamin" 
                       class="form-select w-full" 
                       required
-                      :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('jenisKelamin') }"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('jenisKelamin') }"
                     >
                       <option value="">Pilih Jenis Kelamin</option>
                       <option value="laki-laki">Laki-laki</option>
@@ -294,7 +290,7 @@
                     v-model="form.statusPernikahan" 
                     class="form-select w-full" 
                     required
-                    :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('statusPernikahan') }"
+                    :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('statusPernikahan') }"
                   >
                     <option value="">Pilih Status</option>
                     <option value="belum-menikah">Belum Menikah</option>
@@ -313,7 +309,7 @@
                     class="form-textarea w-full" 
                     rows="3" 
                     required
-                    :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('alamat') }"
+                    :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('alamat') }"
                   ></textarea>
                   <p v-if="autoFilledFields.includes('alamat')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                 </div>
@@ -326,7 +322,7 @@
                     class="form-input w-full" 
                     type="tel" 
                     required 
-                    :class="{ 'bg-violet-50 border-violet-200': autoFilledFields.includes('nomorTelepon') }"
+                    :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('nomorTelepon') }"
                   />
                   <p v-if="autoFilledFields.includes('nomorTelepon')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                 </div>
@@ -439,7 +435,8 @@ export default {
       dataDeclaration: false,
       form: {
         nomorPolis: '',
-        namaPerusahaan: '',
+        // namaPerusahaan: '',
+        nomorKartu: '',
         nomorPeserta: '',
         namaPemegang: '',
         namaPeserta: '',
@@ -539,16 +536,21 @@ export default {
     applyExtractedData(data) {
       this.extractedData = data;
       this.autoFilledFields = [];
+      
+      console.log('Extracted data received:', data);
+      console.log('Birth date field:', data.birth_date);
+      console.log('Tempat/Tgl Lahir field:', data['Tempat/Tgl Lahir']);
 
       // Map extracted data to form fields
       const fieldMapping = {
         'nomorPolis': data.policy_number,
-        'namaPerusahaan': data.insurance_company,
+        // 'namaPerusahaan': data.insurance_company,
+        'nomorKartu': data.card_number,
         'nomorPeserta': data.participant_number,
-        'namaPemegang': data.policy_holder_name,
-        'namaPeserta': data.policy_holder_name,
+        'namaPemegang': data.full_name,
+        'namaPeserta': data.full_name,
         'nik': data.nik,
-        'tanggalLahir': this.formatBirthDate(data.birth_date),
+        'tanggalLahir': this.formatBirthDate(data.birth_date || data['Tempat/Tgl Lahir']),
         'jenisKelamin': this.mapGender(data.gender),
         'statusPernikahan': this.mapMaritalStatus(data.marital_status),
         'alamat': this.buildAddress(data)
@@ -565,12 +567,18 @@ export default {
     
     formatBirthDate(dateStr) {
       if (!dateStr) return '';
-      // Extract date from "JAKARTA, 18-02-1986" format
-      const match = dateStr.match(/(\d{2}-\d{2}-\d{4})/);
+      console.log('Formatting birth date:', dateStr);
+      // Extract date from "JAKARTA, 18- 02- 1986" format
+      const match = dateStr.match(/,\s*(\d{1,2})\s*-\s*(\d{1,2})\s*-\s*(\d{4})/);
       if (match) {
-        const [day, month, year] = match[1].split('-');
-        return `${year}-${month}-${day}`;
+        const day = match[1].padStart(2, '0');
+        const month = match[2].padStart(2, '0');
+        const year = match[3];
+        const formatted = `${year}-${month}-${day}`;
+        console.log('Formatted date:', formatted);
+        return formatted;
       }
+      console.log('No match found for date format');
       return '';
     },
     
@@ -609,17 +617,36 @@ export default {
         return;
       }
 
-      // Mock registration - just show success and redirect
-      const registrationData = {
-        ...this.form,
-        isPemegangPolis: this.isPemegangPolis,
-        extractedData: this.extractedData,
-        autoFilledFields: this.autoFilledFields
-      };
-      
-      console.log('Registration data:', registrationData);
-      alert('Registration successful!');
-      this.$router.push('/signin');
+      try {
+        const registrationData = {
+          ...this.form,
+          isPemegangPolis: this.isPemegangPolis
+        };
+        
+        const response = await fetch('http://localhost:5000/api/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(registrationData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          // Store token and user data
+          localStorage.setItem('token', result.token);
+          localStorage.setItem('user', JSON.stringify(result.user));
+          
+          alert('Registration successful!');
+          this.$router.push('/customer-dashboard');
+        } else {
+          alert(result.error || 'Registration failed');
+        }
+      } catch (error) {
+        console.error('Registration error:', error);
+        alert('Registration failed. Please try again.');
+      }
     }
   }
 }

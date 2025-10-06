@@ -560,14 +560,33 @@ export default {
       selectedClaim.value = null
     }
 
-    const downloadDocument = (document) => {
-      window.open(document.url, '_blank')
+    const downloadDocument = async (doc) => {
+      try {
+        // Get secure download URL
+        const response = await fetch(`http://localhost:5000/api/documents/${doc.doc_id}/download`)
+        const result = await response.json()
+        
+        if (result.status === 'success') {
+          // Create temporary link and trigger download
+          const link = document.createElement('a')
+          link.href = result.download_url
+          link.download = result.filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        } else {
+          alert('Failed to download document: ' + result.error)
+        }
+      } catch (error) {
+        console.error('Download failed:', error)
+        alert('Failed to download document')
+      }
     }
 
     const downloadAllDocuments = () => {
       if (selectedClaim.value?.documents) {
         selectedClaim.value.documents.forEach(doc => {
-          window.open(doc.url, '_blank')
+          downloadDocument(doc)
         })
       }
       closeModal()

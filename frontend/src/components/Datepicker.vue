@@ -15,23 +15,86 @@ import flatPickr from 'vue-flatpickr-component'
 
 export default {
   name: 'Datepicker',
-  props: ['align', 'modelValue'],
+  props: {
+    align: String,
+    modelValue: {
+      type: [String, Number, Date, Array],
+      default: null
+    }
+  },
   emits: ['update:modelValue'],
     data (props) {
       return {
-        date: props.modelValue,
+        date: props.modelValue || null,
         config: {
           mode: 'single',
           static: false,
-          monthSelectorType: 'dropdown',
           dateFormat: 'M j, Y',
           defaultDate: props.modelValue || new Date(),
           prevArrow: '<svg class="fill-current" width="7" height="11" viewBox="0 0 7 11"><path d="M5.4 10.8l1.4-1.4-4-4 4-4L5.4 0 0 5.4z" /></svg>',
           nextArrow: '<svg class="fill-current" width="7" height="11" viewBox="0 0 7 11"><path d="M1.4 10.8L0 9.4l4-4-4-4L1.4 0l5.4 5.4z" /></svg>',
+
           onReady: (selectedDates, dateStr, instance) => {
             instance.element.value = dateStr;
             const customClass = (props.align) ? props.align : '';
-            instance.calendarContainer.classList.add(`flatpickr-${customClass}`);            
+            instance.calendarContainer.classList.add(`flatpickr-${customClass}`);
+            
+            // Convert month to dropdown
+            const monthElement = instance.monthElements[0];
+            if (monthElement) {
+              const currentMonth = new Date().getMonth();
+              const monthSelect = document.createElement('select');
+              monthSelect.className = 'form-select text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ml-2 mr-2 flex-0.75';
+              
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              months.forEach((month, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = month;
+                if (index === currentMonth) option.selected = true;
+                monthSelect.appendChild(option);
+              });
+              
+              monthSelect.addEventListener('change', (e) => {
+                instance.changeMonth(parseInt(e.target.value));
+              });
+              
+              monthElement.parentNode.replaceChild(monthSelect, monthElement);
+              instance.monthElements[0] = monthSelect;
+            }
+            
+            // Convert year input to dropdown
+            const yearInput = instance.yearElements[0];
+            if (yearInput) {
+              const currentYear = new Date().getFullYear();
+              const yearSelect = document.createElement('select');
+              yearSelect.className = 'form-select text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 flex-1';
+              
+              // Add years from 1900 to current year + 10
+              for (let year = 1900; year <= currentYear + 10; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === currentYear) option.selected = true;
+                yearSelect.appendChild(option);
+              }
+              
+              yearSelect.addEventListener('change', (e) => {
+                instance.changeYear(parseInt(e.target.value));
+              });
+              
+              yearInput.parentNode.replaceChild(yearSelect, yearInput);
+              instance.yearElements[0] = yearSelect;
+            }
+            
+            // Apply flex layout to current month container
+            const currentMonthContainer = instance.currentMonthElement?.parentNode;
+            if (currentMonthContainer) {
+              currentMonthContainer.style.display = 'flex';
+              currentMonthContainer.style.gap = '8px';
+              currentMonthContainer.style.alignItems = 'center';
+              currentMonthContainer.style.width = '100%';
+            }
           },
           onChange: (selectedDates, dateStr, instance) => {
             instance.element.value = dateStr;

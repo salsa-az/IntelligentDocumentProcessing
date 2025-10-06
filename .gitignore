@@ -2,3 +2,15 @@
 .env
 __pycache__/
 .ipynb_checkpoints/
+env*
+credential*
+test*
+
+node_modules/
+
+idp-new
+idp-venv
+.gitignore
+coba*
+
+token*

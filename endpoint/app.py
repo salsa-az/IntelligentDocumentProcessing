@@ -11,6 +11,8 @@ import bcrypt
 # Flask
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
+from werkzeug.security import check_password_hash # For securely checking passwords
 
 # Azure
 from azure.storage.blob import BlobServiceClient,ContentSettings
@@ -28,6 +30,7 @@ thread_id = uuid.uuid4()
 config = {"configurable": {"thread_id": thread_id}}
 # Initialize Flask app once
 app = Flask(__name__)
+
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"]}})
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
@@ -446,6 +449,14 @@ def update_claim_status(claim_id):
 def get_customer_claims_detailed(customer_id):
     """Get detailed claims for a specific customer with documents"""
     try:
+        # Get the identity of the current user from the JWT
+        current_user = get_jwt_identity()
+        customer_id = current_user.get('id')
+        user_role = current_user.get('role')
+
+        if user_role != 'customer':
+            return jsonify({'error': 'Access forbidden: Customers only'}), 403
+
         claims = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId ORDER BY c._ts DESC", 
             "claim", 
@@ -485,6 +496,14 @@ def validate_customer_data(form_data, customer_data):
 def get_customer_claim_history(customer_id):
     """Get claim history for a specific customer with hospital names from invoices"""
     try:
+        # Get the identity of the current user from the JWT
+        current_user = get_jwt_identity()
+        customer_id = current_user.get('id')
+        user_role = current_user.get('role')
+
+        if user_role != 'customer':
+            return jsonify({'error': 'Access forbidden: Customers only'}), 403
+
         claims = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId ORDER BY c._ts DESC", 
             "claim", 
@@ -539,6 +558,11 @@ def submit_claim():
         claim_amount = request.form.get('claimAmount')
         currency = request.form.get('currency')
         customer_id = request.form.get('customerId')
+
+        # Get customer_id from the JWT token instead of the form
+        current_user = get_jwt_identity()
+        customer_id = current_user.get('id')
+
         policy_id = request.form.get('policyId')
         date_checkin = request.form.get('treatmentStartDate')
         date_checkout = request.form.get('treatmentEndDate')

@@ -64,50 +64,6 @@ def run_analysis_async(customer_id, claim_id):
             print(f"Error in analyst_function_executor: {e}", file=sys.stderr)
     threading.Thread(target=target, daemon=True).start()
 
-@app.route('/api/login', methods=['POST'])
-def login():
-    """Login endpoint to authenticate users and return a JWT."""
-    try:
-        email = request.json.get('email', None)
-        password = request.json.get('password', None)
-
-        if not email or not password:
-            return jsonify({"msg": "Missing email or password"}), 400
-
-        # --- Authenticate against 'customer' or 'Insurance Administrator' container ---
-        # Note: You should store hashed passwords in your DB, not plaintext.
-        # Using werkzeug.security.check_password_hash is recommended.
-
-        # Try to find user in 'customer' container
-        user_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.email = @email",
-            "customer",
-            [{"name": "@email", "value": email}]
-        )
-        role = "customer"
-
-        # If not found, try 'Insurance Administrator' container
-        if not user_data:
-            user_data = cosmos_retrive_data(
-                "SELECT * FROM c WHERE c.email = @email",
-                "Insurance Administrator",
-                [{"name": "@email", "value": email}]
-            )
-            role = "approver"
-
-        # For this example, we'll use a hardcoded password check.
-        # In a real app, you would use: check_password_hash(user_data[0]['password_hash'], password)
-        if not user_data or password != "password123":
-            return jsonify({"msg": "Bad email or password"}), 401
-
-        user = user_data[0]
-        # Create a new token with the user's ID and role as the identity
-        access_token = create_access_token(identity={"id": user.get('customer_id') or user.get('admin_id'), "role": role})
-        return jsonify(access_token=access_token, user=user)
-    except Exception as e:
-        print(f"Error in login: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
 @app.route('/api/analyze-claim', methods=['POST'])
 def analyze_claim():
     """Analyze claim using customer_id and claim_id"""

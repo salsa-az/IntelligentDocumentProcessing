@@ -418,18 +418,26 @@
             <textarea v-model="notes" rows="3" class="form-textarea w-full" placeholder="Add your review notes..."></textarea>
           </div>
           <div class="flex space-x-3">
-            <button @click="$emit('approve', notes)" class="flex-1 btn bg-green-600 hover:bg-green-700 text-white">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            <div v-if="decisionMade" class="flex-1 btn bg-blue-600 text-white cursor-not-allowed">
+              <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
               </svg>
-              Approve
-            </button>
-            <button @click="$emit('reject', notes)" class="flex-1 btn bg-red-600 hover:bg-red-700 text-white">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-              Reject
-            </button>
+              Processing...
+            </div>
+            <template v-else>
+              <button @click="handleApprove" :disabled="!isApproveMatchesAI && !notes.trim()" class="flex-1 btn bg-green-600 hover:bg-green-700 text-white disabled:opacity-50">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                Approve
+              </button>
+              <button @click="handleReject" :disabled="!isRejectMatchesAI && !notes.trim()" class="flex-1 btn bg-red-600 hover:bg-red-700 text-white disabled:opacity-50">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                Reject
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -445,7 +453,7 @@
 </template>
 
 <script>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { formatValue } from '../utils/Utils'
 import DocumentReview from './DocumentReview.vue'
 
@@ -464,6 +472,7 @@ export default {
     const expandedDocs = ref(new Set())
     const showRawDocument = ref(false)
     const selectedDocId = ref(null)
+    const decisionMade = ref(false)
 
     const openRawDocument = (docId) => {
       selectedDocId.value = docId
@@ -478,6 +487,7 @@ export default {
     watch(() => props.show, (newVal) => {
       if (newVal) {
         notes.value = ''
+        decisionMade.value = false
       }
     })
 
@@ -565,6 +575,32 @@ export default {
       return Math.floor(numValue).toString()
     }
 
+    const isApproveMatchesAI = computed(() => {
+      const rec = props.claim?.aiAnalysis?.recommendation?.toLowerCase()
+      return rec?.includes('approve') || rec?.includes('setuju')
+    })
+
+    const isRejectMatchesAI = computed(() => {
+      const rec = props.claim?.aiAnalysis?.recommendation?.toLowerCase()
+      return rec?.includes('reject') || rec?.includes('tolak')
+    })
+
+    const handleApprove = () => {
+      if (decisionMade.value) return
+      if (!isApproveMatchesAI.value && !notes.value.trim()) return
+      
+      decisionMade.value = true
+      emit('approve', notes.value || '')
+    }
+
+    const handleReject = () => {
+      if (decisionMade.value) return
+      if (!isRejectMatchesAI.value && !notes.value.trim()) return
+      
+      decisionMade.value = true
+      emit('reject', notes.value || '')
+    }
+
     return {
       notes,
       expandedDocs,
@@ -578,7 +614,12 @@ export default {
       showRawDocument,
       selectedDocId,
       openRawDocument,
-      closeRawDocument
+      closeRawDocument,
+      isApproveMatchesAI,
+      isRejectMatchesAI,
+      handleApprove,
+      handleReject,
+      decisionMade
     }
   }
 }

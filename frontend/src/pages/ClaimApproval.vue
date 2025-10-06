@@ -274,11 +274,6 @@ export default {
     }
 
     const approveClaim = async (notes) => {
-      if (!notes.trim()) {
-        alert('Please add review notes before approving')
-        return
-      }
-      
       try {
         const response = await fetch(`http://localhost:5000/api/claims/${selectedClaim.value.id}/update-status`, {
           method: 'POST',
@@ -313,11 +308,6 @@ export default {
     }
 
     const rejectClaim = async (notes) => {
-      if (!notes.trim()) {
-        alert('Please add review notes before rejecting')
-        return
-      }
-      
       try {
         const response = await fetch(`http://localhost:5000/api/claims/${selectedClaim.value.id}/update-status`, {
           method: 'POST',

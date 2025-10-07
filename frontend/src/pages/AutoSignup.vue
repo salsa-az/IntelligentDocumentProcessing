@@ -260,8 +260,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="block text-sm font-medium mb-1" for="tanggalLahir">Tanggal Lahir <span class="text-red-500">*</span></label>
-                    <Datepicker 
-                      v-model="form.tanggalLahir"
+                    <input 
+                      id="tanggalLahir" 
+                      v-model="form.tanggalLahir" 
+                      class="form-input w-full" 
+                      type="date" 
+                      required
                       :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('tanggalLahir') }"
                     />
                     <p v-if="autoFilledFields.includes('tanggalLahir')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
@@ -561,8 +565,12 @@ export default {
         if (extractedValue && extractedValue.trim && extractedValue.trim()) {
           this.form[formField] = extractedValue.trim();
           this.autoFilledFields.push(formField);
+          console.log(`Applied ${formField}:`, extractedValue.trim());
         }
       }
+      
+      console.log('Final form data:', this.form);
+      console.log('Auto-filled fields:', this.autoFilledFields);
     },
     
     formatBirthDate(dateStr) {

@@ -247,19 +247,19 @@ export default {
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
     
     const form = ref({
-      // Auto-filled profile data
-      nomorPolis: 'P001',
-      namaPerusahaan: 'PT XYZ Asuransi',
-      nomorPeserta: 'CUST1234',
-      namaPemegang: 'Feri Hussen',
-      nik: '32010298345',
-      tanggalLahir: '1985-04-12',
-      jenisKelamin: 'Male',
-      statusPernikahan: 'Married',
-      alamat: 'Jl. Contoh No. 123, Jakarta',
-      email: 'feri.hussen@xyz.com',
-      nomorTelepon: '081234567890',
-      
+      // Auto-filled profile data from logged in user
+      nomorPolis: '',
+      namaPerusahaan: '',
+      nomorPeserta: '',
+      namaPemegang: '',
+      nik: '',
+      tanggalLahir: '',
+      jenisKelamin: '',
+      statusPernikahan: '',
+      alamat: '',
+      email: '',
+      nomorTelepon: '',
+
       // Form fields
       claimType: '',
       otherClaimType: '',
@@ -346,6 +346,45 @@ export default {
         ]
       }
     ]
+
+    const loadUserProfile = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          router.push('/signin')
+          return
+        }
+
+        const response = await fetch('http://localhost:5000/api/customer/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          const customer = result.customer
+          console.log('Customer profile loaded:', customer)
+          
+          // Auto-fill form with user profile data
+          form.value.nomorPolis = customer.policy_id || ''
+          form.value.namaPerusahaan = customer.insurance_company || 'PT XYZ Asuransi'
+          form.value.nomorPeserta = customer.customer_no || ''
+          form.value.namaPemegang = customer.name || ''
+          form.value.nik = customer.NIK || ''
+          form.value.tanggalLahir = customer.dob || ''
+          form.value.jenisKelamin = customer.gender || ''
+          form.value.statusPernikahan = customer.marital_status || ''
+          form.value.alamat = customer.address || ''
+          form.value.email = customer.email || ''
+          form.value.nomorTelepon = customer.phone || ''
+        } else {
+          console.error('Failed to load profile:', response.status, response.statusText)
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error)
+      }
+    }
 
     const loadClaimData = async () => {
       const editId = route.query.edit
@@ -456,8 +495,12 @@ export default {
           formData.append('additionalDoc', form.value.additionalDoc)
         }
         
+        const token = localStorage.getItem('token')
         const response = await fetch('http://localhost:5000/api/submit-claim', {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
           body: formData
         })
         
@@ -501,6 +544,7 @@ export default {
     })
 
     onMounted(async () => {
+      await loadUserProfile()
       await loadClaimData()
     })
 

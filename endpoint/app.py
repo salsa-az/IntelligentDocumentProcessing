@@ -5,13 +5,13 @@ import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import uuid
 from datetime import datetime
-import jwt
+import jwt as jwt_lib
 import bcrypt
 
 # Flask
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager, get_jwt
 from werkzeug.security import check_password_hash # For securely checking passwords
 
 # Azure
@@ -33,9 +33,24 @@ app = Flask(__name__)
 
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"]}})
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-if not JWT_SECRET_KEY:
-    raise ValueError("JWT_SECRET_KEY environment variable not set")
+import secrets
+JWT_SECRET_KEY = secrets.token_hex(32)
+
+app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
+app.config['JWT_CSRF_IN_COOKIES'] = False
+jwt = JWTManager(app)
+
+# JWT Error handlers
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({'error': 'Token has expired'}), 401
+
+# Token blacklist for logout
+blacklisted_tokens = set()
+
+@jwt.token_in_blocklist_loader
+def check_if_token_revoked(jwt_header, jwt_payload):
+    return jwt_payload['jti'] in blacklisted_tokens
 
 # Azure setup
 blob_connection_string = os.getenv("BLOB_STRING_CONECTION")
@@ -110,14 +125,11 @@ def query_from_cosmosDB():
 def get_all_claims():
     """Retrieve all claims from CosmosDB"""
     try:
-        claims = list(database.get_container_client("claim").query_items(
-            query="SELECT * FROM c",
-            enable_cross_partition_query=True
-        ))
-        return claims
+        claims = cosmos_retrive_data("SELECT * FROM c", "claim", [])
+        return jsonify({'status': 'success', 'claims': claims})
     except Exception as e:
         print(f"Error retrieving claims: {e}", file=sys.stderr)
-        return []
+        return jsonify({'error': 'Internal server error'}), 500
     
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -142,11 +154,22 @@ def signup():
         if existing_customer:
             return jsonify({'error': 'Customer already exists'}), 400
         
+        # Check if policy already exist
+        existing_policy = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.policy_id = @policyId",
+            "customer",
+            [{"name": "@policyId", "value": data.get('nomorPolis', '')}]
+        )
+        
+        if existing_policy:
+            return jsonify({'error': 'Policy already registered'}), 400
+        
         # Hash password
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
         # Generate customer ID
         customer_id = f"CU{uuid.uuid4().hex[:8].upper()}"
+        policy_id = data.get('nomorPolis', '')
         
         # Calculate age from birth date
         age = None
@@ -192,18 +215,26 @@ def signup():
             "claim_id": []
         }
         
-        # Save to database
-        database.get_container_client("customer").create_item(customer_data)
-        
-        # Generate JWT token
-        token_payload = {
-            'customer_id': customer_id,
-            'email': email,
-            'role': 'customer',
-            'exp': datetime.utcnow().timestamp() + 86400  # 24 hours
+        policy_data = {
+                "id": policy_id,
+                "policy_id": policy_id,
+                "user_id": customer_id,
+                "policy_no": policy_id,
+                "policyholder_name": data.get('namaPemegang', ''),
+                "insured_name": data.get('namaTertanggung', ''),
+                "start_date": data.get('policyStartDate', ''),
+                "expire_date": data.get('policyEndDate', ''),
+                "insurance_plan_type": "Health",
+                # "total_claim_limit": '',
+                "insurance_company": "XYZ Insurance",
         }
         
-        token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm='HS256')
+        # Save to database
+        database.get_container_client("customer").create_item(customer_data)
+        database.get_container_client("policy").create_item(policy_data)
+        
+        # Generate JWT token using Flask-JWT-Extended
+        token = create_access_token(identity=customer_id)
         
         return jsonify({
             'status': 'success',
@@ -224,51 +255,61 @@ def signup():
 @app.route('/api/signin', methods=['POST'])
 def signin():
     """User login"""
-    data = request.json
-    email = data.get('email', '')
-    password = data.get('password', '')
+    try:
+        data = request.json
+        email = data.get('email', '')
+        password = data.get('password', '')
 
-    if not email or not password:
-        return jsonify({'error': 'Email and password are required'}), 400
+        if not email or not password:
+            return jsonify({'error': 'Email and password are required'}), 400
 
-    # Check user credentials
-    user = cosmos_retrive_data(
-        "SELECT * FROM c WHERE c.email = @Email",
-        "customer",
-        [{"name": "@Email", "value": email}]
-    )
+        # Check user credentials
+        user = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.email = @Email",
+            "customer",
+            [{"name": "@Email", "value": email}]
+        )
 
-    if not user:
-        return jsonify({'error': 'Invalid email or password'}), 401
+        if not user:
+            return jsonify({'error': 'Invalid email or password'}), 401
 
-    user = user[0]
-    if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
-        return jsonify({'error': 'Invalid email or password'}), 401
+        user = user[0]
+        if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
+            return jsonify({'error': 'Invalid email or password'}), 401
 
-    # Set default role if not present
-    user_role = user.get('role', 'customer')
+        # Set default role if not present
+        user_role = user.get('role', 'customer')
+        
+        # Generate JWT token using Flask-JWT-Extended
+        token = create_access_token(identity=user['customer_id'])
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Login successful',
+            'token': token,
+            'user': {
+                'id': user['customer_id'],
+                'name': user['name'],
+                'email': email,
+                'role': user_role
+            }
+        })
     
-    # Generate JWT token
-    token_payload = {
-        'customer_id': user['customer_id'],
-        'email': email,
-        'role': user_role,
-        'exp': datetime.utcnow().timestamp() + 86400  # 24 hours
-    }
+    except Exception as e:
+        print(f"Error in signin: {e}")
+        return jsonify({'error': 'Login failed'}), 500
 
-    token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm='HS256')
-
-    return jsonify({
-        'status': 'success',
-        'message': 'Login successful',
-        'token': token,
-        'user': {
-            'id': user['customer_id'],
-            'name': user['name'],
-            'email': email,
-            'role': user_role
-        }
-    })
+@app.route('/api/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """User logout - invalidate JWT token"""
+    try:
+        jti = get_jwt()['jti']
+        blacklisted_tokens.add(jti)
+        return jsonify({'status': 'success', 'message': 'Logged out successfully'})
+    except Exception as e:
+        print(f"Error in logout: {e}")
+        return jsonify({'error': 'Logout failed'}), 500
 
 @app.route('/api/documents/<doc_id>/download', methods=['GET'])
 def download_document(doc_id):
@@ -312,7 +353,7 @@ def download_document(doc_id):
             'status': 'success',
             'download_url': download_url,
             'filename': doc.get('doc_type', 'document') + '.pdf',
-            'expires_in': 900  # 15 minutes in seconds
+            'expires_in': 900 
         })
         
     except Exception as e:
@@ -446,16 +487,11 @@ def update_claim_status(claim_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/customer/<customer_id>/claims-detailed', methods=['GET'])
+@jwt_required()
 def get_customer_claims_detailed(customer_id):
     """Get detailed claims for a specific customer with documents"""
     try:
-        # Get the identity of the current user from the JWT
-        current_user = get_jwt_identity()
-        customer_id = current_user.get('id')
-        user_role = current_user.get('role')
-
-        if user_role != 'customer':
-            return jsonify({'error': 'Access forbidden: Customers only'}), 403
+        customer_id = get_jwt_identity()
 
         claims = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId ORDER BY c._ts DESC", 
@@ -493,16 +529,11 @@ def validate_customer_data(form_data, customer_data):
     return True, "Valid customer"
 
 @app.route('/api/customer-claim-history/<customer_id>', methods=['GET'])
+@jwt_required()
 def get_customer_claim_history(customer_id):
     """Get claim history for a specific customer with hospital names from invoices"""
     try:
-        # Get the identity of the current user from the JWT
-        current_user = get_jwt_identity()
-        customer_id = current_user.get('id')
-        user_role = current_user.get('role')
-
-        if user_role != 'customer':
-            return jsonify({'error': 'Access forbidden: Customers only'}), 403
+        customer_id = get_jwt_identity()
 
         claims = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId ORDER BY c._ts DESC", 
@@ -546,6 +577,7 @@ def get_customer_claim_history(customer_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/submit-claim', methods=['POST'])
+@jwt_required(optional=True)
 def submit_claim():
     """Submit or update claim form with file uploads"""
     try:
@@ -559,9 +591,12 @@ def submit_claim():
         currency = request.form.get('currency')
         customer_id = request.form.get('customerId')
 
-        # Get customer_id from the JWT token instead of the form
+        # Try to get customer_id from JWT token, fallback to form
         current_user = get_jwt_identity()
-        customer_id = current_user.get('id')
+        if current_user:
+            customer_id = current_user
+        else:
+            customer_id = request.form.get('customerId')
 
         policy_id = request.form.get('policyId')
         date_checkin = request.form.get('treatmentStartDate')
@@ -583,9 +618,11 @@ def submit_claim():
             [{"name": "@customerId", "value": customer_id}]
         )
         
-        is_valid, message = validate_customer_data(request.form, customer_data)
-        if not is_valid:
-            return jsonify({'error': message}), 400
+        # Skip customer validation for JWT authenticated users
+        if not current_user:
+            is_valid, message = validate_customer_data(request.form, customer_data)
+            if not is_valid:
+                return jsonify({'error': message}), 400
         
         if is_edit:
             # Get existing claim
@@ -814,10 +851,77 @@ def extract_registration_info():
         print(f"Error in document extraction: {e}")
         return jsonify({'error': 'Document processing failed'}), 500
 
+@app.route('/api/customer/profile', methods=['GET'])
+@jwt_required()
+def get_customer_profile():
+    """Get customer profile data"""
+    try:
+        customer_id = get_jwt_identity()
+        
+        customer_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId",
+            "customer",
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        if not customer_data:
+            return jsonify({'error': 'Customer not found'}), 404
+            
+        return jsonify({
+            'status': 'success',
+            'customer': customer_data[0]
+        })
+        
+    except Exception as e:
+        print(f"Error getting customer profile: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy'})
+
+@app.route('/api/test-jwt', methods=['GET'])
+@jwt_required()
+def test_jwt():
+    """Test JWT endpoint"""
+    current_user = get_jwt_identity()
+    return jsonify({
+        'status': 'success',
+        'user': current_user,
+        'message': 'JWT is working'
+    })
+
+@app.route('/api/debug-token', methods=['GET'])
+@jwt_required()
+def debug_token():
+    """Debug token endpoint - no JWT required"""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No Authorization header'}), 400
+        
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Invalid Authorization header format'}), 400
+        
+        token = auth_header.split(' ')[1]
+        
+        # Try to decode token manually
+        import jwt as jwt_lib
+        try:
+            decoded = jwt_lib.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+            return jsonify({
+                'status': 'success',
+                'token_valid': True,
+                'decoded': decoded
+            })
+        except jwt_lib.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt_lib.InvalidTokenError as e:
+            return jsonify({'error': f'Invalid token: {str(e)}'}), 422
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/documents/<doc_id>', methods=['GET'])
 def get_document_metadata(doc_id):

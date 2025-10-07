@@ -449,10 +449,12 @@ export default {
       try {
         console.log('Fetching claims for customer:', currentUser.id)
         
+        const token = localStorage.getItem('token')
         const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           }
         })
         

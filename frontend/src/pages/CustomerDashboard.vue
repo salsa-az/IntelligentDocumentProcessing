@@ -65,8 +65,13 @@
             </div>
           </div>
 
+          <!-- Loading State -->
+          <div v-if="loading" class="flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+          </div>
+
           <!-- Cards -->
-          <div class="grid grid-cols-12 gap-4">
+          <div v-else class="grid grid-cols-12 gap-4">
 
             <!-- Policy Status -->
             <div class="col-span-12 sm:col-span-6">
@@ -272,6 +277,7 @@ export default {
   setup() {
     const sidebarOpen = ref(false)
     const claims = ref([])
+    const loading = ref(true)
     const currentUser = ref(JSON.parse(localStorage.getItem('user') || '{}'))
 
     // Mock policy data from FormClaim
@@ -380,8 +386,11 @@ export default {
     }
 
     const fetchClaims = async () => {
+      loading.value = true
       try {
-        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.value.id}`)
+        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.value.id}`, {
+          credentials: 'include'
+        })
         const data = await response.json()
         if (data.status === 'success') {
           claims.value = data.claims.map(claim => ({
@@ -392,6 +401,8 @@ export default {
         }
       } catch (error) {
         console.error('Error fetching claims:', error)
+      } finally {
+        loading.value = false
       }
     }
 
@@ -414,7 +425,8 @@ export default {
       premiumData,
       recentActivity,
       coverageByType,
-      formatCurrency
+      formatCurrency,
+      loading
     }  
   }
 }

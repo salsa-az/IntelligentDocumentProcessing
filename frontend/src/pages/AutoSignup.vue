@@ -7,9 +7,8 @@
           <div class="max-w-2xl mx-auto w-full px-4 py-8">
             <!-- Logo -->
             <div class="flex justify-center">
-              <svg class="fill-violet-500" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
-                <path d="M31.956 14.8C31.372 6.92 25.08.628 17.2.044V5.76a9.04 9.04 0 0 0 9.04 9.04h5.716ZM14.8 26.24v5.716C6.92 31.372.63 25.08.044 17.2H5.76a9.04 9.04 0 0 1 9.04 9.04Zm11.44-9.04h5.716c-.584 7.88-6.876 14.172-14.756 14.756V26.24a9.04 9.04 0 0 1 9.04-9.04ZM.044 14.8C.63 6.92 6.92.628 14.8.044V5.76a9.04 9.04 0 0 1-9.04 9.04H.044Z" />
-              </svg>
+              <img src="/src/images/logo.svg" alt="App Logo" class="w-8 h-8 lg:w-10 lg:h-10" />
+                <span class="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-100 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Nexclaim</span>
             </div>
 
             <div class="flex justify-center mb-8">
@@ -508,6 +507,7 @@ export default {
 
         const response = await fetch('http://localhost:5000/api/extract-registration-info', {
         method: 'POST',
+        credentials: 'include',
         body: formData
         });
 
@@ -628,6 +628,7 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify(registrationData)
         });
         

@@ -76,8 +76,13 @@
             </div>
           </div>
 
+          <!-- Loading State -->
+          <div v-if="loading" class="flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+          </div>
+
           <!-- Claims List -->
-          <div class="space-y-4">
+          <div v-else class="space-y-4">
             <div v-for="claim in filteredClaims" :key="claim.id" class="claim-card cursor-pointer" @click="toggleClaim(claim.id)">
               <!-- Claim Summary -->
               <div class="flex items-center justify-between">
@@ -169,7 +174,7 @@
           </div>
           
           <!-- Empty State -->
-          <div v-if="filteredClaims.length === 0" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
+          <div v-if="!loading && filteredClaims.length === 0" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
             <p class="text-gray-500 dark:text-gray-400">No claims found matching your criteria.</p>
           </div>
         </div>
@@ -453,7 +458,8 @@ export default {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-          }
+          },
+          credentials: 'include'
         })
         
         if (!response.ok) {
@@ -563,7 +569,9 @@ export default {
     const downloadDocument = async (doc) => {
       try {
         // Get secure download URL
-        const response = await fetch(`http://localhost:5000/api/documents/${doc.doc_id}/download`)
+        const response = await fetch(`http://localhost:5000/api/documents/${doc.doc_id}/download`, {
+          credentials: 'include'
+        })
         const result = await response.json()
         
         if (result.status === 'success') {
@@ -635,7 +643,8 @@ export default {
       downloadDocument,
       downloadAllDocuments,
       editClaim,
-      fetchClaimHistory
+      fetchClaimHistory,
+      loading
     }
   }
 }

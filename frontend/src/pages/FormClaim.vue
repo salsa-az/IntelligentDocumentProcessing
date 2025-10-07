@@ -352,7 +352,9 @@ export default {
       
       if (editId) {
         try {
-          const response = await fetch(`http://localhost:5000/api/claims/${editId}`)
+          const response = await fetch(`http://localhost:5000/api/claims/${editId}`, {
+            credentials: 'include'
+          })
           const result = await response.json()
           
           if (result.status === 'success' && result.claim) {
@@ -458,6 +460,7 @@ export default {
         
         const response = await fetch('http://localhost:5000/api/submit-claim', {
           method: 'POST',
+          credentials: 'include',
           body: formData
         })
         
@@ -500,7 +503,27 @@ export default {
       }
     })
 
+    const loadUserProfile = () => {
+      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      
+      if (userData && userData.id) {
+        // Autofill form dengan data dari session
+        form.value.nomorPolis = userData.policy_number || form.value.nomorPolis
+        form.value.namaPerusahaan = userData.insurance_company || form.value.namaPerusahaan
+        form.value.nomorPeserta = userData.customer_id || userData.id || form.value.nomorPeserta
+        form.value.namaPemegang = userData.name || form.value.namaPemegang
+        form.value.nik = userData.nik || form.value.nik
+        form.value.tanggalLahir = userData.birth_date || form.value.tanggalLahir
+        form.value.jenisKelamin = userData.gender || form.value.jenisKelamin
+        form.value.statusPernikahan = userData.marital_status || form.value.statusPernikahan
+        form.value.alamat = userData.address || form.value.alamat
+        form.value.email = userData.email || form.value.email
+        form.value.nomorTelepon = userData.phone || form.value.nomorTelepon
+      }
+    }
+
     onMounted(async () => {
+      loadUserProfile()
       await loadClaimData()
     })
 

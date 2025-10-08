@@ -230,118 +230,101 @@
                 <div v-else-if="doc.doc_type === 'report lab' && doc.doc_contents">
                   <h6 class="font-semibold mb-2">Hasil Pemeriksaan Laboratorium</h6>
                   <div class="space-y-3">
-                    <!-- Handle actual lab report structure -->
-                    <div v-if="doc.doc_contents['0']" class="space-y-3">
-                      <!-- Lab Information -->
-                      <div>
-                        <h6 class="font-semibold text-purple-800 dark:text-purple-300 mb-2">Informasi Laboratorium</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['Lab name']">
-                            <strong>Nama Lab:</strong> {{ doc.doc_contents['0']['Lab name'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Lab address']">
-                            <strong>Alamat Lab:</strong> {{ doc.doc_contents['0']['Lab address'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Report Date']">
-                            <strong>Tanggal Laporan:</strong> {{ doc.doc_contents['0']['Report Date'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Registration Date']">
-                            <strong>Tanggal Registrasi:</strong> {{ doc.doc_contents['0']['Registration Date'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['No. registration']">
-                            <strong>No. Registrasi:</strong> {{ doc.doc_contents['0']['No. registration'] }}
-                          </div>
+                    <!-- Lab Information -->
+                    <div v-if="doc.doc_contents['Lab name']">
+                      <h6 class="font-semibold text-purple-800 dark:text-purple-300 mb-2">Informasi Laboratorium</h6>
+                      <div class="text-xs space-y-1">
+                        <div v-if="doc.doc_contents['Lab name']">
+                          <strong>Nama Lab:</strong> {{ doc.doc_contents['Lab name'] }}
                         </div>
-                      </div>
-
-                      <!-- Patient Information -->
-                      <div>
-                        <h6 class="font-semibold text-blue-800 dark:text-blue-300 mb-2">Informasi Pasien</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['Patient Name']">
-                            <strong>Nama Pasien:</strong> {{ doc.doc_contents['0']['Patient Name'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Patient Age']">
-                            <strong>Umur:</strong> {{ doc.doc_contents['0']['Patient Age'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Patient Gender']">
-                            <strong>Jenis Kelamin:</strong> {{ doc.doc_contents['0']['Patient Gender'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['patient Address'] || doc.doc_contents['0']['Patient address']">
-                            <strong>Alamat:</strong> {{ doc.doc_contents['0']['patient Address'] || doc.doc_contents['0']['Patient address'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Patient Contact']">
-                            <strong>Kontak:</strong> {{ doc.doc_contents['0']['Patient Contact'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['ID Patient in lab']">
-                            <strong>ID Pasien Lab:</strong> {{ doc.doc_contents['0']['ID Patient in lab'] }}
-                          </div>
+                        <div v-if="doc.doc_contents['Lab address']">
+                          <strong>Alamat Lab:</strong> {{ doc.doc_contents['Lab address'] }}
                         </div>
-                      </div>
-
-                      <!-- Doctor Information -->
-                      <div>
-                        <h6 class="font-semibold text-green-800 dark:text-green-300 mb-2">Informasi Dokter</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['Doctor Name']">
-                            <strong>Dokter Pengirim:</strong> {{ doc.doc_contents['0']['Doctor Name'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Doctor address']">
-                            <strong>Alamat Dokter:</strong> {{ doc.doc_contents['0']['Doctor address'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Person Responsible']">
-                            <strong>Dokter Penanggung Jawab:</strong> {{ doc.doc_contents['0']['Person Responsible'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Person validated']">
-                            <strong>Validator:</strong> {{ doc.doc_contents['0']['Person validated'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['validator signature']">
-                            <strong>Tanda Tangan Validator:</strong> {{ doc.doc_contents['0']['validator signature'] }}
-                          </div>
+                        <div v-if="doc.doc_contents['Report Date']">
+                          <strong>Tanggal Laporan:</strong> {{ doc.doc_contents['Report Date'] }}
                         </div>
-                      </div>
-
-                      <div>
-                        <h6 class="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Informasi Pemeriksaan</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['speciment']">
-                            <strong>Tanggal Spesimen:</strong> {{ doc.doc_contents['0']['speciment'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Result test']">
-                            <strong>Hasil Tes:</strong> {{ doc.doc_contents['0']['Result test'] }}
-                          </div>
-                          <div v-else>
-                            <strong>Hasil Tes:</strong> <span class="text-gray-500 italic">Data hasil tes sedang diproses</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- Additional Lab Data -->
-                      <div v-if="Object.keys(doc.doc_contents['0']).some(key => !['Lab name', 'Lab address', 'Report Date', 'Registration Date', 'No. registration', 'Patient Name', 'Patient Age', 'Patient Gender', 'patient Address', 'Patient address', 'Patient Contact', 'ID Patient in lab', 'Doctor Name', 'Doctor address', 'Person Responsible', 'Person validated', 'validator signature', 'speciment', 'Result test'].includes(key))" class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-                        <h6 class="font-semibold text-gray-800 dark:text-gray-300 mb-2">Data Tambahan</h6>
-                        <div class="space-y-1 text-sm">
-                          <div v-for="(value, key) in doc.doc_contents['0']" :key="key">
-                            <div v-if="!['Lab name', 'Lab address', 'Report Date', 'Registration Date', 'No. registration', 'Patient Name', 'Patient Age', 'Patient Gender', 'patient Address', 'Patient address', 'Patient Contact', 'ID Patient in lab', 'Doctor Name', 'Doctor address', 'Person Responsible', 'Person validated', 'validator signature', 'speciment', 'Result test'].includes(key) && value && value !== 'None'">
-                              <strong>{{ key }}:</strong> {{ value }}
-                            </div>
-                          </div>
+                        <div v-if="doc.doc_contents['Registration Date']">
+                          <strong>Tanggal Registrasi:</strong> {{ doc.doc_contents['Registration Date'] }}
                         </div>
                       </div>
                     </div>
-                    
-                    <!-- Fallback if no data in '0' key -->
-                    <div v-else class="text-sm text-gray-600 dark:text-gray-400">
-                      <p>Data laboratorium tidak tersedia atau sedang diproses.</p>
+
+                    <!-- Patient Information -->
+                    <div v-if="doc.doc_contents['Patient Name']">
+                      <h6 class="font-semibold text-blue-800 dark:text-blue-300 mb-2">Informasi Pasien</h6>
+                      <div class="text-xs space-y-1">
+                        <div v-if="doc.doc_contents['Patient Name']">
+                          <strong>Nama Pasien:</strong> {{ doc.doc_contents['Patient Name'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Patient Age']">
+                          <strong>Umur:</strong> {{ doc.doc_contents['Patient Age'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Patient Gender']">
+                          <strong>Jenis Kelamin:</strong> {{ doc.doc_contents['Patient Gender'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['patient Address']">
+                          <strong>Alamat:</strong> {{ doc.doc_contents['patient Address'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Patient Contact']">
+                          <strong>Kontak:</strong> {{ doc.doc_contents['Patient Contact'] }}
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Result Test Table -->
+                    <div v-if="doc.doc_contents['Result test'] && Array.isArray(doc.doc_contents['Result test'])">
+                      <h6 class="font-semibold text-green-800 dark:text-green-300 mb-2">Hasil Pemeriksaan</h6>
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs border border-gray-300 dark:border-gray-600">
+                          <thead class="bg-gray-100 dark:bg-gray-700">
+                            <tr>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Jenis Pemeriksaan</th>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Hasil</th>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Nilai Rujukan</th>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Satuan</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(test, index) in doc.doc_contents['Result test']" :key="index" 
+                                :class="test['HASIL'] && test['HASIL'] !== 'None' && test['HASIL'].includes('*') ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''">
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1">{{ test['JENIS PEMERIKSAAN'] || '-' }}</td>
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1 font-medium" 
+                                  :class="test['HASIL'] && test['HASIL'].includes('*') ? 'text-red-600 dark:text-red-400' : ''">
+                                {{ test['HASIL'] && test['HASIL'] !== 'None' ? test['HASIL'] : '-' }}
+                              </td>
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1">{{ test['NILAI RUJUKAN'] && test['NILAI RUJUKAN'] !== 'None' ? test['NILAI RUJUKAN'] : '-' }}</td>
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1">{{ test['SATUAN'] && test['SATUAN'] !== 'None' ? test['SATUAN'] : '-' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <!-- Additional Information -->
+                    <div v-if="doc.doc_contents['Person Responsible'] || doc.doc_contents['speciment']">
+                      <h6 class="font-semibold text-gray-800 dark:text-gray-300 mb-2">Informasi Tambahan</h6>
+                      <div class="text-xs space-y-1">
+                        <div v-if="doc.doc_contents['Person Responsible']">
+                          <strong>Dokter Penanggung Jawab:</strong> {{ doc.doc_contents['Person Responsible'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Person validated']">
+                          <strong>Validator:</strong> {{ doc.doc_contents['Person validated'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['speciment']">
+                          <strong>Spesimen:</strong> {{ doc.doc_contents['speciment'] }}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
                 
-                <div v-else-if="doc.doc_type === 'additional doc' && doc.doc_contents">
-                  <h6 class="font-semibold mb-2 text-green-600">Dokumen Tambahan</h6>
-                  <div class="space-y-3">
-                    <div v-for="(value, key) in doc.doc_contents['1']" :key="key" class="text-sm text-gray-700 dark:text-gray-300">
-                      <div v-if="value && value !== 'None'">
-                        <strong>{{ key }}:</strong> {{ value }}
+                <div v-else-if="doc.doc_type === 'additional document' && doc.doc_contents?.fields">
+                  <h6 class="font-semibold mb-2 text-gray-900 dark:text-gray-100">Dokumen Tambahan</h6>
+                  <div class="space-y-2">
+                    <div v-for="(value, key) in doc.doc_contents.fields" :key="key" class="text-sm text-gray-700 dark:text-gray-300">
+                      <div v-if="value && value !== 'None' && value !== ''">
+                        <strong class="text-gray-900 dark:text-gray-100">{{ key }}:</strong> 
+                        <span class="ml-1">{{ value }}</span>
                       </div>
                     </div>
                   </div>

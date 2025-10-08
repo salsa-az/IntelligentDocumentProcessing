@@ -205,11 +205,16 @@
 
                 <!-- Submit Button -->
                 <div class="flex justify-end">
-                  <button type="submit" class="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-gray-200 transition-all duration-200 ease-in-out transform dark:hover:bg-gray-800 dark:hover:text-white hover:shadow-lg dark:hover:border-gray-200">
-                      <svg class="fill-current shrink-0 xs:hidden" width="16" height="16" viewBox="0 0 16 16">
+                  <button type="submit" :disabled="isSubmitting" class="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-gray-200 transition-all duration-200 ease-in-out transform dark:hover:bg-gray-800 dark:hover:text-white hover:shadow-lg dark:hover:border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <svg v-if="isSubmitting" class="animate-spin w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                      </svg>
+                      <svg v-else class="fill-current shrink-0 xs:hidden" width="16" height="16" viewBox="0 0 16 16">
                           <path d="M15 7H9V1c0-.6-.4-1-1-1S7 .4 7 1v6H1c-.6 0-1 .4-1 1s.4 1 1 1h6v6c0 .6.4 1 1 1s1-.4 1-1V9h6c.6 0 1-.4 1-1s-.4-1-1-1z" />
                       </svg>
-                      <span class="max-xs:sr-only">{{ isEditing ? 'Update Klaim' : 'Ajukan Klaim' }}</span>
+                      <span class="max-xs:sr-only">
+                        {{ isSubmitting ? 'Processing...' : (isEditing ? 'Update Klaim' : 'Ajukan Klaim') }}
+                      </span>
                   </button>
                 </div>
 
@@ -244,21 +249,22 @@ export default {
     const sidebarOpen = ref(false)
     const isEditing = ref(false)
     const existingDocuments = ref([])
+    const isSubmitting = ref(false)
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
     
     const form = ref({
-      // Auto-filled profile data
-      nomorPolis: 'P001',
-      namaPerusahaan: 'PT XYZ Asuransi',
-      nomorPeserta: 'CUST1234',
-      namaPemegang: 'Feri Hussen',
-      nik: '32010298345',
-      tanggalLahir: '1985-04-12',
-      jenisKelamin: 'Male',
-      statusPernikahan: 'Married',
-      alamat: 'Jl. Contoh No. 123, Jakarta',
-      email: 'feri.hussen@xyz.com',
-      nomorTelepon: '081234567890',
+      // Profile data
+      nomorPolis: '',
+      namaPerusahaan: '',
+      nomorPeserta: '',
+      namaPemegang: '',
+      nik: '',
+      tanggalLahir: '',
+      jenisKelamin: '',
+      statusPernikahan: '',
+      alamat: '',
+      email: '',
+      nomorTelepon: '',
       
       // Form fields
       claimType: '',
@@ -426,6 +432,9 @@ export default {
     const { showSuccess, showError } = useAlert()
 
     const submitClaim = async () => {
+      if (isSubmitting.value) return
+      
+      isSubmitting.value = true
       try {
         const formData = new FormData()
         
@@ -488,6 +497,8 @@ export default {
           'Kesalahan Sistem',
           'Terjadi kesalahan koneksi. Silakan periksa koneksi internet Anda dan coba lagi.'
         )
+      } finally {
+        isSubmitting.value = false
       }
     }
 
@@ -503,27 +514,46 @@ export default {
       }
     })
 
-    const loadUserProfile = () => {
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
-      
-      if (userData && userData.id) {
-        // Autofill form dengan data dari session
-        form.value.nomorPolis = userData.policy_number || form.value.nomorPolis
-        form.value.namaPerusahaan = userData.insurance_company || form.value.namaPerusahaan
-        form.value.nomorPeserta = userData.customer_id || userData.id || form.value.nomorPeserta
-        form.value.namaPemegang = userData.name || form.value.namaPemegang
-        form.value.nik = userData.nik || form.value.nik
-        form.value.tanggalLahir = userData.birth_date || form.value.tanggalLahir
-        form.value.jenisKelamin = userData.gender || form.value.jenisKelamin
-        form.value.statusPernikahan = userData.marital_status || form.value.statusPernikahan
-        form.value.alamat = userData.address || form.value.alamat
-        form.value.email = userData.email || form.value.email
-        form.value.nomorTelepon = userData.phone || form.value.nomorTelepon
+    const loadUserProfile = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/session-status', {
+          credentials: 'include'
+        })
+        const result = await response.json()
+        
+        if (result.status === 'authenticated' && result.user) {
+          const customerId = result.user.customer_id
+          
+          // Fetch customer details from database
+          const customerResponse = await fetch(`http://localhost:5000/api/query?query=SELECT * FROM c WHERE c.customer_id = "${customerId}"&container=customer`, {
+            credentials: 'include'
+          })
+          const customerData = await customerResponse.json()
+          
+          if (customerData && customerData.length > 0) {
+            const customer = customerData[0]
+            
+            // Autofill form sesuai field yang ada
+            form.value.nomorPolis = customer.policy_id || ''
+            form.value.namaPerusahaan = 'PT Asuransi Indonesia' // Default company name
+            form.value.nomorPeserta = customer.customer_no || ''
+            form.value.namaPemegang = customer.name || ''
+            form.value.nik = customer.NIK || ''
+            form.value.tanggalLahir = customer.dob || ''
+            form.value.jenisKelamin = customer.gender || ''
+            form.value.statusPernikahan = customer.marital_status || ''
+            form.value.alamat = customer.address || ''
+            form.value.email = customer.email || ''
+            form.value.nomorTelepon = customer.phone || ''
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error)
       }
     }
 
     onMounted(async () => {
-      loadUserProfile()
+      await loadUserProfile()
       await loadClaimData()
     })
 
@@ -531,6 +561,7 @@ export default {
       sidebarOpen,
       form,
       isEditing,
+      isSubmitting,
       existingDocuments,
       handleFileUpload,
       viewDocument,

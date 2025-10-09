@@ -162,13 +162,16 @@ export default {
       }
     }
   },
-  mounted() {
+  async mounted() {
     // Check for error parameters from OAuth callback
     const urlParams = new URLSearchParams(window.location.search)
     const error = urlParams.get('error')
     
     if (error) {
       switch (error) {
+        case 'user_not_found':
+          this.errorMessage = 'Email tidak terdaftar sebagai admin. Hubungi administrator.'
+          break
         case 'unauthorized_domain':
           this.errorMessage = 'Domain email tidak diizinkan. Gunakan email @swosupport.id'
           break
@@ -181,9 +184,43 @@ export default {
         default:
           this.errorMessage = 'Terjadi kesalahan saat login. Silakan coba lagi.'
       }
+      // Clear URL parameters after showing error
+      window.history.replaceState({}, document.title, window.location.pathname)
+      return
     }
     
-    // Check if user is already logged in
+    // Check session status from server (prioritize this for Microsoft auth)
+    try {
+      const response = await fetch('http://localhost:5000/api/session-status', {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.status === 'authenticated' && data.user) {
+          console.log('Session authenticated, redirecting...', data.user)
+          // Store user data and redirect
+          localStorage.setItem('user', JSON.stringify(data.user))
+          
+          // Clear any URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname)
+          
+          // Redirect based on role
+          if (data.user.role === 'customer') {
+            this.$router.push('/customer-dashboard')
+          } else if (data.user.role === 'approver') {
+            this.$router.push('/claim-approval')
+          } else {
+            this.$router.push('/dashboard')
+          }
+          return
+        }
+      }
+    } catch (error) {
+      console.log('No active session:', error)
+    }
+    
+    // Check localStorage as fallback only if no server session
     const user = JSON.parse(localStorage.getItem('user') || '{}')
     if (user.id) {
       if (user.role === 'customer') {

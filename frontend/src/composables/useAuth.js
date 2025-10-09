@@ -25,9 +25,21 @@ export const useAuth = () => {
   }
 
   // Logout user
-  const logout = () => {
-    currentUser.value = null
-    localStorage.removeItem('user')
+  const logout = async () => {
+    try {
+      // Call backend logout API to clear session
+      await fetch('http://localhost:5000/api/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+    } catch (error) {
+      console.error('Logout API error:', error)
+    } finally {
+      // Always clear frontend state
+      currentUser.value = null
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+    }
   }
 
   // Update user data

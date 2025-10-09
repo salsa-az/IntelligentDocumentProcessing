@@ -376,7 +376,8 @@
                 </button>
                 <button 
                   @click="proceedToFinalStep" 
-                  class="btn bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  :disabled="validateRequiredFields().length > 0 || errorFields.length > 0"
+                  class="btn bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue to Final Step
                 </button>
@@ -693,7 +694,51 @@ export default {
         console.error('Validation error:', error);
       }
     },
+    validateRequiredFields() {
+      const requiredFields = [
+        'nomorPolis', 'nomorKartu', 'nomorPeserta', 'namaPemegang',
+        'perusahaanAsuransi', 'premiumPlan', 'nik', 'tanggalLahir',
+        'jenisKelamin', 'statusPernikahan', 'alamat', 'nomorTelepon'
+      ];
+      
+      if (!this.isPemegangPolis) {
+        requiredFields.push('namaPeserta', 'hubungan');
+      }
+      
+      const missingFields = requiredFields.filter(field => !this.form[field] || this.form[field].trim() === '');
+      return missingFields;
+    },
     proceedToFinalStep() {
+      const missingFields = this.validateRequiredFields();
+      
+      if (missingFields.length > 0) {
+        const fieldLabels = {
+          nomorPolis: 'Nomor Polis',
+          nomorKartu: 'Nomor Kartu',
+          nomorPeserta: 'Nomor Peserta',
+          namaPemegang: 'Nama Pemegang Polis',
+          namaPeserta: 'Nama Peserta',
+          hubungan: 'Hubungan dengan Pemegang Polis',
+          perusahaanAsuransi: 'Perusahaan Asuransi',
+          premiumPlan: 'Paket Premi',
+          nik: 'NIK',
+          tanggalLahir: 'Tanggal Lahir',
+          jenisKelamin: 'Jenis Kelamin',
+          statusPernikahan: 'Status Pernikahan',
+          alamat: 'Alamat',
+          nomorTelepon: 'Nomor Telepon'
+        };
+        
+        const missingLabels = missingFields.map(field => fieldLabels[field]).join(', ');
+        alert(`Please fill in the following required fields: ${missingLabels}`);
+        return;
+      }
+      
+      if (this.errorFields.length > 0) {
+        alert('Please fix the validation errors before continuing.');
+        return;
+      }
+      
       this.currentStep = 3;
     },
     async handleSignup() {

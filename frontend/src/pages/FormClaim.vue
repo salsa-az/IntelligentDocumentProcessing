@@ -205,11 +205,16 @@
 
                 <!-- Submit Button -->
                 <div class="flex justify-end">
-                  <button type="submit" class="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-gray-200 transition-all duration-200 ease-in-out transform dark:hover:bg-gray-800 dark:hover:text-white hover:shadow-lg dark:hover:border-gray-200">
-                      <svg class="fill-current shrink-0 xs:hidden" width="16" height="16" viewBox="0 0 16 16">
+                  <button type="submit" :disabled="isSubmitting" class="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-gray-200 transition-all duration-200 ease-in-out transform dark:hover:bg-gray-800 dark:hover:text-white hover:shadow-lg dark:hover:border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <svg v-if="isSubmitting" class="animate-spin w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                      </svg>
+                      <svg v-else class="fill-current shrink-0 xs:hidden" width="16" height="16" viewBox="0 0 16 16">
                           <path d="M15 7H9V1c0-.6-.4-1-1-1S7 .4 7 1v6H1c-.6 0-1 .4-1 1s.4 1 1 1h6v6c0 .6.4 1 1 1s1-.4 1-1V9h6c.6 0 1-.4 1-1s-.4-1-1-1z" />
                       </svg>
-                      <span class="max-xs:sr-only">{{ isEditing ? 'Update Klaim' : 'Ajukan Klaim' }}</span>
+                      <span class="max-xs:sr-only">
+                        {{ isSubmitting ? 'Processing...' : (isEditing ? 'Update Klaim' : 'Ajukan Klaim') }}
+                      </span>
                   </button>
                 </div>
 
@@ -244,6 +249,7 @@ export default {
     const sidebarOpen = ref(false)
     const isEditing = ref(false)
     const existingDocuments = ref([])
+    const isSubmitting = ref(false)
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
     
     const form = ref({
@@ -441,8 +447,8 @@ export default {
             form.value.claimType = claim.claim_type || ''
             form.value.claimAmount = claim.claim_amount || ''
             form.value.currency = claim.currency || 'IDR'
-            form.value.treatmentStartDate = claim.date_checkin || ''
-            form.value.treatmentEndDate = claim.date_checkout || ''
+            form.value.treatmentStartDate = claim.date_checkin ? new Date(claim.date_checkin + 'T00:00:00') : ''
+            form.value.treatmentEndDate = claim.date_checkout ? new Date(claim.date_checkout + 'T00:00:00') : ''
             form.value.namaPerusahaan = claim.insurance_company || ''
             
             // Load existing documents
@@ -492,6 +498,19 @@ export default {
     const { showSuccess, showError } = useAlert()
 
     const submitClaim = async () => {
+      if (isSubmitting.value) return
+      
+      // Validate claim amount against limit
+      const claimAmount = parseFloat(form.value.claimAmount)
+      if (claimAmount > form.value.claimLimit) {
+        showError(
+          'Jumlah Klaim Melebihi Batas',
+          `Jumlah klaim Rp ${formatCurrency(claimAmount)} melebihi batas maksimal Rp ${formatCurrency(form.value.claimLimit)} untuk paket ${form.value.premiumPlan}.`
+        )
+        return
+      }
+      
+      isSubmitting.value = true
       try {
         const formData = new FormData()
         
@@ -563,6 +582,8 @@ export default {
           'Kesalahan Sistem',
           'Terjadi kesalahan koneksi. Silakan periksa koneksi internet Anda dan coba lagi.'
         )
+      } finally {
+        isSubmitting.value = false
       }
     }
 
@@ -583,18 +604,25 @@ export default {
     
     onMounted(async () => {
       await loadUserProfile()
+      await loadUserProfile()
       await loadClaimData()
     })
+
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat('id-ID').format(amount)
+    }
 
     return {
       sidebarOpen,
       form,
       isEditing,
+      isSubmitting,
       existingDocuments,
       handleFileUpload,
       viewDocument,
       getExistingDocument,
-      submitClaim
+      submitClaim,
+      formatCurrency
     }
   }
 }

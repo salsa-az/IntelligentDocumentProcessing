@@ -44,6 +44,18 @@
             <span class="text-sm text-gray-500 dark:text-gray-400">Treatment Period</span>
             <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ formatDate(claim?.checkIn) }} - {{ formatDate(claim?.checkOut) }}</span>
           </div>
+          <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+            <span class="text-sm text-gray-500 dark:text-gray-400">Annual Claim Limit</span>
+            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Rp {{ formatCurrency(policyLimit) }}</span>
+          </div>
+          <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+            <span class="text-sm text-gray-500 dark:text-gray-400">Claims Used ({{ currentYear }})</span>
+            <span class="text-sm font-medium" :class="usagePercentage > 80 ? 'text-red-600' : usagePercentage > 60 ? 'text-yellow-600' : 'text-green-600'">Rp {{ formatCurrency(totalUsedAmount) }} ({{ usagePercentage }}%)</span>
+          </div>
+          <div class="flex justify-between py-2">
+            <span class="text-sm text-gray-500 dark:text-gray-400">Remaining Limit</span>
+            <span class="text-sm font-medium" :class="remainingLimit < claim?.amount ? 'text-red-600' : 'text-green-600'">Rp {{ formatCurrency(remainingLimit) }}</span>
+          </div>
         </div>
       </div>
 
@@ -230,118 +242,101 @@
                 <div v-else-if="doc.doc_type === 'report lab' && doc.doc_contents">
                   <h6 class="font-semibold mb-2">Hasil Pemeriksaan Laboratorium</h6>
                   <div class="space-y-3">
-                    <!-- Handle actual lab report structure -->
-                    <div v-if="doc.doc_contents['0']" class="space-y-3">
-                      <!-- Lab Information -->
-                      <div>
-                        <h6 class="font-semibold text-purple-800 dark:text-purple-300 mb-2">Informasi Laboratorium</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['Lab name']">
-                            <strong>Nama Lab:</strong> {{ doc.doc_contents['0']['Lab name'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Lab address']">
-                            <strong>Alamat Lab:</strong> {{ doc.doc_contents['0']['Lab address'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Report Date']">
-                            <strong>Tanggal Laporan:</strong> {{ doc.doc_contents['0']['Report Date'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Registration Date']">
-                            <strong>Tanggal Registrasi:</strong> {{ doc.doc_contents['0']['Registration Date'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['No. registration']">
-                            <strong>No. Registrasi:</strong> {{ doc.doc_contents['0']['No. registration'] }}
-                          </div>
+                    <!-- Lab Information -->
+                    <div v-if="doc.doc_contents['Lab name']">
+                      <h6 class="font-semibold text-purple-800 dark:text-purple-300 mb-2">Informasi Laboratorium</h6>
+                      <div class="text-xs space-y-1">
+                        <div v-if="doc.doc_contents['Lab name']">
+                          <strong>Nama Lab:</strong> {{ doc.doc_contents['Lab name'] }}
                         </div>
-                      </div>
-
-                      <!-- Patient Information -->
-                      <div>
-                        <h6 class="font-semibold text-blue-800 dark:text-blue-300 mb-2">Informasi Pasien</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['Patient Name']">
-                            <strong>Nama Pasien:</strong> {{ doc.doc_contents['0']['Patient Name'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Patient Age']">
-                            <strong>Umur:</strong> {{ doc.doc_contents['0']['Patient Age'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Patient Gender']">
-                            <strong>Jenis Kelamin:</strong> {{ doc.doc_contents['0']['Patient Gender'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['patient Address'] || doc.doc_contents['0']['Patient address']">
-                            <strong>Alamat:</strong> {{ doc.doc_contents['0']['patient Address'] || doc.doc_contents['0']['Patient address'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Patient Contact']">
-                            <strong>Kontak:</strong> {{ doc.doc_contents['0']['Patient Contact'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['ID Patient in lab']">
-                            <strong>ID Pasien Lab:</strong> {{ doc.doc_contents['0']['ID Patient in lab'] }}
-                          </div>
+                        <div v-if="doc.doc_contents['Lab address']">
+                          <strong>Alamat Lab:</strong> {{ doc.doc_contents['Lab address'] }}
                         </div>
-                      </div>
-
-                      <!-- Doctor Information -->
-                      <div>
-                        <h6 class="font-semibold text-green-800 dark:text-green-300 mb-2">Informasi Dokter</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['Doctor Name']">
-                            <strong>Dokter Pengirim:</strong> {{ doc.doc_contents['0']['Doctor Name'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Doctor address']">
-                            <strong>Alamat Dokter:</strong> {{ doc.doc_contents['0']['Doctor address'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Person Responsible']">
-                            <strong>Dokter Penanggung Jawab:</strong> {{ doc.doc_contents['0']['Person Responsible'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Person validated']">
-                            <strong>Validator:</strong> {{ doc.doc_contents['0']['Person validated'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['validator signature']">
-                            <strong>Tanda Tangan Validator:</strong> {{ doc.doc_contents['0']['validator signature'] }}
-                          </div>
+                        <div v-if="doc.doc_contents['Report Date']">
+                          <strong>Tanggal Laporan:</strong> {{ doc.doc_contents['Report Date'] }}
                         </div>
-                      </div>
-
-                      <div>
-                        <h6 class="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Informasi Pemeriksaan</h6>
-                        <div>
-                          <div v-if="doc.doc_contents['0']['speciment']">
-                            <strong>Tanggal Spesimen:</strong> {{ doc.doc_contents['0']['speciment'] }}
-                          </div>
-                          <div v-if="doc.doc_contents['0']['Result test']">
-                            <strong>Hasil Tes:</strong> {{ doc.doc_contents['0']['Result test'] }}
-                          </div>
-                          <div v-else>
-                            <strong>Hasil Tes:</strong> <span class="text-gray-500 italic">Data hasil tes sedang diproses</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- Additional Lab Data -->
-                      <div v-if="Object.keys(doc.doc_contents['0']).some(key => !['Lab name', 'Lab address', 'Report Date', 'Registration Date', 'No. registration', 'Patient Name', 'Patient Age', 'Patient Gender', 'patient Address', 'Patient address', 'Patient Contact', 'ID Patient in lab', 'Doctor Name', 'Doctor address', 'Person Responsible', 'Person validated', 'validator signature', 'speciment', 'Result test'].includes(key))" class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-                        <h6 class="font-semibold text-gray-800 dark:text-gray-300 mb-2">Data Tambahan</h6>
-                        <div class="space-y-1 text-sm">
-                          <div v-for="(value, key) in doc.doc_contents['0']" :key="key">
-                            <div v-if="!['Lab name', 'Lab address', 'Report Date', 'Registration Date', 'No. registration', 'Patient Name', 'Patient Age', 'Patient Gender', 'patient Address', 'Patient address', 'Patient Contact', 'ID Patient in lab', 'Doctor Name', 'Doctor address', 'Person Responsible', 'Person validated', 'validator signature', 'speciment', 'Result test'].includes(key) && value && value !== 'None'">
-                              <strong>{{ key }}:</strong> {{ value }}
-                            </div>
-                          </div>
+                        <div v-if="doc.doc_contents['Registration Date']">
+                          <strong>Tanggal Registrasi:</strong> {{ doc.doc_contents['Registration Date'] }}
                         </div>
                       </div>
                     </div>
-                    
-                    <!-- Fallback if no data in '0' key -->
-                    <div v-else class="text-sm text-gray-600 dark:text-gray-400">
-                      <p>Data laboratorium tidak tersedia atau sedang diproses.</p>
+
+                    <!-- Patient Information -->
+                    <div v-if="doc.doc_contents['Patient Name']">
+                      <h6 class="font-semibold text-blue-800 dark:text-blue-300 mb-2">Informasi Pasien</h6>
+                      <div class="text-xs space-y-1">
+                        <div v-if="doc.doc_contents['Patient Name']">
+                          <strong>Nama Pasien:</strong> {{ doc.doc_contents['Patient Name'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Patient Age']">
+                          <strong>Umur:</strong> {{ doc.doc_contents['Patient Age'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Patient Gender']">
+                          <strong>Jenis Kelamin:</strong> {{ doc.doc_contents['Patient Gender'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['patient Address']">
+                          <strong>Alamat:</strong> {{ doc.doc_contents['patient Address'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Patient Contact']">
+                          <strong>Kontak:</strong> {{ doc.doc_contents['Patient Contact'] }}
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Result Test Table -->
+                    <div v-if="doc.doc_contents['Result test'] && Array.isArray(doc.doc_contents['Result test'])">
+                      <h6 class="font-semibold text-green-800 dark:text-green-300 mb-2">Hasil Pemeriksaan</h6>
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs border border-gray-300 dark:border-gray-600">
+                          <thead class="bg-gray-100 dark:bg-gray-700">
+                            <tr>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Jenis Pemeriksaan</th>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Hasil</th>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Nilai Rujukan</th>
+                              <th class="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left">Satuan</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(test, index) in doc.doc_contents['Result test']" :key="index" 
+                                :class="test['HASIL'] && test['HASIL'] !== 'None' && test['HASIL'].includes('*') ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''">
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1">{{ test['JENIS PEMERIKSAAN'] || '-' }}</td>
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1 font-medium" 
+                                  :class="test['HASIL'] && test['HASIL'].includes('*') ? 'text-red-600 dark:text-red-400' : ''">
+                                {{ test['HASIL'] && test['HASIL'] !== 'None' ? test['HASIL'] : '-' }}
+                              </td>
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1">{{ test['NILAI RUJUKAN'] && test['NILAI RUJUKAN'] !== 'None' ? test['NILAI RUJUKAN'] : '-' }}</td>
+                              <td class="border border-gray-300 dark:border-gray-600 px-2 py-1">{{ test['SATUAN'] && test['SATUAN'] !== 'None' ? test['SATUAN'] : '-' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <!-- Additional Information -->
+                    <div v-if="doc.doc_contents['Person Responsible'] || doc.doc_contents['speciment']">
+                      <h6 class="font-semibold text-gray-800 dark:text-gray-300 mb-2">Informasi Tambahan</h6>
+                      <div class="text-xs space-y-1">
+                        <div v-if="doc.doc_contents['Person Responsible']">
+                          <strong>Dokter Penanggung Jawab:</strong> {{ doc.doc_contents['Person Responsible'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['Person validated']">
+                          <strong>Validator:</strong> {{ doc.doc_contents['Person validated'] }}
+                        </div>
+                        <div v-if="doc.doc_contents['speciment']">
+                          <strong>Spesimen:</strong> {{ doc.doc_contents['speciment'] }}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
                 
-                <div v-else-if="doc.doc_type === 'additional doc' && doc.doc_contents">
-                  <h6 class="font-semibold mb-2 text-green-600">Dokumen Tambahan</h6>
-                  <div class="space-y-3">
-                    <div v-for="(value, key) in doc.doc_contents['1']" :key="key" class="text-sm text-gray-700 dark:text-gray-300">
-                      <div v-if="value && value !== 'None'">
-                        <strong>{{ key }}:</strong> {{ value }}
+                <div v-else-if="doc.doc_type === 'additional document' && doc.doc_contents?.fields">
+                  <h6 class="font-semibold mb-2 text-gray-900 dark:text-gray-100">Dokumen Tambahan</h6>
+                  <div class="space-y-2">
+                    <div v-for="(value, key) in doc.doc_contents.fields" :key="key" class="text-sm text-gray-700 dark:text-gray-300">
+                      <div v-if="value && value !== 'None' && value !== ''">
+                        <strong class="text-gray-900 dark:text-gray-100">{{ key }}:</strong> 
+                        <span class="ml-1">{{ value }}</span>
                       </div>
                     </div>
                   </div>
@@ -364,6 +359,26 @@
                     </svg>
                     Raw Document
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Claim Limit Warning -->
+      <div v-if="claim?.rawData?.exceeds_limit" class="mb-6">
+        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div class="flex items-start space-x-3">
+            <svg class="w-5 h-5 text-red-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <div>
+              <h5 class="font-medium text-red-900 dark:text-red-100 mb-2">⚠️ Claim Limit Exceeded</h5>
+              <div class="text-sm text-red-800 dark:text-red-200 space-y-1">
+                <p><strong>Policy Limit:</strong> Rp {{ formatCurrency(claim.rawData.limit_info?.policy_limit) }}</p>
+                <p><strong>Already Used:</strong> Rp {{ formatCurrency(claim.rawData.limit_info?.total_used) }}</p>
+                <p><strong>Current Claim:</strong> Rp {{ formatCurrency(claim.rawData.limit_info?.current_claim) }}</p>
+                <p><strong>Would Exceed By:</strong> Rp {{ formatCurrency(claim.rawData.limit_info?.would_exceed_by) }}</p>
               </div>
             </div>
           </div>
@@ -473,6 +488,9 @@ export default {
     const showRawDocument = ref(false)
     const selectedDocId = ref(null)
     const decisionMade = ref(false)
+    const policyLimit = ref(0)
+    const totalUsedAmount = ref(0)
+    const currentYear = new Date().getFullYear()
 
     const openRawDocument = (docId) => {
       selectedDocId.value = docId
@@ -484,11 +502,36 @@ export default {
       selectedDocId.value = null
     }
 
-    watch(() => props.show, (newVal) => {
-      if (newVal) {
+    watch(() => props.show, async (newVal) => {
+      if (newVal && props.claim) {
         notes.value = ''
         decisionMade.value = false
+        await fetchPolicyLimits()
       }
+    })
+
+    const fetchPolicyLimits = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/customer/${props.claim.customer_id}/policy-limits`, {
+          credentials: 'include'
+        })
+        const data = await response.json()
+        if (data.status === 'success') {
+          policyLimit.value = data.policy_limit
+          totalUsedAmount.value = data.total_used
+        }
+      } catch (error) {
+        console.error('Error fetching policy limits:', error)
+      }
+    }
+
+    const usagePercentage = computed(() => {
+      if (policyLimit.value === 0) return 0
+      return Math.round((totalUsedAmount.value / policyLimit.value) * 100)
+    })
+
+    const remainingLimit = computed(() => {
+      return Math.max(0, policyLimit.value - totalUsedAmount.value)
     })
 
     const toggleDocument = (docId) => {
@@ -623,7 +666,12 @@ export default {
       isRejectMatchesAI,
       handleApprove,
       handleReject,
-      decisionMade
+      decisionMade,
+      policyLimit,
+      totalUsedAmount,
+      currentYear,
+      usagePercentage,
+      remainingLimit
     }
   }
 }

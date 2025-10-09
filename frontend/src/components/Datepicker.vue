@@ -42,7 +42,8 @@ export default {
             // Convert month to dropdown
             const monthElement = instance.monthElements[0];
             if (monthElement) {
-              const currentMonth = new Date().getMonth();
+              const currentDate = instance.selectedDates[0] || new Date();
+              const currentMonth = currentDate.getMonth();
               const monthSelect = document.createElement('select');
               monthSelect.className = 'form-select text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ml-2 mr-2 flex-0.75';
               
@@ -56,7 +57,10 @@ export default {
               });
               
               monthSelect.addEventListener('change', (e) => {
-                instance.changeMonth(parseInt(e.target.value));
+                const newMonth = parseInt(e.target.value);
+                const currentDate = instance.selectedDates[0] || new Date();
+                const newDate = new Date(currentDate.getFullYear(), newMonth, currentDate.getDate());
+                instance.setDate(newDate);
               });
               
               monthElement.parentNode.replaceChild(monthSelect, monthElement);
@@ -66,12 +70,13 @@ export default {
             // Convert year input to dropdown
             const yearInput = instance.yearElements[0];
             if (yearInput) {
-              const currentYear = new Date().getFullYear();
+              const currentDate = instance.selectedDates[0] || new Date();
+              const currentYear = currentDate.getFullYear();
               const yearSelect = document.createElement('select');
               yearSelect.className = 'form-select text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 flex-1';
               
               // Add years from 1900 to current year + 10
-              for (let year = 1900; year <= currentYear + 10; year++) {
+              for (let year = 1900; year <= new Date().getFullYear() + 10; year++) {
                 const option = document.createElement('option');
                 option.value = year;
                 option.textContent = year;
@@ -80,7 +85,10 @@ export default {
               }
               
               yearSelect.addEventListener('change', (e) => {
-                instance.changeYear(parseInt(e.target.value));
+                const newYear = parseInt(e.target.value);
+                const currentDate = instance.selectedDates[0] || new Date();
+                const newDate = new Date(newYear, currentDate.getMonth(), currentDate.getDate());
+                instance.setDate(newDate);
               });
               
               yearInput.parentNode.replaceChild(yearSelect, yearInput);
@@ -99,8 +107,14 @@ export default {
           onChange: (selectedDates, dateStr, instance) => {
             instance.element.value = dateStr;
             // Convert display format back to YYYY-MM-DD for database
-            const dbFormat = selectedDates[0] ? selectedDates[0].toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-            this.$emit('update:modelValue', dbFormat);
+            if (selectedDates[0]) {
+              const date = selectedDates[0];
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const day = String(date.getDate()).padStart(2, '0');
+              const dbFormat = `${year}-${month}-${day}`;
+              this.$emit('update:modelValue', dbFormat);
+            }
           },
         },                
       }
@@ -112,7 +126,11 @@ export default {
     convertToDisplayFormat(dateStr) {
       if (!dateStr) return null;
       if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        return new Date(dateStr + 'T00:00:00');
+        const [year, month, day] = dateStr.split('-');
+        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      }
+      if (dateStr instanceof Date) {
+        return dateStr;
       }
       return dateStr;
     }

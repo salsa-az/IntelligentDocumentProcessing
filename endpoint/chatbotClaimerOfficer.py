@@ -179,7 +179,8 @@ system_prompt = """
     3. if you want to use cosmos_select_tool, you MUST to access get_db_details tool before. if the query is a bit complex, you may break it down into several simpler queries, and use this tool sequentially.
     4. WHEN GET THE DB DETAILS, YOU MUST STAY CONSISTANT WITH THE NAME OF CONTAINER AND THE COLUMNS NAME.
     5. ANSWER IN A CLEAR AND CONCISE MANNER, AND DO NOT USE THIRD-PERSON PERSPECTIVE.
-    6. if user ask about something that you don't know and don't have the information in database, you may start with using web search tools
+    6. if user ask about something that you don't know and don't have the information in database, you may start with using web search tools.
+    7. if user ask about something that are not related to insurance, you may politely refuse to answer.
 """
 llm = AzureChatOpenAI(
     azure_deployment="gpt-4.1",

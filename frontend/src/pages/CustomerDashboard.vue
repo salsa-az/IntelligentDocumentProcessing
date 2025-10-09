@@ -75,8 +75,8 @@
 
             <!-- Policy Status -->
             <div class="col-span-12 sm:col-span-6">
-              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5">
-                <div class="flex items-center">
+              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 overflow-hidden">
+                <div class="flex items-center min-w-0">
                   <div class="flex-shrink-0">
                     <div class="flex items-center justify-center w-8 h-8 bg-violet-500 rounded-full">
                       <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,11 +84,11 @@
                       </svg>
                     </div>
                   </div>
-                  <div class="ml-5">
+                  <div class="ml-5 min-w-0 flex-1">
                     <dl>
                       <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Claim Limit</dt>
-                      <dd class="text-lg font-medium text-green-600">Rp {{ formatCurrency(policyData.claimLimit) }}</dd>
-                      <dd class="text-sm text-gray-500 dark:text-gray-400">{{ policyData.premiumType || 'Basic' }} Plan</dd>
+                      <dd class="text-lg font-medium text-green-600 truncate">Rp {{ formatCurrency(policyData.claimLimit) }}</dd>
+                      <dd class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ policyData.premiumType || 'Basic' }} Plan</dd>
                     </dl>
                   </div>
                 </div>
@@ -97,8 +97,8 @@
 
             <!-- Total Claim Amount -->
             <div class="col-span-12 sm:col-span-6">
-              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5">
-                <div class="flex items-center">
+              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 overflow-hidden">
+                <div class="flex items-center min-w-0">
                   <div class="flex-shrink-0">
                     <div class="flex items-center justify-center w-8 h-8 bg-blue-500 rounded-full">
                       <svg class="w-5.5 h-5.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,11 +106,11 @@
                       </svg>
                     </div>
                   </div>
-                  <div class="ml-5">
+                  <div class="ml-5 min-w-0 flex-1">
                     <dl>
                       <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Jumlah Klaim</dt>
-                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100">Rp {{ formatCurrency(totalClaimAmount) }}</dd>
-                      <dd class="text-sm text-gray-500 dark:text-gray-400">Semua klaim yang diajukan</dd>
+                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate">Rp {{ formatCurrency(totalClaimAmount) }}</dd>
+                      <dd class="text-sm text-gray-500 dark:text-gray-400 truncate">Semua klaim yang diajukan</dd>
                     </dl>
                   </div>
                 </div>
@@ -119,8 +119,8 @@
 
             <!-- Rejected Claims -->
             <div class="col-span-12 sm:col-span-4">
-              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 h-24 flex items-center">
-                <div class="flex items-center">
+              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 h-24 flex items-center overflow-hidden">
+                <div class="flex items-center min-w-0 w-full">
                   <div class="flex-shrink-0">
                     <div class="flex items-center justify-center w-8 h-8 bg-red-500 rounded-full">
                       <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,11 +128,11 @@
                       </svg>
                     </div>
                   </div>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0 flex-1">
                     <dl>
                       <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Klaim Ditolak</dt>
-                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ rejectedClaims.length }} Klaim</dd>
-                      <dd class="text-sm text-gray-500 dark:text-gray-400">Rp {{ formatCurrency(rejectedAmount) }}</dd>
+                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate">{{ rejectedClaims.length }} Klaim</dd>
+                      <dd class="text-sm text-gray-500 dark:text-gray-400 truncate">Rp {{ formatCurrency(rejectedAmount) }}</dd>
                     </dl>
                   </div>
                 </div>
@@ -141,8 +141,8 @@
 
             <!-- Approved Claims -->
             <div class="col-span-12 sm:col-span-4">
-              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 h-24 flex items-center">
-                <div class="flex items-center">
+              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 h-24 flex items-center overflow-hidden">
+                <div class="flex items-center min-w-0 w-full">
                   <div class="flex-shrink-0">
                     <div class="flex items-center justify-center w-8 h-8 bg-green-500 rounded-full">
                       <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,11 +150,11 @@
                       </svg>
                     </div>
                   </div>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0 flex-1">
                     <dl>
                       <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Klaim Disetujui</dt>
-                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ approvedClaims.length }} Klaim</dd>
-                      <dd class="text-sm text-gray-500 dark:text-gray-400">Rp {{ formatCurrency(approvedAmount) }}</dd>
+                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate">{{ approvedClaims.length }} Klaim</dd>
+                      <dd class="text-sm text-gray-500 dark:text-gray-400 truncate">Rp {{ formatCurrency(approvedAmount) }}</dd>
                     </dl>
                   </div>
                 </div>
@@ -163,8 +163,8 @@
 
             <!-- Pending Claims -->
             <div class="col-span-12 sm:col-span-4">
-              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 h-24 flex items-center">
-                <div class="flex items-center">
+              <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-5 h-24 flex items-center overflow-hidden">
+                <div class="flex items-center min-w-0 w-full">
                   <div class="flex-shrink-0">
                     <div class="flex items-center justify-center w-8 h-8 bg-yellow-500 rounded-full">
                       <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,11 +172,11 @@
                       </svg>
                     </div>
                   </div>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0 flex-1">
                     <dl>
                       <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Klaim Menunggu</dt>
-                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ pendingClaims.length }} Klaim</dd>
-                      <dd class="text-sm text-gray-500 dark:text-gray-400">Rp {{ formatCurrency(pendingAmount) }}</dd>
+                      <dd class="text-lg font-medium text-gray-900 dark:text-gray-100 truncate">{{ pendingClaims.length }} Klaim</dd>
+                      <dd class="text-sm text-gray-500 dark:text-gray-400 truncate">Rp {{ formatCurrency(pendingAmount) }}</dd>
                     </dl>
                   </div>
                 </div>
@@ -188,54 +188,23 @@
               <header class="px-5 py-4 border-b border-gray-100 dark:border-gray-700/60">
                 <h2 class="font-semibold text-gray-800 dark:text-gray-100">Cakupan Berdasarkan Jenis</h2>
               </header>
-              <div class="flex items-center justify-center p-5">
-                <div class="relative" style="width: 200px; height: 200px;">
-                  <svg class="w-full h-full transform -rotate-90" viewBox="0 0 42 42">
-                    <circle class="text-gray-200 dark:text-gray-700" stroke="currentColor" stroke-width="4" fill="none" cx="21" cy="21" r="15.915"></circle>
-                    <circle 
-                      v-for="(type, index) in coverageByType" 
-                      :key="type.name"
-                      :class="`text-${type.color}`" 
-                      stroke="currentColor" 
-                      stroke-width="4" 
-                      fill="none" 
-                      :stroke-dasharray="`${type.percentage} ${100 - type.percentage}`" 
-                      :stroke-dashoffset="index === 0 ? 0 : `-${coverageByType.slice(0, index).reduce((sum, t) => sum + t.percentage, 0)}`" 
-                      cx="21" 
-                      cy="21" 
-                      r="15.915"
-                    ></circle>
-                  </svg>
-
-                </div>
-              </div>
-              <div class="px-5 pb-5">
-                <div class="grid grid-cols-2 gap-4">
-                  <div v-for="type in coverageByType" :key="type.name" class="flex items-center">
-                    <div :class="`w-3 h-3 bg-${type.color} rounded-full mr-2`"></div>
-                    <div class="flex flex-col">
-                      <span class="text-sm text-gray-600 dark:text-gray-400">{{ type.name }}</span>
-                      <span class="text-xs text-gray-500 dark:text-gray-500">{{ type.count }} klaim</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <DoughnutChart :data="chartData" width="389" height="260" />
             </div>
 
             <!-- Recent Activity -->
-            <div class="flex flex-col col-span-12 sm:col-span-6 xl:col-span-4 bg-white dark:bg-gray-800 shadow-xs rounded-xl">
+            <div class="flex flex-col col-span-12 sm:col-span-6 xl:col-span-4 bg-white dark:bg-gray-800 shadow-xs rounded-xl overflow-hidden">
               <header class="px-5 py-4 border-b border-gray-100 dark:border-gray-700/60">
-                <h2 class="font-semibold text-gray-800 dark:text-gray-100">Aktivitas Terbaru</h2>
+                <h2 class="font-semibold text-gray-800 dark:text-gray-100 truncate">Aktivitas Terbaru</h2>
               </header>
-              <div class="p-5">
+              <div class="p-5 overflow-hidden">
                 <div class="space-y-3">
-                  <div v-for="activity in recentActivity" :key="activity.id" class="flex items-center space-x-3">
+                  <div v-for="activity in recentActivity" :key="activity.id" class="flex items-center space-x-3 min-w-0">
                     <div class="flex-shrink-0">
                       <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
                     </div>
-                    <div class="flex-1">
-                      <p class="text-sm text-gray-900 dark:text-gray-100">{{ activity.description }}</p>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ activity.date }}</p>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm text-gray-900 dark:text-gray-100 truncate">{{ activity.description }}</p>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ activity.date }}</p>
                     </div>
                   </div>
                 </div>
@@ -264,6 +233,7 @@ import Header from '../partials/Header.vue'
 import FilterButton from '../components/DropdownFilter.vue'
 import Datepicker from '../components/Datepicker.vue'
 import Banner from '../partials/Chatbot.vue'
+import DoughnutChart from '../charts/DoughnutChart.vue'
 
 export default {
   name: 'Dashboard',
@@ -273,6 +243,7 @@ export default {
     FilterButton,
     Datepicker,
     Banner,
+    DoughnutChart,
   },
   setup() {
     const sidebarOpen = ref(false)
@@ -359,28 +330,37 @@ export default {
       return `${Math.ceil(diffDays / 30)} bulan yang lalu`
     }
 
-    const coverageByType = computed(() => {
+    const chartData = computed(() => {
       const typeMap = {
-        'rawat-inap': { name: 'Rawat Inap', color: 'violet-500', amount: 0, count: 0 },
-        'rawat-jalan': { name: 'Rawat Jalan', color: 'sky-500', amount: 0, count: 0 },
-        'penyakit-kritis': { name: 'Penyakit Kritis', color: 'violet-800', amount: 0, count: 0 },
-        'medical-checkup': { name: 'Medical Checkup', color: 'gray-400', amount: 0, count: 0 }
+        'rawat-inap': { name: 'Rawat Inap', color: '#1e40af', count: 0 },
+        'rawat-jalan': { name: 'Rawat Jalan', color: '#0ea5e9', count: 0 },
+        'pra-pasca-rawat-inap': { name: 'Pra/Pasca Rawat Inap', color: '#3b82f6', count: 0 },
+        'kehamilan-melahirkan': { name: 'Kehamilan/Melahirkan', color: '#ec4899', count: 0 },
+        'santunan-harian': { name: 'Santunan Harian', color: '#f59e0b', count: 0 },
+        'gigi': { name: 'Gigi', color: '#10b981', count: 0 },
+        'penyakit-kritis': { name: 'Penyakit Kritis', color: '#5b21b6', count: 0 },
+        'medical-checkup': { name: 'Medical Checkup', color: '#9ca3af', count: 0 },
+        'lainnya': { name: 'Lainnya', color: '#6b7280', count: 0 }
       }
       
       claims.value.forEach(claim => {
         const type = claim.claim_type || claim.type
         if (typeMap[type]) {
-          typeMap[type].amount += claim.amount
           typeMap[type].count += 1
         }
       })
       
-      const total = Object.values(typeMap).reduce((sum, type) => sum + type.amount, 0)
+      const types = Object.values(typeMap).filter(type => type.count > 0)
       
-      return Object.values(typeMap).map(type => ({
-        ...type,
-        percentage: total > 0 ? Math.round((type.amount / total) * 100) : 0
-      }))
+      return {
+        labels: types.map(type => type.name),
+        datasets: [{
+          data: types.map(type => type.count),
+          backgroundColor: types.map(type => type.color),
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      }
     })
 
     const formatCurrency = (amount) => {
@@ -442,7 +422,7 @@ export default {
       coverageData,
       premiumData,
       recentActivity,
-      coverageByType,
+      chartData,
       formatCurrency,
       loading
     }  

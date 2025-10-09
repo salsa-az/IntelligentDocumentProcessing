@@ -60,7 +60,7 @@ JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
 # File validation for localhost
 ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
 
-# Azure Entra ID URLs
+# Azure Entra ID URLs - Using common endpoint for multi-tenant support
 AUTHORIZE_URL = f'https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/authorize'
 TOKEN_URL = f'https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token'
 USER_INFO_URL = 'https://graph.microsoft.com/v1.0/me'
@@ -568,6 +568,7 @@ def validate_customer_data(form_data, customer_data):
     customer = customer_data[0]
     form_customer_id = form_data.get('customerId')
     form_policy_id = form_data.get('policyId')
+    print(f"Validating customer ID: form {form_customer_id} vs db {customer['customer_id']}")
     
     if customer['customer_id'] != form_customer_id:
         return False, "Customer ID mismatch"
@@ -670,6 +671,35 @@ def submit_claim():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid claim amount format'}), 400
         
+        # Check claim limit for new claims
+        if not is_edit:
+            policy_data = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.policy_no = @policyNo",
+                "policy",
+                [{"name": "@policyNo", "value": policy_id}]
+            )
+            
+            if policy_data:
+                policy_limit = policy_data[0].get('total_claim_limit', 0)
+                
+                # Get approved claims for this year
+                current_year = datetime.now().year
+                approved_claims = cosmos_retrive_data(
+                    "SELECT * FROM c WHERE c.customer_id = @customerId AND c.claim_status = 'Approved' AND STARTSWITH(c.claim_date, @year)",
+                    "claim",
+                    [
+                        {"name": "@customerId", "value": customer_id},
+                        {"name": "@year", "value": str(current_year)}
+                    ]
+                )
+                
+                total_approved = sum(float(claim.get('claim_amount', 0)) for claim in approved_claims)
+                
+                if total_approved + claim_amount_float > policy_limit:
+                    return jsonify({
+                        'error': f'Claim amount exceeds annual limit. Used: Rp {total_approved:,.0f}, Limit: Rp {policy_limit:,.0f}'
+                    }), 400
+        
         # Get customer data
         customer_data = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId", 
@@ -732,6 +762,39 @@ def submit_claim():
                     database.get_container_client("document").create_item(doc_data)
                     uploaded_docs.append(doc_id)
         
+        # Check if claim exceeds limit (for approver warning)
+        exceeds_limit = False
+        limit_info = {}
+        
+        policy_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.policy_no = @policyNo",
+            "policy",
+            [{"name": "@policyNo", "value": customer_data[0]['policy_id']}]
+        )
+        
+        if policy_data:
+            policy_limit = policy_data[0].get('total_claim_limit', 0)
+            current_year = datetime.now().year
+            approved_claims = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.customer_id = @customerId AND c.claim_status = 'Approved' AND STARTSWITH(c.claim_date, @year)",
+                "claim",
+                [
+                    {"name": "@customerId", "value": customer_id},
+                    {"name": "@year", "value": str(current_year)}
+                ]
+            )
+            
+            total_approved = sum(float(claim.get('claim_amount', 0)) for claim in approved_claims)
+            
+            if total_approved + claim_amount_float > policy_limit:
+                exceeds_limit = True
+                limit_info = {
+                    'total_used': total_approved,
+                    'policy_limit': policy_limit,
+                    'current_claim': claim_amount_float,
+                    'would_exceed_by': (total_approved + claim_amount_float) - policy_limit
+                }
+        
         # Save or update claim
         claim_data = {
             "id": claim_id,
@@ -748,7 +811,9 @@ def submit_claim():
             "insurance_company": insurance_company,
             "date_checkin": date_checkin,
             "date_checkout": date_checkout,
-            "resubmitted": is_edit  # Mark as resubmitted if editing
+            "resubmitted": is_edit,  # Mark as resubmitted if editing
+            "exceeds_limit": exceeds_limit,
+            "limit_info": limit_info if exceeds_limit else None
         }
         
         database.get_container_client("claim").upsert_item(claim_data)
@@ -863,6 +928,57 @@ def get_customer_policy(customer_id):
         
     except Exception as e:
         print(f"Error getting customer policy: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/customer/<customer_id>/policy-limits', methods=['GET'])
+def get_customer_policy_limits(customer_id):
+    """Get customer policy limits and usage for approvers"""
+    try:
+        # Get customer data
+        customer_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId",
+            "customer",
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        if not customer_data:
+            return jsonify({'error': 'Customer not found'}), 404
+        
+        # Get policy data
+        policy_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.policy_no = @policyNo",
+            "policy",
+            [{"name": "@policyNo", "value": customer_data[0]['policy_id']}]
+        )
+        
+        if not policy_data:
+            return jsonify({'error': 'Policy not found'}), 404
+        
+        policy_limit = policy_data[0].get('total_claim_limit', 0)
+        
+        # Get approved claims for current year
+        current_year = datetime.now().year
+        approved_claims = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId AND c.claim_status = 'Approved' AND STARTSWITH(c.claim_date, @year)",
+            "claim",
+            [
+                {"name": "@customerId", "value": customer_id},
+                {"name": "@year", "value": str(current_year)}
+            ]
+        )
+        
+        total_used = sum(float(claim.get('claim_amount', 0)) for claim in approved_claims)
+        
+        return jsonify({
+            'status': 'success',
+            'policy_limit': policy_limit,
+            'total_used': total_used,
+            'remaining': policy_limit - total_used,
+            'year': current_year
+        })
+        
+    except Exception as e:
+        print(f"Error getting policy limits: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -1020,23 +1136,32 @@ def get_document_metadata(doc_id):
 @app.route('/api/session-status', methods=['GET'])
 def session_status():
     """Check session status"""
-    if 'customer_id' in session and not check_session_expired():
+    print(f"Session data: {dict(session)}")
+    print(f"Session expired: {check_session_expired()}")
+    
+    if ('customer_id' in session or 'admin_id' in session) and not check_session_expired():
         return jsonify({
             'status': 'authenticated',
             'user': {
+                'id': session.get('customer_id') or session.get('admin_id'),
                 'customer_id': session.get('customer_id'),
+                'admin_id': session.get('admin_id'),
                 'email': session.get('email'),
                 'role': session.get('role'),
                 'name': session.get('name')
             }
         })
     else:
+        print("Session not authenticated or expired")
         return jsonify({'status': 'not_authenticated'}), 401
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
     """User logout"""
+    print("Logging out user...")
+    print(f"Session before clear: {dict(session)}")
     session.clear()
+    session.permanent = False
     return jsonify({'status': 'success', 'message': 'Logged out successfully'})
 
 
@@ -1056,12 +1181,25 @@ def microsoft_auth():
     }
     
     auth_url = f"{AUTHORIZE_URL}?{urlencode(params)}"
+    print(f"Generated auth URL: {auth_url}")
+    print(f"Redirect URI: {AZURE_REDIRECT_URI}")
     return redirect(auth_url)
 
 @app.route('/api/auth/microsoft/callback', methods=['GET'])
 def microsoft_callback():
     """Handle Microsoft Entra ID callback"""
     try:
+        # Debug: Print all query parameters
+        print(f"Callback received parameters: {dict(request.args)}")
+        print(f"Session oauth_state: {session.get('oauth_state')}")
+        
+        # Check for error in callback
+        error = request.args.get('error')
+        if error:
+            error_desc = request.args.get('error_description', 'Unknown error')
+            print(f"OAuth error: {error} - {error_desc}")
+            return redirect(f'http://localhost:5173/signin?error={error}')
+        
         # Verify state parameter
         if request.args.get('state') != session.get('oauth_state'):
             return redirect('http://localhost:5173/signin?error=invalid_state')
@@ -1069,6 +1207,7 @@ def microsoft_callback():
         # Get authorization code
         code = request.args.get('code')
         if not code:
+            print("No authorization code received")
             return redirect('http://localhost:5173/signin?error=no_code')
         
         # Exchange code for token
@@ -1082,9 +1221,17 @@ def microsoft_callback():
         }
         
         token_response = requests.post(TOKEN_URL, data=token_data)
+        print(f"Token response status: {token_response.status_code}")
+        print(f"Token response: {token_response.text}")
+        
+        if token_response.status_code != 200:
+            return redirect('http://localhost:5173/signin?error=token_request_failed')
+            
         token_json = token_response.json()
         
         if 'access_token' not in token_json:
+            error_desc = token_json.get('error_description', 'Unknown error')
+            print(f"Token error: {error_desc}")
             return redirect('http://localhost:5173/signin?error=token_failed')
         
         # Get user info from Microsoft Graph
@@ -1092,32 +1239,36 @@ def microsoft_callback():
         user_response = requests.get(USER_INFO_URL, headers=headers)
         user_data = user_response.json()
         
-        # Validate domain
         email = user_data.get('mail') or user_data.get('userPrincipalName')
-        if not email or not email.lower().endswith('@swosupport.id'):
-            return redirect('http://localhost:5173/signin?error=unauthorized_domain')
+        if not email:
+            return redirect('http://localhost:5173/signin?error=no_email')
         
-        # Create or get user
-        user_info = {
-            'id': f"ENT{user_data.get('id', '')[:8].upper()}",
-            'email': email,
-            'name': user_data.get('displayName', ''),
-            'role': 'approver'  # Set role for Entra ID users
-        }
+        # Check if email exists in insurance_admin container
+        admin_user = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.email = @email",
+            "insurance_admin",
+            [{"name": "@email", "value": email}]
+        )
         
-        # Generate JWT token
-        jwt_token = jwt.encode(user_info, JWT_SECRET, algorithm='HS256')
+        if not admin_user:
+            return redirect('http://localhost:5173/signin?error=user_not_found')
         
-        # Store user data in session
-        session['customer_id'] = user_info['id']
-        session['email'] = user_info['email']
-        session['role'] = user_info['role']
-        session['name'] = user_info['name']
+        admin = admin_user[0]
+        
+        # Set session with insurance_admin data and role as approver
+        session['customer_id'] = admin.get('admin_id', admin.get('id'))
+        session['email'] = admin['email']
+        session['role'] = 'approver'
+        session['name'] = admin['name']
+        session['admin_id'] = admin.get('admin_id', admin.get('id'))
         session['login_time'] = datetime.now().isoformat()
         session.permanent = True
         
-        # Redirect to frontend with token
-        return redirect(f'http://localhost:5173/auth/callback?token={jwt_token}')
+        print(f"Session set successfully: {dict(session)}")
+        print(f"Session permanent: {session.permanent}")
+        
+        # Redirect to signin page, frontend will check session and handle redirect
+        return redirect('http://localhost:5173/signin')
         
     except Exception as e:
         print(f"Microsoft auth error: {e}")

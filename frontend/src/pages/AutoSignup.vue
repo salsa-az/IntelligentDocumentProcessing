@@ -7,9 +7,8 @@
           <div class="max-w-2xl mx-auto w-full px-4 py-8">
             <!-- Logo -->
             <div class="flex justify-center">
-              <svg class="fill-violet-500" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
-                <path d="M31.956 14.8C31.372 6.92 25.08.628 17.2.044V5.76a9.04 9.04 0 0 0 9.04 9.04h5.716ZM14.8 26.24v5.716C6.92 31.372.63 25.08.044 17.2H5.76a9.04 9.04 0 0 1 9.04 9.04Zm11.44-9.04h5.716c-.584 7.88-6.876 14.172-14.756 14.756V26.24a9.04 9.04 0 0 1 9.04-9.04ZM.044 14.8C.63 6.92 6.92.628 14.8.044V5.76a9.04 9.04 0 0 1-9.04 9.04H.044Z" />
-              </svg>
+              <img src="/src/images/logo.svg" alt="App Logo" class="w-8 h-8 lg:w-10 lg:h-10" />
+                <span class="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-100 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Nexclaim</span>
             </div>
 
             <div class="flex justify-center mb-8">
@@ -183,9 +182,13 @@
                       class="form-input w-full" 
                       type="text" 
                       required 
-                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('nomorPeserta') }"
+                      :class="{ 
+                        'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('nomorPeserta') && !errorFields.includes('nomorPeserta'),
+                        'bg-red-50 border-red-200 dark:bg-red-900 dark:border-red-600': errorFields.includes('nomorPeserta')
+                      }"
                     />
-                    <p v-if="autoFilledFields.includes('nomorPeserta')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
+                    <p v-if="autoFilledFields.includes('nomorPeserta') && !errorFields.includes('nomorPeserta')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
+                    <p v-if="errorFields.includes('nomorPeserta')" class="text-xs text-red-600 mt-1">This participant number already exists. Please change it.</p>
                   </div>
                   <div>
                     <label class="block text-sm font-medium mb-1" for="namaPemegang">Nama Pemegang Polis <span class="text-red-500">*</span></label>
@@ -232,6 +235,36 @@
                     <option value="lainnya">Lainnya</option>
                   </select>
                 </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium mb-1" for="perusahaanAsuransi">Perusahaan Asuransi <span class="text-red-500">*</span></label>
+                    <input 
+                      id="perusahaanAsuransi" 
+                      v-model="form.perusahaanAsuransi" 
+                      class="form-input w-full" 
+                      type="text" 
+                      required 
+                      placeholder="Masukkan nama perusahaan asuransi"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium mb-1" for="premiumPlan">Paket Premi <span class="text-red-500">*</span></label>
+                    <select 
+                      id="premiumPlan" 
+                      v-model="form.premiumPlan" 
+                      class="form-select w-full" 
+                      required
+                      @change="updateClaimLimit"
+                    >
+                      <option value="">Pilih Paket Premi</option>
+                      <option value="basic">Basic - IDR 5,000,000</option>
+                      <option value="standard">Standard - IDR 10,000,000</option>
+                      <option value="premium">Premium - IDR 25,000,000</option>
+                      <option value="platinum">Platinum - IDR 50,000,000</option>
+                    </select>
+                  </div>
+                </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -260,14 +293,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="block text-sm font-medium mb-1" for="tanggalLahir">Tanggal Lahir <span class="text-red-500">*</span></label>
-                    <input 
+                    <!-- <input 
                       id="tanggalLahir" 
                       v-model="form.tanggalLahir" 
                       class="form-input w-full" 
                       type="date" 
                       required
                       :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('tanggalLahir') }"
-                    />
+                    /> -->
+                    <Datepicker id="tanggalLahir" v-model="form.tanggalLahir" />
                     <p v-if="autoFilledFields.includes('tanggalLahir')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                   </div>
                   <div>
@@ -330,6 +364,7 @@
                   />
                   <p v-if="autoFilledFields.includes('nomorTelepon')" class="text-xs text-violet-600 mt-1">Auto-filled from document</p>
                 </div>
+
               </form>
 
               <div class="flex justify-between mt-8">
@@ -435,6 +470,7 @@ export default {
       processingStatus: 'Initializing...',
       extractedData: {},
       autoFilledFields: [],
+      errorFields: [],
       isPemegangPolis: false,
       dataDeclaration: false,
       form: {
@@ -452,6 +488,9 @@ export default {
         alamat: '',
         email: '',
         nomorTelepon: '',
+        perusahaanAsuransi: '',
+        premiumPlan: '',
+        claimLimit: 0,
         password: '',
         confirmPassword: ''
       }
@@ -512,6 +551,7 @@ export default {
 
         const response = await fetch('http://localhost:5000/api/extract-registration-info', {
         method: 'POST',
+        credentials: 'include',
         body: formData
         });
 
@@ -520,6 +560,9 @@ export default {
         if (result.status === 'success') {
             this.applyExtractedData(result.data);
         }
+        
+        // Check for duplicate participant number after processing
+        await this.validateParticipantNumber();
         
         setTimeout(() => {
             this.currentStep = 2;
@@ -548,7 +591,7 @@ export default {
       // Map extracted data to form fields
       const fieldMapping = {
         'nomorPolis': data.policy_number,
-        // 'namaPerusahaan': data.insurance_company,
+        'perusahaanAsuransi': data.insurance_company,
         'nomorKartu': data.card_number,
         'nomorPeserta': data.participant_number,
         'namaPemegang': data.full_name,
@@ -615,6 +658,41 @@ export default {
       if (data.kecamatan) parts.push(data.kecamatan);
       return parts.join(', ');
     },
+    updateClaimLimit() {
+      const limits = {
+        basic: 5000000,
+        standard: 10000000,
+        premium: 25000000,
+        platinum: 50000000
+      };
+      this.form.claimLimit = limits[this.form.premiumPlan] || 0;
+    },
+    async validateParticipantNumber() {
+      if (!this.form.nomorPeserta || !this.form.nomorPolis || !this.form.nomorKartu) return;
+      
+      try {
+        const response = await fetch('http://localhost:5000/api/validate-participant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            nomorPeserta: this.form.nomorPeserta,
+            nomorPolis: this.form.nomorPolis,
+            nomorKartu: this.form.nomorKartu,
+            perusahaanAsuransi: this.form.perusahaanAsuransi
+          })
+        });
+        
+        const result = await response.json();
+        if (!response.ok && result.field) {
+          this.errorFields = [result.field];
+        } else {
+          this.errorFields = [];
+        }
+      } catch (error) {
+        console.error('Validation error:', error);
+      }
+    },
     proceedToFinalStep() {
       this.currentStep = 3;
     },
@@ -626,8 +704,17 @@ export default {
       }
 
       try {
+        // Ensure date is in YYYY-MM-DD format for backend
+        const formatDateForBackend = (date) => {
+          if (!date) return new Date().toISOString().split('T')[0];
+          if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+          if (date instanceof Date) return date.toISOString().split('T')[0];
+          return date;
+        };
+        
         const registrationData = {
           ...this.form,
+          tanggalLahir: formatDateForBackend(this.form.tanggalLahir),
           isPemegangPolis: this.isPemegangPolis
         };
         
@@ -636,6 +723,7 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify(registrationData)
         });
         

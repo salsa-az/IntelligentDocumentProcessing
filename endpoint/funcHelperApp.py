@@ -23,9 +23,9 @@ container_name_blob = "intelegent-document-processing-st"
 def get_content_type(file):
     # Guess the MIME type based on the file extension
     mime_type, encoding = mimetypes.guess_type(file.filename)
-    
     # Default to 'application/octet-stream' if the type can't be determined
     return mime_type or 'application/octet-stream'
+
 def cosmos_retrive_data(query: str, container: str, parameters: list = None) -> List[Dict[str, Any]]:
     """Run a Cosmos DB select query."""
     try:

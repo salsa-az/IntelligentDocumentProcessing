@@ -259,7 +259,9 @@ export default {
       alamat: '',
       email: '',
       nomorTelepon: '',
-
+      premiumPlan: '',
+      claimLimit: 0,
+      
       // Form fields
       claimType: '',
       otherClaimType: '',
@@ -349,24 +351,20 @@ export default {
 
     const loadUserProfile = async () => {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          router.push('/signin')
-          return
-        }
-
+        // First try to load from API
         const response = await fetch('http://localhost:5000/api/customer/profile', {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
         })
         
         if (response.ok) {
           const result = await response.json()
           const customer = result.customer
-          console.log('Customer profile loaded:', customer)
+          console.log('Customer profile loaded from API:', customer)
           
-          // Auto-fill form with user profile data
+          // Auto-fill form with API data
           form.value.nomorPolis = customer.policy_id || ''
           form.value.namaPerusahaan = customer.insurance_company || 'PT XYZ Asuransi'
           form.value.nomorPeserta = customer.customer_no || ''
@@ -378,11 +376,40 @@ export default {
           form.value.alamat = customer.address || ''
           form.value.email = customer.email || ''
           form.value.nomorTelepon = customer.phone || ''
-        } else {
-          console.error('Failed to load profile:', response.status, response.statusText)
+          
+          // Load policy data for premium plan and limits
+          const policyResponse = await fetch(`http://localhost:5000/api/customer/${customer.customer_id}/policy`, {
+            credentials: 'include'
+          })
+          if (policyResponse.ok) {
+            const policyResult = await policyResponse.json()
+            if (policyResult.status === 'success' && policyResult.policy) {
+              form.value.premiumPlan = policyResult.policy.insurance_plan_type || 'basic'
+              form.value.claimLimit = policyResult.policy.total_claim_limit || 5000000
+            }
+          }
+          return
         }
       } catch (error) {
-        console.error('Error loading user profile:', error)
+        console.error('Error loading user profile from API:', error)
+      }
+      
+      // Fallback to localStorage if API fails
+      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      console.log('Loading user data from localStorage:', userData)
+      
+      if (userData && userData.id) {
+        form.value.nomorPolis = userData.policy_number || form.value.nomorPolis
+        form.value.namaPerusahaan = userData.insurance_company || form.value.namaPerusahaan
+        form.value.nomorPeserta = userData.customer_id || userData.id || form.value.nomorPeserta
+        form.value.namaPemegang = userData.name || form.value.namaPemegang
+        form.value.nik = userData.nik || form.value.nik
+        form.value.tanggalLahir = userData.birth_date || form.value.tanggalLahir
+        form.value.jenisKelamin = userData.gender || form.value.jenisKelamin
+        form.value.statusPernikahan = userData.marital_status || form.value.statusPernikahan
+        form.value.alamat = userData.address || form.value.alamat
+        form.value.email = userData.email || form.value.email
+        form.value.nomorTelepon = userData.phone || form.value.nomorTelepon
       }
     }
 
@@ -391,7 +418,9 @@ export default {
       
       if (editId) {
         try {
-          const response = await fetch(`http://localhost:5000/api/claims/${editId}`)
+          const response = await fetch(`http://localhost:5000/api/claims/${editId}`, {
+            credentials: 'include'
+          })
           const result = await response.json()
           
           if (result.status === 'success' && result.claim) {
@@ -472,8 +501,16 @@ export default {
         formData.append('currency', form.value.currency)
         formData.append('customerId', currentUser.id)
         formData.append('policyId', form.value.nomorPolis)
-        formData.append('treatmentStartDate', form.value.treatmentStartDate)
-        formData.append('treatmentEndDate', form.value.treatmentEndDate)
+        // Ensure dates are in YYYY-MM-DD format for backend
+        const formatDateForBackend = (date) => {
+          if (!date) return new Date().toISOString().split('T')[0];
+          if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+          if (date instanceof Date) return date.toISOString().split('T')[0];
+          return date;
+        };
+        
+        formData.append('treatmentStartDate', formatDateForBackend(form.value.treatmentStartDate))
+        formData.append('treatmentEndDate', formatDateForBackend(form.value.treatmentEndDate))
         formData.append('insuranceCompany', form.value.namaPerusahaan)
         
         if (isEditing.value) {
@@ -498,9 +535,7 @@ export default {
         const token = localStorage.getItem('token')
         const response = await fetch('http://localhost:5000/api/submit-claim', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
+          credentials: 'include',
           body: formData
         })
         
@@ -531,6 +566,7 @@ export default {
       }
     }
 
+
     watch(() => form.value.treatmentStartDate, (newVal) => {
       if (newVal && isEditing.value) {
         console.log('Start date updated:', newVal)
@@ -543,6 +579,8 @@ export default {
       }
     })
 
+
+    
     onMounted(async () => {
       await loadUserProfile()
       await loadClaimData()
@@ -561,4 +599,3 @@ export default {
   }
 }
 </script>
-

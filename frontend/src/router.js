@@ -9,6 +9,7 @@ import MyAccount from './pages/MyAccount.vue'
 import ClaimApproval from './pages/ClaimApproval.vue'
 import AlertDemo from './pages/AlertDemo.vue'
 import AutoSignup from './pages/AutoSignup.vue'
+import ApproverDashboard from './pages/ApproverDashboard.vue'
 
 const routerHistory = createWebHistory()
 
@@ -60,6 +61,11 @@ const router = createRouter({
     {
       path: '/claim-approval',
       component: ClaimApproval,
+      meta: { requiresAuth: true, role: 'approver' }
+    },
+    {
+      path: '/approver-dashboard',
+      component: ApproverDashboard,
       meta: { requiresAuth: true, role: 'approver' }
     },
     {

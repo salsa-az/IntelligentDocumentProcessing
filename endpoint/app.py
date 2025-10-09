@@ -1,17 +1,18 @@
+import json
 import sys
 import os
 import requests
 import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import uuid
-from datetime import datetime
-import jwt
+from datetime import datetime, timedelta
 import bcrypt
+import jwt
+from urllib.parse import urlencode
 
 # Flask
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session, redirect, url_for
 from flask_cors import CORS
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 from werkzeug.security import check_password_hash # For securely checking passwords
 
 # Azure
@@ -24,18 +25,20 @@ from funcHelperApp import cosmos_retrive_data, function_triger, get_content_type
 from dotenv import load_dotenv
 from chatbotClaimerOfficer import agent 
 from doc_intel_for_registration import analize_doc as analize_doc_registration, get_sas_url
-
+import secrets
 load_dotenv()
 thread_id = uuid.uuid4()
 config = {"configurable": {"thread_id": thread_id}}
 # Initialize Flask app once
 app = Flask(__name__)
 
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"]}})
+CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"], "supports_credentials": True}})
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-if not JWT_SECRET_KEY:
-    raise ValueError("JWT_SECRET_KEY environment variable not set")
+app.config['SECRET_KEY'] = secrets.token_hex(32)
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour in seconds
 
 # Azure setup
 blob_connection_string = os.getenv("BLOB_STRING_CONECTION")
@@ -47,8 +50,29 @@ container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
 cosmos_client = CosmosClient(os.getenv("COSMOS_DB_URI"), credential=os.getenv("COSMOS_DB_KEY"))
 database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE_NAME"))
 
+# Azure Entra ID Configuration
+AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
+AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
+AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
+AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', 'http://localhost:5000/api/auth/microsoft/callback')
+JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
+
 # File validation for localhost
 ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
+
+# Azure Entra ID URLs
+AUTHORIZE_URL = f'https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/authorize'
+TOKEN_URL = f'https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token'
+USER_INFO_URL = 'https://graph.microsoft.com/v1.0/me'
+
+def check_session_expired():
+    """Check if session is expired"""
+    if 'login_time' in session:
+        login_time = datetime.fromisoformat(session['login_time'])
+        if datetime.now() - login_time > timedelta(seconds=app.config['PERMANENT_SESSION_LIFETIME']):
+            session.clear()
+            return True
+    return False
 
 def validate_file(file):
     """Basic file validation"""
@@ -142,6 +166,36 @@ def signup():
         if existing_customer:
             return jsonify({'error': 'Customer already exists'}), 400
         
+        # Check if user is registering as policy holder
+        if data.get('isPemegangPolis', True):
+            # Check if policy holder already exists for this policy number
+            existing_policy_holder = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.policy_no = @policyNo AND c.policyholder_name = @policyHolder",
+                "policy",
+                [
+                    {"name": "@policyNo", "value": data.get('nomorPolis', '')},
+                    {"name": "@policyHolder", "value": data.get('namaPemegang', '')}
+                ]
+            )
+            
+            if existing_policy_holder:
+                return jsonify({'error': 'Policy holder already exists for this policy number'}), 400
+        
+        # Check if participant number already exists for this policy, card number and insurance company
+        existing_participant = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_no = @participantNo AND c.policy_id = @policyId AND c.card_no = @cardNo AND c.insurance_company = @insuranceCompany",
+            "customer",
+            [
+                {"name": "@participantNo", "value": data.get('nomorPeserta', '')},
+                {"name": "@policyId", "value": data.get('nomorPolis', '')},
+                {"name": "@cardNo", "value": data.get('nomorKartu', '')},
+                {"name": "@insuranceCompany", "value": data.get('perusahaanAsuransi', '')}
+            ]
+        )
+        
+        if existing_participant:
+            return jsonify({'error': 'Participant number already exists for this policy, card number and insurance company', 'field': 'nomorPeserta'}), 400
+        
         # Hash password
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
@@ -151,6 +205,7 @@ def signup():
         # Calculate age from birth date
         age = None
         dob = data.get('tanggalLahir', '')
+        print(f"Received DOB: {dob}")
         if dob:
             try:
                 birth_date = datetime.strptime(dob, '%Y-%m-%d')
@@ -193,29 +248,59 @@ def signup():
             "claim_id": []
         }
         
-        # Save to database
+        # Save customer to database
         database.get_container_client("customer").create_item(customer_data)
         
-        # Generate JWT token
-        token_payload = {
-            'customer_id': customer_id,
-            'email': email,
-            'role': 'customer',
-            'exp': datetime.utcnow().timestamp() + 86400  # 24 hours
-        }
+        # Check if policy already exists for this policy number
+        existing_policy = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.policy_no = @policyNo",
+            "policy",
+            [{"name": "@policyNo", "value": data.get('nomorPolis', '')}]
+        )
         
-        token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm='HS256')
+        if existing_policy:
+            # Link to existing policy
+            policy_data = existing_policy[0]
+        else:
+            # Create new policy (only for policy holders)
+            if data.get('isPemegangPolis', True):
+                policy_data = {
+                    "id": f"POL{uuid.uuid4().hex[:8].upper()}",
+                    "customer_id": customer_id,  # Only policy holder's customer_id
+                    "policy_id": data.get('nomorPolis', ''),
+                    "policy_no": data.get('nomorPolis', ''),
+                    "policyholder_name": data.get('namaPemegang', ''),
+                    "insured_name": data.get('namaPemegang', ''),
+                    "start_date": datetime.now().strftime('%Y-%m-%d'),
+                    "expire_date": (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d'),
+                    "insurance_plan_type": data.get('premiumPlan', 'basic'),
+                    "total_claim_limit": data.get('claimLimit', ''),
+                    "insurance_company": data.get('perusahaanAsuransi', '')
+                }
+                
+                # Save policy to database
+                database.get_container_client("policy").create_item(policy_data)
+            else:
+                return jsonify({'error': 'Policy must be created by policy holder first'}), 400
+        
+        # Store user data in session
+        session['customer_id'] = customer_id
+        session['email'] = email
+        session['role'] = 'customer'
+        session['name'] = customer_data['name']
+        session['login_time'] = datetime.now().isoformat()
+        session.permanent = True
         
         return jsonify({
             'status': 'success',
-            'message': 'Customer registered successfully',
-            'token': token,
+            'message': 'Customer and policy registered successfully',
             'user': {
                 'id': customer_id,
                 'name': customer_data['name'],
                 'email': email,
                 'role': 'customer'
-            }
+            },
+            'policy': policy_data
         })
         
     except Exception as e:
@@ -238,7 +323,6 @@ def signin():
         "customer",
         [{"name": "@Email", "value": email}]
     )
-
     if not user:
         return jsonify({'error': 'Invalid email or password'}), 401
 
@@ -249,20 +333,18 @@ def signin():
     # Set default role if not present
     user_role = user.get('role', 'customer')
     
-    # Generate JWT token
-    token_payload = {
-        'customer_id': user['customer_id'],
-        'email': email,
-        'role': user_role,
-        'exp': datetime.utcnow().timestamp() + 86400  # 24 hours
-    }
+    # Store user data in session
+    session['customer_id'] = user['customer_id']
+    session['email'] = email
+    session['role'] = user_role
+    session['name'] = user['name']
+    session['login_time'] = datetime.now().isoformat()
+    session.permanent = True
 
-    token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm='HS256')
-
+    print("-"*10,"User session data:", session)
     return jsonify({
         'status': 'success',
         'message': 'Login successful',
-        'token': token,
         'user': {
             'id': user['customer_id'],
             'name': user['name'],
@@ -450,10 +532,12 @@ def update_claim_status(claim_id):
 def get_customer_claims_detailed(customer_id):
     """Get detailed claims for a specific customer with documents"""
     try:
-        # Get the identity of the current user from the JWT
-        current_user = get_jwt_identity()
-        customer_id = current_user.get('id')
-        user_role = current_user.get('role')
+        # Check if user is logged in
+        if 'customer_id' not in session or check_session_expired():
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        customer_id = session['customer_id']
+        user_role = session.get('role')
 
         if user_role != 'customer':
             return jsonify({'error': 'Access forbidden: Customers only'}), 403
@@ -493,17 +577,23 @@ def validate_customer_data(form_data, customer_data):
     
     return True, "Valid customer"
 
+
 @app.route('/api/customer-claim-history/<customer_id>', methods=['GET'])
 def get_customer_claim_history(customer_id):
     """Get claim history for a specific customer with hospital names from invoices"""
     try:
-        # Get the identity of the current user from the JWT
-        current_user = get_jwt_identity()
-        customer_id = current_user.get('id')
-        user_role = current_user.get('role')
-
+        print (f"Session data: {session}")
+        if 'customer_id' not in session or check_session_expired():
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_role = session.get('role')
         if user_role != 'customer':
             return jsonify({'error': 'Access forbidden: Customers only'}), 403
+        
+        # Verify customer can only access their own data
+        session_customer_id = session['customer_id']
+        if customer_id != session_customer_id:
+            return jsonify({'error': 'Access forbidden: Can only access own data'}), 403
 
         claims = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId ORDER BY c._ts DESC", 
@@ -550,6 +640,10 @@ def get_customer_claim_history(customer_id):
 def submit_claim():
     """Submit or update claim form with file uploads"""
     try:
+        # Check if user is logged in
+        if 'customer_id' not in session or check_session_expired():
+            return jsonify({'error': 'Authentication required'}), 401
+        
         # Check if this is an edit
         is_edit = request.form.get('isEdit') == 'true'
         existing_claim_id = request.form.get('claimId') if is_edit else None
@@ -560,9 +654,8 @@ def submit_claim():
         currency = request.form.get('currency')
         customer_id = request.form.get('customerId')
 
-        # Get customer_id from the JWT token instead of the form
-        current_user = get_jwt_identity()
-        customer_id = current_user.get('id')
+        # Get customer_id from session
+        customer_id = session['customer_id']
 
         policy_id = request.form.get('policyId')
         date_checkin = request.form.get('treatmentStartDate')
@@ -672,7 +765,6 @@ def submit_claim():
         print(f"Error submitting claim: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-import json
 
 @app.route('/api/chatbot', methods=['POST'])
 def chatbot_api():
@@ -709,7 +801,69 @@ def chatbot_api():
         print(f"Error in chatbot: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/customer/profile', methods=['GET'])
+def get_customer_profile():
+    """Get customer profile data"""
+    try:
+        if 'customer_id' not in session or check_session_expired():
+            return jsonify({'error': 'Authentication required'}), 401        
+        customer_id = session['customer_id']
+        customer_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId",
+            "customer",
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        if not customer_data:
+            return jsonify({'error': 'Customer not found'}), 404
+            
+        return jsonify({
+            'status': 'success',
+            'customer': customer_data[0]
+        })
+        
+    except Exception as e:
+        print(f"Error getting customer profile: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/customer/<customer_id>/policy', methods=['GET'])
+def get_customer_policy(customer_id):
+    """Get customer policy data"""
+    try:
+        if 'customer_id' not in session or check_session_expired():
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        if session['customer_id'] != customer_id:
+            return jsonify({'error': 'Access forbidden'}), 403
+        
+        # Get customer data first
+        customer_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId",
+            "customer",
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        if not customer_data:
+            return jsonify({'error': 'Customer not found'}), 404
+        
+        # Get policy data by policy_no (shared across all users with same policy)
+        policy_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.policy_no = @policyNo",
+            "policy",
+            [{"name": "@policyNo", "value": customer_data[0]['policy_id']}]
+        )
+        
+        if not policy_data:
+            return jsonify({'error': 'Policy not found'}), 404
+            
+        return jsonify({
+            'status': 'success',
+            'policy': policy_data[0]
+        })
+        
+    except Exception as e:
+        print(f"Error getting customer policy: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/update-claim', methods=['POST'])
@@ -815,6 +969,31 @@ def extract_registration_info():
         print(f"Error in document extraction: {e}")
         return jsonify({'error': 'Document processing failed'}), 500
 
+@app.route('/api/validate-participant', methods=['POST'])
+def validate_participant():
+    """Validate participant number uniqueness"""
+    try:
+        data = request.json
+        
+        existing_participant = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_no = @participantNo AND c.policy_id = @policyId AND c.card_no = @cardNo AND c.insurance_company = @insuranceCompany",
+            "customer",
+            [
+                {"name": "@participantNo", "value": data.get('nomorPeserta', '')},
+                {"name": "@policyId", "value": data.get('nomorPolis', '')},
+                {"name": "@cardNo", "value": data.get('nomorKartu', '')},
+                {"name": "@insuranceCompany", "value": data.get('perusahaanAsuransi', '')}
+            ]
+        )
+        
+        if existing_participant:
+            return jsonify({'error': 'Participant number already exists', 'field': 'nomorPeserta'}), 400
+            
+        return jsonify({'status': 'valid'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -837,6 +1016,112 @@ def get_document_metadata(doc_id):
         return jsonify(document)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/session-status', methods=['GET'])
+def session_status():
+    """Check session status"""
+    if 'customer_id' in session and not check_session_expired():
+        return jsonify({
+            'status': 'authenticated',
+            'user': {
+                'customer_id': session.get('customer_id'),
+                'email': session.get('email'),
+                'role': session.get('role'),
+                'name': session.get('name')
+            }
+        })
+    else:
+        return jsonify({'status': 'not_authenticated'}), 401
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """User logout"""
+    session.clear()
+    return jsonify({'status': 'success', 'message': 'Logged out successfully'})
+
+
+@app.route('/api/auth/microsoft', methods=['GET'])
+def microsoft_auth():
+    """Redirect to Microsoft Entra ID for authentication"""
+    state = str(uuid.uuid4())
+    session['oauth_state'] = state
+    
+    params = {
+        'client_id': AZURE_CLIENT_ID,
+        'response_type': 'code',
+        'redirect_uri': AZURE_REDIRECT_URI,
+        'response_mode': 'query',
+        'scope': 'openid profile email User.Read',
+        'state': state
+    }
+    
+    auth_url = f"{AUTHORIZE_URL}?{urlencode(params)}"
+    return redirect(auth_url)
+
+@app.route('/api/auth/microsoft/callback', methods=['GET'])
+def microsoft_callback():
+    """Handle Microsoft Entra ID callback"""
+    try:
+        # Verify state parameter
+        if request.args.get('state') != session.get('oauth_state'):
+            return redirect('http://localhost:5173/signin?error=invalid_state')
+        
+        # Get authorization code
+        code = request.args.get('code')
+        if not code:
+            return redirect('http://localhost:5173/signin?error=no_code')
+        
+        # Exchange code for token
+        token_data = {
+            'client_id': AZURE_CLIENT_ID,
+            'client_secret': AZURE_CLIENT_SECRET,
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': AZURE_REDIRECT_URI,
+            'scope': 'openid profile email User.Read'
+        }
+        
+        token_response = requests.post(TOKEN_URL, data=token_data)
+        token_json = token_response.json()
+        
+        if 'access_token' not in token_json:
+            return redirect('http://localhost:5173/signin?error=token_failed')
+        
+        # Get user info from Microsoft Graph
+        headers = {'Authorization': f"Bearer {token_json['access_token']}"}
+        user_response = requests.get(USER_INFO_URL, headers=headers)
+        user_data = user_response.json()
+        
+        # Validate domain
+        email = user_data.get('mail') or user_data.get('userPrincipalName')
+        if not email or not email.lower().endswith('@swosupport.id'):
+            return redirect('http://localhost:5173/signin?error=unauthorized_domain')
+        
+        # Create or get user
+        user_info = {
+            'id': f"ENT{user_data.get('id', '')[:8].upper()}",
+            'email': email,
+            'name': user_data.get('displayName', ''),
+            'role': 'approver'  # Set role for Entra ID users
+        }
+        
+        # Generate JWT token
+        jwt_token = jwt.encode(user_info, JWT_SECRET, algorithm='HS256')
+        
+        # Store user data in session
+        session['customer_id'] = user_info['id']
+        session['email'] = user_info['email']
+        session['role'] = user_info['role']
+        session['name'] = user_info['name']
+        session['login_time'] = datetime.now().isoformat()
+        session.permanent = True
+        
+        # Redirect to frontend with token
+        return redirect(f'http://localhost:5173/auth/callback?token={jwt_token}')
+        
+    except Exception as e:
+        print(f"Microsoft auth error: {e}")
+        return redirect('http://localhost:5173/signin?error=auth_failed')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

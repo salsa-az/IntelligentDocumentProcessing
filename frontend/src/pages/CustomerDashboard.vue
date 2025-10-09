@@ -27,7 +27,7 @@
               <!-- Filter button -->
               <!-- <FilterButton align="right" /> -->
               <!-- Datepicker built with flatpickr -->
-              <Datepicker align="right" />
+              <!-- <Datepicker align="right" /> -->
               <!-- Submit Claim button -->
               <router-link to="/claim-form ">
                 <button class="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-gray-200 transition-all duration-200 ease-in-out transform dark:hover:bg-gray-800 dark:hover:text-white hover:shadow-lg dark:hover:border-gray-200">
@@ -57,7 +57,7 @@
               <div class="flex items-center space-x-4">
                 <div class="text-right">
                   <div class="flex items-center text-sm text-blue-100">
-                    <span class="bg-orange-500 text-white px-2 py-1 rounded text-xs font-medium mr-2">Platinum</span>
+                    <span class="bg-orange-500 text-white px-2 py-1 rounded text-xs font-medium mr-2 premium capitalize">{{ policyData.premiumType || 'Basic' }}</span>
                   </div>
                   <!-- <div class="text-xs text-blue-200">{{ policyData.policyNumber }}</div> -->
                 </div>
@@ -65,8 +65,13 @@
             </div>
           </div>
 
+          <!-- Loading State -->
+          <div v-if="loading" class="flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+          </div>
+
           <!-- Cards -->
-          <div class="grid grid-cols-12 gap-4">
+          <div v-else class="grid grid-cols-12 gap-4">
 
             <!-- Policy Status -->
             <div class="col-span-12 sm:col-span-6">
@@ -81,9 +86,9 @@
                   </div>
                   <div class="ml-5">
                     <dl>
-                      <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Status Polis</dt>
-                      <dd class="text-lg font-medium text-green-600">Aktif - Premi Lunas</dd>
-                      <dd class="text-sm text-gray-500 dark:text-gray-400"> Rp {{ formatCurrency(premiumData.amount) }}/bulan</dd>
+                      <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Claim Limit</dt>
+                      <dd class="text-lg font-medium text-green-600">Rp {{ formatCurrency(policyData.claimLimit) }}</dd>
+                      <dd class="text-sm text-gray-500 dark:text-gray-400">{{ policyData.premiumType || 'Basic' }} Plan</dd>
                     </dl>
                   </div>
                 </div>
@@ -272,13 +277,16 @@ export default {
   setup() {
     const sidebarOpen = ref(false)
     const claims = ref([])
+    const loading = ref(true)
     const currentUser = ref(JSON.parse(localStorage.getItem('user') || '{}'))
 
-    // Mock policy data from FormClaim
+    // Policy data
     const policyData = ref({
       status: 'Active',
       policyNumber: 'P001',
-      company: 'PT Asuransi Terpercaya'
+      company: 'PT Asuransi Terpercaya',
+      premiumType: 'Basic',
+      claimLimit: 5000000
     })
 
     const coverageData = ref([
@@ -380,8 +388,11 @@ export default {
     }
 
     const fetchClaims = async () => {
+      loading.value = true
       try {
-        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.value.id}`)
+        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.value.id}`, {
+          credentials: 'include'
+        })
         const data = await response.json()
         if (data.status === 'success') {
           claims.value = data.claims.map(claim => ({
@@ -392,11 +403,29 @@ export default {
         }
       } catch (error) {
         console.error('Error fetching claims:', error)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const fetchPolicyData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/customer/${currentUser.value.id}/policy`, {
+          credentials: 'include'
+        })
+        const data = await response.json()
+        if (data.status === 'success' && data.policy) {
+          policyData.value.premiumType = data.policy.insurance_plan_type || 'basic'
+          policyData.value.claimLimit = data.policy.total_claim_limit || 5000000
+        }
+      } catch (error) {
+        console.error('Error fetching policy:', error)
       }
     }
 
     onMounted(() => {
       fetchClaims()
+      fetchPolicyData()
     })
 
     return {
@@ -414,7 +443,8 @@ export default {
       premiumData,
       recentActivity,
       coverageByType,
-      formatCurrency
+      formatCurrency,
+      loading
     }  
   }
 }

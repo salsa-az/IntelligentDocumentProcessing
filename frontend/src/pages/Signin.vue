@@ -27,13 +27,13 @@
                 <p class="text-sm text-red-700 dark:text-red-300">{{ errorMessage }}</p>
               </div>
 
-              <form @submit.prevent="handleSignin">
+              <form @submit.prevent="isEntraIdDomain ? handleEntraIdLogin() : handleSignin()">
                 <div class="space-y-4">
                   <div>
                     <label class="block text-sm font-medium mb-1" for="email">Email Address <span class="text-red-500">*</span></label>
                     <input id="email" v-model="form.email" class="form-input w-full" type="email" required />
                   </div>
-                  <div>
+                  <div v-if="!isEntraIdDomain">
                     <label class="block text-sm font-medium mb-1" for="password">Password <span class="text-red-500">*</span></label>
                     <input id="password" v-model="form.password" class="form-input w-full" type="password" required />
                   </div>
@@ -48,8 +48,14 @@
                   <router-link class="text-sm underline hover:no-underline" to="/reset-password">Lupa Password?</router-link>
                 </div>
                 <div class="flex flex-wrap items-center justify-between mt-6">
-                  <button :disabled="loading" class="btn bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white ml-3 w-full shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50">
+                  <button v-if="!isEntraIdDomain" :disabled="loading" class="btn bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white ml-3 w-full shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50">
                     {{ loading ? 'Signing In...' : 'Sign In' }}
+                  </button>
+                  <button v-else @click="handleEntraIdLogin" :disabled="loading" class="btn bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white ml-3 w-full shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 23 23">
+                      <path d="M1 1h10v10H1zM12 1h10v10H12zM1 12h10v10H1zM12 12h10v10H12z"/>
+                    </svg>
+                    {{ loading ? 'Connecting...' : 'Login with Microsoft' }}
                   </button>
                 </div>
               </form>
@@ -82,7 +88,26 @@ export default {
       errorMessage: ''
     }
   },
+  computed: {
+    isEntraIdDomain() {
+      return this.form.email.toLowerCase().endsWith('@swosupport.id')
+    }
+  },
   methods: {
+    async handleEntraIdLogin() {
+      this.loading = true
+      this.errorMessage = ''
+      
+      try {
+        // Redirect to Entra ID authentication
+        window.location.href = 'http://localhost:5000/api/auth/microsoft'
+      } catch (error) {
+        this.errorMessage = 'Terjadi kesalahan saat menghubungkan ke Microsoft. Silakan coba lagi.'
+        console.error('Entra ID login error:', error)
+      } finally {
+        this.loading = false
+      }
+    },
     async handleSignin() {
       this.loading = true
       this.errorMessage = ''
@@ -93,6 +118,7 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify({
             email: this.form.email,
             password: this.form.password
@@ -137,6 +163,26 @@ export default {
     }
   },
   mounted() {
+    // Check for error parameters from OAuth callback
+    const urlParams = new URLSearchParams(window.location.search)
+    const error = urlParams.get('error')
+    
+    if (error) {
+      switch (error) {
+        case 'unauthorized_domain':
+          this.errorMessage = 'Domain email tidak diizinkan. Gunakan email @swosupport.id'
+          break
+        case 'auth_failed':
+          this.errorMessage = 'Autentikasi Microsoft gagal. Silakan coba lagi.'
+          break
+        case 'invalid_state':
+          this.errorMessage = 'Session tidak valid. Silakan coba lagi.'
+          break
+        default:
+          this.errorMessage = 'Terjadi kesalahan saat login. Silakan coba lagi.'
+      }
+    }
+    
     // Check if user is already logged in
     const user = JSON.parse(localStorage.getItem('user') || '{}')
     if (user.id) {

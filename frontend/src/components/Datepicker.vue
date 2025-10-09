@@ -25,12 +25,12 @@ export default {
   emits: ['update:modelValue'],
     data (props) {
       return {
-        date: props.modelValue || null,
+        date: this.convertToDisplayFormat(props.modelValue) || null,
         config: {
           mode: 'single',
           static: false,
           dateFormat: 'M j, Y',
-          defaultDate: props.modelValue || new Date(),
+          defaultDate: this.convertToDisplayFormat(props.modelValue) || new Date(),
           prevArrow: '<svg class="fill-current" width="7" height="11" viewBox="0 0 7 11"><path d="M5.4 10.8l1.4-1.4-4-4 4-4L5.4 0 0 5.4z" /></svg>',
           nextArrow: '<svg class="fill-current" width="7" height="11" viewBox="0 0 7 11"><path d="M1.4 10.8L0 9.4l4-4-4-4L1.4 0l5.4 5.4z" /></svg>',
 
@@ -98,7 +98,9 @@ export default {
           },
           onChange: (selectedDates, dateStr, instance) => {
             instance.element.value = dateStr;
-            this.$emit('update:modelValue', dateStr);
+            // Convert display format back to YYYY-MM-DD for database
+            const dbFormat = selectedDates[0] ? selectedDates[0].toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            this.$emit('update:modelValue', dbFormat);
           },
         },                
       }
@@ -106,12 +108,22 @@ export default {
   components: {
     flatPickr
   },
+  methods: {
+    convertToDisplayFormat(dateStr) {
+      if (!dateStr) return null;
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return new Date(dateStr + 'T00:00:00');
+      }
+      return dateStr;
+    }
+  },
   watch: {
     modelValue(newVal) {
-      if (newVal !== this.date) {
-        this.date = newVal;
+      const displayDate = this.convertToDisplayFormat(newVal);
+      if (displayDate !== this.date) {
+        this.date = displayDate;
         if (this.$refs.flatpickr && this.$refs.flatpickr.fp) {
-          this.$refs.flatpickr.fp.setDate(newVal);
+          this.$refs.flatpickr.fp.setDate(displayDate);
         }
       }
     }

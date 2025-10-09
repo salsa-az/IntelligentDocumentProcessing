@@ -404,6 +404,7 @@ export default {
     }
 
     onMounted(() => {
+      document.title = 'Dashboard - NexClaim'
       fetchClaims()
       fetchPolicyData()
     })

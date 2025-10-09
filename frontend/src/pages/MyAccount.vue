@@ -15,7 +15,7 @@
 
           <!-- Page header -->
           <div class="mb-8">
-            <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Akun Saya</h1>
+            <h1 class="text-3xl md:text-4xl text-gray-800 dark:text-gray-100 font-bold">Akun Saya</h1>
           </div>
 
           <div class="bg-white dark:bg-gray-800 shadow-xs rounded-xl">
@@ -24,28 +24,21 @@
             <div class="p-6">
               <div class="grid grid-cols-12 gap-6">
                 
-                <!-- Profile section -->
-                <div class="col-span-12 xl:col-span-4">
-                  <div class="text-center">
-                    <div class="inline-flex mb-4">
-                      <img class="w-20 h-20 rounded-full" :src="currentUser?.avatar || '/src/images/user-avatar-32.png'" width="80" height="80" alt="User" />
+                <!-- Compact user header (profile picture removed) -->
+                <div class="col-span-12">
+                  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                    <div>
+                      <h2 class="text-2xl md:text-3xl leading-snug text-gray-800 dark:text-gray-100 font-bold">{{ currentUser?.name || 'User' }}</h2>
+                      <div class="text-sm text-gray-500 dark:text-gray-400">
+                        <span v-if="currentUser?.role === 'customer'">{{ currentUser?.policyType || 'Pemegang Polis' }}</span>
+                        <span v-if="currentUser?.role === 'approver'">{{ currentUser?.jobRole || 'Staff Internal' }}</span>
+                      </div>
                     </div>
-                    <h2 class="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">{{ currentUser?.name || 'User' }}</h2>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                      <span v-if="currentUser?.role === 'customer'">{{ currentUser?.policyType || 'Pemegang Polis' }}</span>
-                      <span v-if="currentUser?.role === 'approver'">{{ currentUser?.jobRole || 'Staff Internal' }}</span>
-                    </div>
-                    <button class="btn-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-300">
-                      <svg class="w-4 h-4 fill-current opacity-50 shrink-0" viewBox="0 0 16 16">
-                        <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" />
-                      </svg>
-                      <span class="ml-2">Ubah Foto</span>
-                    </button>
                   </div>
                 </div>
 
-                <!-- Form section -->
-                <div class="col-span-12 xl:col-span-8">
+                <!-- Form section (expanded to full width) -->
+                <div class="col-span-12">
                   <!-- Profile Form -->
                   <form @submit.prevent="updateAccount">
                     <div class="grid grid-cols-12 gap-6">

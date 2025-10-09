@@ -22,59 +22,64 @@ const router = createRouter({
     },
     {
       path: '/signin',
-      component: Signin
+      component: Signin,
+      meta: { title: 'Sign In' }
     },
     {
       path: '/signup',
-      component: AutoSignup
+      component: AutoSignup,
+      meta: { title: 'Sign Up' }
     },
     {
       path: '/reset-password',
       component: ResetPassword,
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, title: 'Reset Password' }
     },
     {
       path: '/dashboard',
-      component: Dashboard
+      component: Dashboard,
+      meta: { title: 'Dashboard' }
     },
     {
       path: '/customer-dashboard',
       component: CustomerDashboard,
-      meta: { requiresAuth: true, role: 'customer' } 
+      meta: { requiresAuth: true, role: 'customer', title: 'Customer Dashboard' } 
     },
     {
       path: '/claim-form',
       name: 'FormClaim',
       component: FormClaim,
-      meta: { requiresAuth: true, role: 'customer' } 
+      meta: { requiresAuth: true, role: 'customer', title: 'New Claim' } 
     },
     {
       path: '/claim-history',
       component: ClaimHistory,
-      meta: { requiresAuth: true, role: 'customer' }
+      meta: { requiresAuth: true, role: 'customer', title: 'Claim History' }
     },
     {
       path: '/my-account',
       component: MyAccount,
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, title: 'My Account' }
     },
     {
       path: '/claim-approval',
       component: ClaimApproval,
-      meta: { requiresAuth: true, role: 'approver' }
+      meta: { requiresAuth: true, role: 'approver', title: 'Claim Approval' }
     },
     {
       path: '/approver-dashboard',
       component: ApproverDashboard,
-      meta: { requiresAuth: true, role: 'approver' }
+      meta: { requiresAuth: true, role: 'approver', title: 'Approver Dashboard' }
     },
     {
       path: '/alert-demo',
-      component: AlertDemo
+      component: AlertDemo,
+      meta: { title: 'Alert Demo' }
     },
     {
       path: '/auto-signup',
-      component: AutoSignup
+      component: AutoSignup,
+      meta: { title: 'Auto Signup' }
     }
   ]
 })

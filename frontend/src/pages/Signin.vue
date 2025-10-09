@@ -136,7 +136,7 @@ export default {
           if (data.user.role === 'customer') {
             this.$router.push('/customer-dashboard')
           } else if (data.user.role === 'approver') {
-            this.$router.push('/claim-approval')
+            this.$router.push('/approver-dashboard')
           } else {
             this.$router.push('/dashboard')
           }
@@ -148,7 +148,7 @@ export default {
             if (dummyUser.role === 'customer') {
               this.$router.push('/customer-dashboard')
             } else if (dummyUser.role === 'approver') {
-              this.$router.push('/claim-approval')
+              this.$router.push('/approver-dashboard')
             }
           } else {
             this.errorMessage = data.error || 'Email atau password salah. Silakan coba lagi.'
@@ -163,6 +163,9 @@ export default {
     }
   },
   async mounted() {
+    // Set browser tab title and favicon
+    document.title = 'Sign In - NexClaim'
+    
     // Check for error parameters from OAuth callback
     const urlParams = new URLSearchParams(window.location.search)
     const error = urlParams.get('error')
@@ -209,7 +212,7 @@ export default {
           if (data.user.role === 'customer') {
             this.$router.push('/customer-dashboard')
           } else if (data.user.role === 'approver') {
-            this.$router.push('/claim-approval')
+            this.$router.push('/approver-dashboard')
           } else {
             this.$router.push('/dashboard')
           }
@@ -226,7 +229,7 @@ export default {
       if (user.role === 'customer') {
         this.$router.push('/customer-dashboard')
       } else if (user.role === 'approver') {
-        this.$router.push('/claim-approval')
+        this.$router.push('/approver-dashboard')
       } else {
         this.$router.push('/dashboard')
       }

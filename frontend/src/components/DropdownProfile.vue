@@ -7,9 +7,8 @@
       @click.prevent="dropdownOpen = !dropdownOpen"
       :aria-expanded="dropdownOpen"
     >
-      <img class="w-8 h-8 rounded-full" :src="profilePicture || UserAvatar" width="32" height="32" alt="User" />
       <div class="flex items-center truncate">
-        <span class="truncate ml-2 text-sm font-medium text-gray-600 dark:text-gray-100 group-hover:text-gray-800 dark:group-hover:text-white">{{ currentUser?.name || 'User' }}</span>
+        <span class="truncate text-sm font-medium text-gray-600 dark:text-gray-100 group-hover:text-gray-800 dark:group-hover:text-white">{{ currentUser?.name || 'User' }}</span>
         <svg class="w-3 h-3 shrink-0 ml-1 fill-current text-gray-400 dark:text-gray-500" viewBox="0 0 12 12">
           <path d="M5.9 11.4L.5 6l1.4-1.4 4 4 4-4L11.3 6z" />
         </svg>
@@ -77,16 +76,10 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth.js'
-import UserAvatar from '../images/user-avatar-32.png'
 
 export default {
   name: 'DropdownProfile',
   props: ['align'],
-  data() {
-    return {
-      UserAvatar: UserAvatar,
-    }
-  },  
   setup() {
     const router = useRouter()
     const { currentUser, logout } = useAuth()

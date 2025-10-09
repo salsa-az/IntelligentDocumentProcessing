@@ -29,7 +29,7 @@
         <!-- Logo -->
         <router-link class="block flex items-center" to="/">
           <img src="/src/images/logo.svg" alt="App Logo" class="w-8 h-8 lg:w-10 lg:h-10" />
-          <span class="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-100 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">Nexclaim</span>
+          <span class="ml-2 text-lg font-semibold text-gray-800 dark:text-gray-100 lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">NexClaim</span>
         </router-link>
       </div>
 

@@ -1,4 +1,3 @@
-import json
 import sys
 import os
 import requests
@@ -166,36 +165,6 @@ def signup():
         if existing_customer:
             return jsonify({'error': 'Customer already exists'}), 400
         
-        # Check if user is registering as policy holder
-        if data.get('isPemegangPolis', True):
-            # Check if policy holder already exists for this policy number
-            existing_policy_holder = cosmos_retrive_data(
-                "SELECT * FROM c WHERE c.policy_no = @policyNo AND c.policyholder_name = @policyHolder",
-                "policy",
-                [
-                    {"name": "@policyNo", "value": data.get('nomorPolis', '')},
-                    {"name": "@policyHolder", "value": data.get('namaPemegang', '')}
-                ]
-            )
-            
-            if existing_policy_holder:
-                return jsonify({'error': 'Policy holder already exists for this policy number'}), 400
-        
-        # Check if participant number already exists for this policy, card number and insurance company
-        existing_participant = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.customer_no = @participantNo AND c.policy_id = @policyId AND c.card_no = @cardNo AND c.insurance_company = @insuranceCompany",
-            "customer",
-            [
-                {"name": "@participantNo", "value": data.get('nomorPeserta', '')},
-                {"name": "@policyId", "value": data.get('nomorPolis', '')},
-                {"name": "@cardNo", "value": data.get('nomorKartu', '')},
-                {"name": "@insuranceCompany", "value": data.get('perusahaanAsuransi', '')}
-            ]
-        )
-        
-        if existing_participant:
-            return jsonify({'error': 'Participant number already exists for this policy, card number and insurance company', 'field': 'nomorPeserta'}), 400
-        
         # Hash password
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
@@ -205,7 +174,6 @@ def signup():
         # Calculate age from birth date
         age = None
         dob = data.get('tanggalLahir', '')
-        print(f"Received DOB: {dob}")
         if dob:
             try:
                 birth_date = datetime.strptime(dob, '%Y-%m-%d')
@@ -230,7 +198,6 @@ def signup():
             "policy_id": data.get('nomorPolis', ''),
             "customer_no": data.get('nomorPeserta', ''),
             "card_no": data.get('nomorKartu', ''),
-            "insurance_company": data.get('perusahaanAsuransi', ''),
             "name": data.get('namaPemegang', ''),
             "dob": dob,
             "age": age,
@@ -248,40 +215,8 @@ def signup():
             "claim_id": []
         }
         
-        # Save customer to database
+        # Save to database
         database.get_container_client("customer").create_item(customer_data)
-        
-        # Check if policy already exists for this policy number
-        existing_policy = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.policy_no = @policyNo",
-            "policy",
-            [{"name": "@policyNo", "value": data.get('nomorPolis', '')}]
-        )
-        
-        if existing_policy:
-            # Link to existing policy
-            policy_data = existing_policy[0]
-        else:
-            # Create new policy (only for policy holders)
-            if data.get('isPemegangPolis', True):
-                policy_data = {
-                    "id": f"POL{uuid.uuid4().hex[:8].upper()}",
-                    "customer_id": customer_id,  # Only policy holder's customer_id
-                    "policy_id": data.get('nomorPolis', ''),
-                    "policy_no": data.get('nomorPolis', ''),
-                    "policyholder_name": data.get('namaPemegang', ''),
-                    "insured_name": data.get('namaPemegang', ''),
-                    "start_date": datetime.now().strftime('%Y-%m-%d'),
-                    "expire_date": (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d'),
-                    "insurance_plan_type": data.get('premiumPlan', 'basic'),
-                    "total_claim_limit": data.get('claimLimit', ''),
-                    "insurance_company": data.get('perusahaanAsuransi', '')
-                }
-                
-                # Save policy to database
-                database.get_container_client("policy").create_item(policy_data)
-            else:
-                return jsonify({'error': 'Policy must be created by policy holder first'}), 400
         
         # Store user data in session
         session['customer_id'] = customer_id
@@ -293,14 +228,13 @@ def signup():
         
         return jsonify({
             'status': 'success',
-            'message': 'Customer and policy registered successfully',
+            'message': 'Customer registered successfully',
             'user': {
                 'id': customer_id,
                 'name': customer_data['name'],
                 'email': email,
                 'role': 'customer'
-            },
-            'policy': policy_data
+            }
         })
         
     except Exception as e:
@@ -568,7 +502,6 @@ def validate_customer_data(form_data, customer_data):
     customer = customer_data[0]
     form_customer_id = form_data.get('customerId')
     form_policy_id = form_data.get('policyId')
-    print(f"Validating customer ID: form {form_customer_id} vs db {customer['customer_id']}")
     
     if customer['customer_id'] != form_customer_id:
         return False, "Customer ID mismatch"
@@ -671,35 +604,6 @@ def submit_claim():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid claim amount format'}), 400
         
-        # Check claim limit for new claims
-        if not is_edit:
-            policy_data = cosmos_retrive_data(
-                "SELECT * FROM c WHERE c.policy_no = @policyNo",
-                "policy",
-                [{"name": "@policyNo", "value": policy_id}]
-            )
-            
-            if policy_data:
-                policy_limit = policy_data[0].get('total_claim_limit', 0)
-                
-                # Get approved claims for this year
-                current_year = datetime.now().year
-                approved_claims = cosmos_retrive_data(
-                    "SELECT * FROM c WHERE c.customer_id = @customerId AND c.claim_status = 'Approved' AND STARTSWITH(c.claim_date, @year)",
-                    "claim",
-                    [
-                        {"name": "@customerId", "value": customer_id},
-                        {"name": "@year", "value": str(current_year)}
-                    ]
-                )
-                
-                total_approved = sum(float(claim.get('claim_amount', 0)) for claim in approved_claims)
-                
-                if total_approved + claim_amount_float > policy_limit:
-                    return jsonify({
-                        'error': f'Claim amount exceeds annual limit. Used: Rp {total_approved:,.0f}, Limit: Rp {policy_limit:,.0f}'
-                    }), 400
-        
         # Get customer data
         customer_data = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_id = @customerId", 
@@ -750,7 +654,6 @@ def submit_claim():
                     blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                     content_type = get_content_type(file)
                     blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
-                    print(f"Uploaded {form_field} to {blob_name} with content type {content_type}")
                     doc_data = {
                         "id": doc_id,
                         "doc_id": doc_id,
@@ -761,39 +664,6 @@ def submit_claim():
                     }
                     database.get_container_client("document").create_item(doc_data)
                     uploaded_docs.append(doc_id)
-        
-        # Check if claim exceeds limit (for approver warning)
-        exceeds_limit = False
-        limit_info = {}
-        
-        policy_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.policy_no = @policyNo",
-            "policy",
-            [{"name": "@policyNo", "value": customer_data[0]['policy_id']}]
-        )
-        
-        if policy_data:
-            policy_limit = policy_data[0].get('total_claim_limit', 0)
-            current_year = datetime.now().year
-            approved_claims = cosmos_retrive_data(
-                "SELECT * FROM c WHERE c.customer_id = @customerId AND c.claim_status = 'Approved' AND STARTSWITH(c.claim_date, @year)",
-                "claim",
-                [
-                    {"name": "@customerId", "value": customer_id},
-                    {"name": "@year", "value": str(current_year)}
-                ]
-            )
-            
-            total_approved = sum(float(claim.get('claim_amount', 0)) for claim in approved_claims)
-            
-            if total_approved + claim_amount_float > policy_limit:
-                exceeds_limit = True
-                limit_info = {
-                    'total_used': total_approved,
-                    'policy_limit': policy_limit,
-                    'current_claim': claim_amount_float,
-                    'would_exceed_by': (total_approved + claim_amount_float) - policy_limit
-                }
         
         # Save or update claim
         claim_data = {
@@ -811,9 +681,7 @@ def submit_claim():
             "insurance_company": insurance_company,
             "date_checkin": date_checkin,
             "date_checkout": date_checkout,
-            "resubmitted": is_edit,  # Mark as resubmitted if editing
-            "exceeds_limit": exceeds_limit,
-            "limit_info": limit_info if exceeds_limit else None
+            "resubmitted": is_edit  # Mark as resubmitted if editing
         }
         
         database.get_container_client("claim").upsert_item(claim_data)
@@ -830,6 +698,7 @@ def submit_claim():
         print(f"Error submitting claim: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+import json
 
 @app.route('/api/chatbot', methods=['POST'])
 def chatbot_api():
@@ -841,10 +710,7 @@ def chatbot_api():
             return jsonify({'error': 'Message is required'}), 400
 
         # Ensure user_message is a valid string
-        user_message = str(user_message)
-
-        print(f"User message: {user_message}")
-
+        user_message = str(user_message)    
         # Ensure that the message is in the correct format
         formatted_input = {
             "messages": [{"role": "user", "content": user_message}]
@@ -854,7 +720,6 @@ def chatbot_api():
             response = ''
             for chunk in agent.stream(input=formatted_input, config=config, stream_mode="values"):
                 response = chunk   # i just want the AI Final answer
-                print(f"AI response: {response}")
             response = response['messages'][-1].content  
             response = str(response)
             return jsonify({'response': response})
@@ -866,120 +731,7 @@ def chatbot_api():
         print(f"Error in chatbot: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/api/customer/profile', methods=['GET'])
-def get_customer_profile():
-    """Get customer profile data"""
-    try:
-        if 'customer_id' not in session or check_session_expired():
-            return jsonify({'error': 'Authentication required'}), 401        
-        customer_id = session['customer_id']
-        customer_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.customer_id = @customerId",
-            "customer",
-            [{"name": "@customerId", "value": customer_id}]
-        )
-        
-        if not customer_data:
-            return jsonify({'error': 'Customer not found'}), 404
-            
-        return jsonify({
-            'status': 'success',
-            'customer': customer_data[0]
-        })
-        
-    except Exception as e:
-        print(f"Error getting customer profile: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/api/customer/<customer_id>/policy', methods=['GET'])
-def get_customer_policy(customer_id):
-    """Get customer policy data"""
-    try:
-        if 'customer_id' not in session or check_session_expired():
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        if session['customer_id'] != customer_id:
-            return jsonify({'error': 'Access forbidden'}), 403
-        
-        # Get customer data first
-        customer_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.customer_id = @customerId",
-            "customer",
-            [{"name": "@customerId", "value": customer_id}]
-        )
-        
-        if not customer_data:
-            return jsonify({'error': 'Customer not found'}), 404
-        
-        # Get policy data by policy_no (shared across all users with same policy)
-        policy_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.policy_no = @policyNo",
-            "policy",
-            [{"name": "@policyNo", "value": customer_data[0]['policy_id']}]
-        )
-        
-        if not policy_data:
-            return jsonify({'error': 'Policy not found'}), 404
-            
-        return jsonify({
-            'status': 'success',
-            'policy': policy_data[0]
-        })
-        
-    except Exception as e:
-        print(f"Error getting customer policy: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-@app.route('/api/customer/<customer_id>/policy-limits', methods=['GET'])
-def get_customer_policy_limits(customer_id):
-    """Get customer policy limits and usage for approvers"""
-    try:
-        # Get customer data
-        customer_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.customer_id = @customerId",
-            "customer",
-            [{"name": "@customerId", "value": customer_id}]
-        )
-        
-        if not customer_data:
-            return jsonify({'error': 'Customer not found'}), 404
-        
-        # Get policy data
-        policy_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.policy_no = @policyNo",
-            "policy",
-            [{"name": "@policyNo", "value": customer_data[0]['policy_id']}]
-        )
-        
-        if not policy_data:
-            return jsonify({'error': 'Policy not found'}), 404
-        
-        policy_limit = policy_data[0].get('total_claim_limit', 0)
-        
-        # Get approved claims for current year
-        current_year = datetime.now().year
-        approved_claims = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.customer_id = @customerId AND c.claim_status = 'Approved' AND STARTSWITH(c.claim_date, @year)",
-            "claim",
-            [
-                {"name": "@customerId", "value": customer_id},
-                {"name": "@year", "value": str(current_year)}
-            ]
-        )
-        
-        total_used = sum(float(claim.get('claim_amount', 0)) for claim in approved_claims)
-        
-        return jsonify({
-            'status': 'success',
-            'policy_limit': policy_limit,
-            'total_used': total_used,
-            'remaining': policy_limit - total_used,
-            'year': current_year
-        })
-        
-    except Exception as e:
-        print(f"Error getting policy limits: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/update-claim', methods=['POST'])
@@ -1037,11 +789,9 @@ def extract_registration_info():
                 blob_name = f"registration/{doc_id}_{file.filename}"
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
                 blob_client.upload_blob(file.read(), overwrite=True)
-                print(f"Insurance card uploaded: {blob_name}")
                 
                 # Extract insurance card data
                 insurance_data = analize_doc_registration(blob_name, "insuranceCard")
-                print(f"Insurance card extraction result: {insurance_data}")
                 if insurance_data and not insurance_data.get('error'):
                     extracted_data.update({
                         'policy_number': insurance_data.get('No. Polis', ''),
@@ -1060,8 +810,6 @@ def extract_registration_info():
                 
                 # Extract using Azure Document Intelligence with fallback
                 id_data = analize_doc_registration(blob_name, "idCard")
-                print(f"ID card extraction result: {id_data}")
-                
                 # Map ID card data to expected format
                 if id_data:
                     extracted_data.update({
@@ -1084,31 +832,6 @@ def extract_registration_info():
     except Exception as e:
         print(f"Error in document extraction: {e}")
         return jsonify({'error': 'Document processing failed'}), 500
-
-@app.route('/api/validate-participant', methods=['POST'])
-def validate_participant():
-    """Validate participant number uniqueness"""
-    try:
-        data = request.json
-        
-        existing_participant = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.customer_no = @participantNo AND c.policy_id = @policyId AND c.card_no = @cardNo AND c.insurance_company = @insuranceCompany",
-            "customer",
-            [
-                {"name": "@participantNo", "value": data.get('nomorPeserta', '')},
-                {"name": "@policyId", "value": data.get('nomorPolis', '')},
-                {"name": "@cardNo", "value": data.get('nomorKartu', '')},
-                {"name": "@insuranceCompany", "value": data.get('perusahaanAsuransi', '')}
-            ]
-        )
-        
-        if existing_participant:
-            return jsonify({'error': 'Participant number already exists', 'field': 'nomorPeserta'}), 400
-            
-        return jsonify({'status': 'valid'})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -1136,9 +859,6 @@ def get_document_metadata(doc_id):
 @app.route('/api/session-status', methods=['GET'])
 def session_status():
     """Check session status"""
-    print(f"Session data: {dict(session)}")
-    print(f"Session expired: {check_session_expired()}")
-    
     if ('customer_id' in session or 'admin_id' in session) and not check_session_expired():
         return jsonify({
             'status': 'authenticated',
@@ -1158,8 +878,6 @@ def session_status():
 @app.route('/api/logout', methods=['POST'])
 def logout():
     """User logout"""
-    print("Logging out user...")
-    print(f"Session before clear: {dict(session)}")
     session.clear()
     session.permanent = False
     return jsonify({'status': 'success', 'message': 'Logged out successfully'})
@@ -1181,8 +899,6 @@ def microsoft_auth():
     }
     
     auth_url = f"{AUTHORIZE_URL}?{urlencode(params)}"
-    print(f"Generated auth URL: {auth_url}")
-    print(f"Redirect URI: {AZURE_REDIRECT_URI}")
     return redirect(auth_url)
 
 @app.route('/api/auth/microsoft/callback', methods=['GET'])
@@ -1190,9 +906,6 @@ def microsoft_callback():
     """Handle Microsoft Entra ID callback"""
     try:
         # Debug: Print all query parameters
-        print(f"Callback received parameters: {dict(request.args)}")
-        print(f"Session oauth_state: {session.get('oauth_state')}")
-        
         # Check for error in callback
         error = request.args.get('error')
         if error:
@@ -1221,8 +934,6 @@ def microsoft_callback():
         }
         
         token_response = requests.post(TOKEN_URL, data=token_data)
-        print(f"Token response status: {token_response.status_code}")
-        print(f"Token response: {token_response.text}")
         
         if token_response.status_code != 200:
             return redirect('http://localhost:5173/signin?error=token_request_failed')
@@ -1264,8 +975,7 @@ def microsoft_callback():
         session['login_time'] = datetime.now().isoformat()
         session.permanent = True
         
-        print(f"Session set successfully: {dict(session)}")
-        print(f"Session permanent: {session.permanent}")
+
         
         # Redirect to signin page, frontend will check session and handle redirect
         return redirect('http://localhost:5173/signin')

@@ -77,8 +77,10 @@
           </div>
 
           <!-- Loading State -->
-          <div v-if="loading" class="flex justify-center items-center py-12">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+          <div v-if="loading" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
+            <!-- Blue spinner: solid blue border with transparent top for the spinning effect -->
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent dark:border-blue-300 dark:border-t-transparent mb-4"></div>
+            <p class="text-gray-600 dark:text-gray-400">Loading claims data...</p>
           </div>
 
           <!-- Claims List -->

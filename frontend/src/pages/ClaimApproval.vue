@@ -78,7 +78,8 @@
 
           <!-- Loading State -->
           <div v-if="loading" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mb-4"></div>
+            <!-- Blue spinner: solid blue border with transparent top for the spinning effect -->
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent dark:border-blue-300 dark:border-t-transparent mb-4"></div>
             <p class="text-gray-600 dark:text-gray-400">Loading claims data...</p>
           </div>
 
@@ -135,7 +136,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
 import Banner from '../partials/Chatbot.vue'
@@ -158,7 +159,9 @@ export default {
     const claims = ref([])
     const showDetailModal = ref(false)
     const selectedClaim = ref(null)
-    const loading = ref(false)
+  // show spinner until first backend response arrives
+  const loading = ref(true)
+  const refreshInterval = ref(null)
 
     // Get current admin user
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
@@ -475,10 +478,15 @@ export default {
 
    onMounted(() => {
       fetchAllClaims()
-      
-      // Set up auto-refresh every 30 seconds
-      setInterval(fetchAllClaims, 30000)
+
+      // Set up auto-refresh every 30 seconds and keep the id to clear later
+      refreshInterval.value = setInterval(fetchAllClaims, 30000)
       document.addEventListener('click', handleClickOutside)
+    })
+
+    onUnmounted(() => {
+      if (refreshInterval.value) clearInterval(refreshInterval.value)
+      document.removeEventListener('click', handleClickOutside)
     })
 
     return {
@@ -488,6 +496,7 @@ export default {
       typeFilter,
       sortBy,
       filteredClaims,
+      loading,
       showDetailModal,
       selectedClaim,
       getStatusClass,

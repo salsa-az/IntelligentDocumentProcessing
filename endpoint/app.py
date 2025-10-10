@@ -372,7 +372,7 @@ def signin():
     session['name'] = user['name']
     session['login_time'] = datetime.now().isoformat()
     session.permanent = True
-
+    
     return jsonify({
         'status': 'success',
         'message': 'Login successful',
@@ -388,7 +388,11 @@ def signin():
 def logout():
     session.clear()
     session.permanent = False
-    return jsonify({'status': 'success', 'message': 'Logged out successfully'})
+    response = jsonify({'status': 'success', 'message': 'Logged out successfully'})
+    response.set_cookie('session', '', expires=0, path='/')
+    #print session for debug 
+    print(session)
+    return response
 
 @app.route('/api/session-status', methods=['GET'])
 def session_status():
@@ -488,9 +492,9 @@ def microsoft_callback():
         session['admin_id'] = admin.get('admin_id', admin.get('id'))
         session['login_time'] = datetime.now().isoformat()
         session.permanent = True
-        
-        return redirect('/signin')
-        
+        # Redirect directly to approver dashboard so frontend does not need to check session on Signin page
+        return redirect('/approver-dashboard')
+
     except Exception as e:
         print(f"Microsoft auth error: {e}")
         return redirect('/signin?error=auth_failed')
@@ -920,6 +924,9 @@ def update_claim():
 # =============================================================================
 # CUSTOMER ROUTES
 # =============================================================================
+
+
+
 @app.route('/api/customer/<customer_id>/claims-detailed', methods=['GET'])
 def get_customer_claims_detailed(customer_id):
     try:

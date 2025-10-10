@@ -181,36 +181,10 @@ export default {
       return
     }
     
-    // Check session status from server (prioritize this for Microsoft auth)
-    try {
-      const response = await fetch('/api/session-status', {
-        credentials: 'include'
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.status === 'authenticated' && data.user) {
-          console.log('Session authenticated, redirecting...', data.user)
-          // Store user data and redirect
-          localStorage.setItem('user', JSON.stringify(data.user))
-          
-          // Clear any URL parameters
-          window.history.replaceState({}, document.title, window.location.pathname)
-          
-          // Redirect based on role
-          if (data.user.role === 'customer') {
-            this.$router.push('/customer-dashboard')
-          } else if (data.user.role === 'approver') {
-            this.$router.push('/approver-dashboard')
-          } else {
-            this.$router.push('/dashboard')
-          }
-          return
-        }
-      }
-    } catch (error) {
-      console.log('No active session:', error)
-    }
+    // NOTE: Do not automatically check /api/session-status on mount.
+    // We rely on the OAuth callback to redirect directly to the approver dashboard
+    // after the server creates the session. If an explicit session check is needed,
+    // add a user action (button) to call the session-status endpoint.
     
     // Check localStorage as fallback only if no server session
     const user = JSON.parse(localStorage.getItem('user') || '{}')

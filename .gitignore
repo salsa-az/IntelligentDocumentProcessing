@@ -6,11 +6,12 @@ env*
 credential*
 test*
 
-node_modules/
+frontend/node_modules/
 
 idp-new
 idp-venv
 .gitignore
+frontned/.gitignore
 coba*
 
 __pycache__

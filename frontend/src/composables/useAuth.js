@@ -39,6 +39,7 @@ export const useAuth = () => {
       currentUser.value = null
       localStorage.removeItem('user')
       localStorage.removeItem('token')
+      sessionStorage.clear()
     }
   }
 

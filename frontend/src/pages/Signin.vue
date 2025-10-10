@@ -74,7 +74,7 @@
 </template>
 
 <script>
-import { authenticateUser } from '../utils/dummyUsers.js'
+
 
 export default {
   name: 'Signin',
@@ -100,7 +100,7 @@ export default {
       
       try {
         // Redirect to Entra ID authentication
-        window.location.href = 'http://localhost:5000/api/auth/microsoft'
+        window.location.href = '/api/auth/microsoft'
       } catch (error) {
         this.errorMessage = 'Terjadi kesalahan saat menghubungkan ke Microsoft. Silakan coba lagi.'
         console.error('Entra ID login error:', error)
@@ -113,7 +113,7 @@ export default {
       this.errorMessage = ''
       
       try {
-        const response = await fetch('http://localhost:5000/api/signin', {
+        const response = await fetch('/api/signin', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -141,18 +141,7 @@ export default {
             this.$router.push('/dashboard')
           }
         } else {
-          // Fallback to dummy users if API fails
-          const dummyUser = authenticateUser(this.form.email, this.form.password)
-          if (dummyUser) {
-            localStorage.setItem('user', JSON.stringify(dummyUser))
-            if (dummyUser.role === 'customer') {
-              this.$router.push('/customer-dashboard')
-            } else if (dummyUser.role === 'approver') {
-              this.$router.push('/approver-dashboard')
-            }
-          } else {
-            this.errorMessage = data.error || 'Email atau password salah. Silakan coba lagi.'
-          }
+          this.errorMessage = data.error || 'Email atau password salah. Silakan coba lagi.'
         }
       } catch (error) {
         this.errorMessage = 'Terjadi kesalahan. Silakan coba lagi.'
@@ -194,7 +183,7 @@ export default {
     
     // Check session status from server (prioritize this for Microsoft auth)
     try {
-      const response = await fetch('http://localhost:5000/api/session-status', {
+      const response = await fetch('/api/session-status', {
         credentials: 'include'
       })
       

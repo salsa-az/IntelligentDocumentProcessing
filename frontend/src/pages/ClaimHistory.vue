@@ -457,7 +457,7 @@ export default {
         console.log('Fetching claims for customer:', currentUser.id)
         
         const token = localStorage.getItem('token')
-        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.id}`, {
+        const response = await fetch(`/api/customer-claim-history/${currentUser.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -572,7 +572,7 @@ export default {
     const downloadDocument = async (doc) => {
       try {
         // Get secure download URL
-        const response = await fetch(`http://localhost:5000/api/documents/${doc.doc_id}/download`, {
+        const response = await fetch(`/api/documents/${doc.doc_id}/download`, {
           credentials: 'include'
         })
         const result = await response.json()
@@ -612,10 +612,6 @@ export default {
 
     onMounted(() => {
       console.log(currentUser)
-      // {id: 'CU001', fullName: 'Feri Hussen', email: 'customer@example.com', role: 'customer', phone: '+62 812-3456-7890', …} address : "Jl. Sudirman No. 123, Jakarta Pusat, DKI Jakarta 10220" avatar : "../images/user-avatar-32.png" birthDate : "1985-04-12" email : "customer@example.com" fullName : "Feri Hussen" id : "CU001" insuranceComp : "PT XYZ Asuransi" participantNumber : "PA001" phone : "+62 812-3456-7890" policyNumber : "P001" policyType : "Asuransi Kesehatan Platinum" role : "customer"
-
-      // mockClaims.forEach(claim => claims.value.push(claim))
-      // console.log('claim type:', claims.value[3].id === 'C2' ? claims.value[3].type : 'not found')
       fetchClaimHistory()
     })
 

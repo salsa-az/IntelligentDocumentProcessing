@@ -2,42 +2,48 @@ import sys
 import os
 import requests
 import threading
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import uuid
-from datetime import datetime, timedelta
-import bcrypt
-import jwt
+import json
+import secrets
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-# Flask
+import bcrypt
+import jwt
 from flask import Flask, request, jsonify, session, redirect, url_for
 from flask_cors import CORS
-from werkzeug.security import check_password_hash # For securely checking passwords
-
-# Azure
-from azure.storage.blob import BlobServiceClient,ContentSettings
+from flask import send_from_directory, send_file
+from werkzeug.security import check_password_hash
+from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
 from azure.cosmos import CosmosClient
-
-# Langchain Functions
-
-from funcHelperApp import cosmos_retrive_data, function_triger, get_content_type
 from dotenv import load_dotenv
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from funcHelperApp import cosmos_retrive_data, function_triger, get_content_type
 from chatbotClaimerOfficer import agent 
 from doc_intel_for_registration import analize_doc as analize_doc_registration, get_sas_url
-import secrets
-load_dotenv()
-thread_id = uuid.uuid4()
-config = {"configurable": {"thread_id": thread_id}}
-# Initialize Flask app once
-app = Flask(__name__)
 
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174"], "supports_credentials": True}})
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+load_dotenv()
+
+app = Flask(__name__)
+# Production CORS configuration
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5000", 
+    "http://localhost:5000",
+    "https://idp-insurance.azurewebsites.net",
+    "https://*.azurewebsites.net"
+]
+CORS(app, resources={r"/api/*": {"origins": allowed_origins, "supports_credentials": True}})
 
 app.config['SECRET_KEY'] = secrets.token_hex(32)
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') != 'development'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour in seconds
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 
 # Azure setup
 blob_connection_string = os.getenv("BLOB_STRING_CONECTION")
@@ -49,75 +55,53 @@ container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
 cosmos_client = CosmosClient(os.getenv("COSMOS_DB_URI"), credential=os.getenv("COSMOS_DB_KEY"))
 database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE_NAME"))
 
-# Azure Entra ID Configuration
+# Azure Entra ID
 AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
 AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
 AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
-AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', 'http://localhost:5000/api/auth/microsoft/callback')
+AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback')
 JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
 
-# File validation for localhost
+# Constants
 ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
-
-# Azure Entra ID URLs - Using common endpoint for multi-tenant support
 AUTHORIZE_URL = f'https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/authorize'
 TOKEN_URL = f'https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token'
 USER_INFO_URL = 'https://graph.microsoft.com/v1.0/me'
 
-def check_session_expired():
-    """Check if session is expired"""
-    if 'login_time' in session:
-        login_time = datetime.fromisoformat(session['login_time'])
-        if datetime.now() - login_time > timedelta(seconds=app.config['PERMANENT_SESSION_LIFETIME']):
-            session.clear()
-            return True
-    return False
+# Chatbot
+thread_id = uuid.uuid4()
+config = {"configurable": {"thread_id": thread_id}}
 
-def validate_file(file):
-    """Basic file validation"""
-    if not file or not file.filename:
-        return False, "No file provided"
-    
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        return False, f"File type {file_ext} not allowed"
-    
-    return True, "Valid file"
-
-def run_analysis_async(customer_id, claim_id):
-    """Run analysis asynchronously"""
-    def target():
-        try:
-            function_triger(customer_id, claim_id)
-        except Exception as e:
-            print(f"Error in analyst_function_executor: {e}", file=sys.stderr)
-    threading.Thread(target=target, daemon=True).start()
-
-@app.route('/api/analyze-claim', methods=['POST'])
-def analyze_claim():
-    """Analyze claim using customer_id and claim_id"""
+# =============================================================================
+# SERVE STATIC FILES
+# =============================================================================
+@app.route('/')
+def serve_frontend():
     try:
-        data = request.json
-        customer_id = data.get('customer_id')
-        claim_id = data.get('claim_id')
-        
-        if not customer_id or not claim_id:
-            return jsonify({'error': 'customer_id and claim_id required'}), 400
-        
-        # Run analysis asynchronously
-        run_analysis_async(customer_id, claim_id)
-        
-        return jsonify({'status': 'success', 'message': 'Analysis started'})
-    
-    except Exception as e:
-        print(f"Error in analyze_claim: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        return send_from_directory('dist', 'index.html')
+    except:
+        return jsonify({'message': 'Frontend not built. Run: cd frontend && npm run build && cd .. && mv frontend/dist dist'}), 404
 
+@app.route('/<path:path>')
+def serve_static(path):
+    if path.startswith('api/'):
+        return jsonify({'error': 'API endpoint not found'}), 404
+    try:
+        return send_from_directory('dist', path)
+    except:
+        try:
+            return send_from_directory('dist', 'index.html')
+        except:
+            return jsonify({'message': 'Frontend not built'}), 404
+
+
+# =============================================================================
+# UTILITY
+# =============================================================================
 @app.route('/api/query', methods=['GET'])
 def query_from_cosmosDB():
-    """Query data from cosmosDB - Fixed parameter access"""
     try:
-        query = request.args.get('query')  # Fixed: use args for GET
+        query = request.args.get('query')
         container = request.args.get('container')
         parameter = request.args.get('parameter')
         
@@ -129,31 +113,85 @@ def query_from_cosmosDB():
         print(f"Error in query: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/api/claims', methods=['GET'])
-def get_all_claims():
-    """Retrieve all claims from CosmosDB"""
-    try:
-        claims = list(database.get_container_client("claim").query_items(
-            query="SELECT * FROM c",
-            enable_cross_partition_query=True
-        ))
-        return claims
-    except Exception as e:
-        print(f"Error retrieving claims: {e}", file=sys.stderr)
-        return []
+
+def check_session_expired():
+    if 'login_time' in session:
+        login_time = datetime.fromisoformat(session['login_time'])
+        if datetime.now() - login_time > timedelta(seconds=app.config['PERMANENT_SESSION_LIFETIME']):
+            session.clear()
+            return True
+    return False
+
+def validate_file(file):
+    if not file or not file.filename:
+        return False, "No file provided"
     
+    # Check file extension
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        return False, f"File type {file_ext} not allowed"
+    
+    # Check file size (10MB limit)
+    file.seek(0, 2)  # Seek to end
+    file_size = file.tell()
+    file.seek(0)  # Reset to beginning
+    if file_size > 10 * 1024 * 1024:  # 10MB
+        return False, "File size exceeds 10MB limit"
+    
+    return True, "Valid file"
+
+def run_analysis_async(customer_id, claim_id):
+    def target():
+        try:
+            function_triger(customer_id, claim_id)
+        except Exception as e:
+            print(f"Error in analyst_function_executor: {e}", file=sys.stderr)
+    threading.Thread(target=target, daemon=True).start()
+
+def safe_fetch_documents(claim_documents):
+    documents = []
+    if not claim_documents:
+        return documents
+    for doc_id in claim_documents:
+        try:
+            doc_data = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.doc_id = @docId", 
+                "document", 
+                [{"name": "@docId", "value": doc_id}]
+            )
+            if doc_data:
+                doc = doc_data[0]
+                doc['download_url'] = f"/api/documents/{doc_id}/download"
+                documents.append(doc)
+        except Exception as e:
+            print(f"Error fetching document {doc_id}: {e}")
+            continue
+    return documents
+
+def validate_customer_data(form_data, customer_data):
+    if not customer_data:
+        return False, "Customer not found in database"
+    customer = customer_data[0]
+    form_customer_id = form_data.get('customerId')
+    form_policy_id = form_data.get('policyId')
+    if customer['customer_id'] != form_customer_id:
+        return False, "Customer ID mismatch"
+    if customer['policy_id'] != form_policy_id:
+        return False, "Policy ID mismatch"
+    return True, "Valid customer"
+
+# =============================================================================
+# AUTHENTICATION ROUTES
+# =============================================================================
 @app.route('/api/signup', methods=['POST'])
 def signup():
-    """Customer signup with document upload support"""
     try:
-        # Extract registration data from form
         email = request.form.get('email')
         password = request.form.get('password')
         
         if not email or not password:
             return jsonify({'error': 'Email and password required'}), 400
         
-        # Check if customer already exists
         existing_customer = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.email = @email",
             "customer",
@@ -163,18 +201,14 @@ def signup():
         if existing_customer:
             return jsonify({'error': 'Customer already exists'}), 400
         
-        # Hash password
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
-        # Generate customer ID
         customer_id = f"CU{uuid.uuid4().hex[:8].upper()}"
         
-        # Check for existing policy and validate participant number
+        # Policy validation
         policy_id = request.form.get('nomorPolis', '')
         participant_no = request.form.get('nomorPeserta', '')
         
         if policy_id and participant_no:
-            # Check for duplicate participant number
             existing_participant = cosmos_retrive_data(
                 "SELECT * FROM c WHERE c.customer_no = @participantNo",
                 "customer",
@@ -184,7 +218,6 @@ def signup():
             if existing_participant:
                 return jsonify({'error': 'Participant number already exists', 'field': 'nomorPeserta'}), 400
             
-            # Check for existing policy holder
             existing_policy_holder = cosmos_retrive_data(
                 "SELECT * FROM c WHERE c.policy_id = @policyId AND c.is_policy_holder = true",
                 "customer",
@@ -193,14 +226,13 @@ def signup():
             
             if existing_policy_holder:
                 policy_holder = existing_policy_holder[0]
-                # Auto-fill policy holder information
                 policy_holder_name = policy_holder.get('name', '')
             else:
                 policy_holder_name = request.form.get('namaPemegang', '')
         else:
             policy_holder_name = request.form.get('namaPemegang', '')
         
-        # Calculate age from birth date
+        # Age calculation
         age = None
         dob = request.form.get('tanggalLahir', '')
         if dob:
@@ -212,49 +244,14 @@ def signup():
             except:
                 pass
         
-        # Map gender
+        # Mappings
         gender_map = {'laki-laki': 'Male', 'perempuan': 'Female'}
         gender = gender_map.get(request.form.get('jenisKelamin', ''), '')
         
-        # Map marital status
         marital_map = {'menikah': 'Married', 'belum-menikah': 'Single', 'cerai': 'Divorced', 'janda-duda': 'Widowed'}
         marital_status = marital_map.get(request.form.get('statusPernikahan', ''), '')
         
-        # Process document uploads
-        registration_docs = []
-        file_mappings = {
-            'insurance_card': ('insurance_card', 'registration/insurance_card/'),
-            'id_card': ('id_card', 'registration/id_card/')
-        }
-        
-        for form_field, (doc_type, blob_path) in file_mappings.items():
-            if form_field in request.files:
-                file = request.files[form_field]
-                if file.filename:
-                    # Validate file
-                    is_valid, message = validate_file(file)
-                    if not is_valid:
-                        return jsonify({'error': f'{form_field}: {message}'}), 400
-                    
-                    doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                    blob_name = f"{blob_path}{doc_id}_{file.filename}"
-                    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                    content_type = get_content_type(file)
-                    blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
-                    
-                    doc_data = {
-                        "id": doc_id,
-                        "doc_id": doc_id,
-                        "customer_id": customer_id,
-                        "doc_type": doc_type,
-                        "doc_blob_address": blob_name,
-                        "upload_date": datetime.now().isoformat(),
-                        # "doc_content": 
-                    }
-                    database.get_container_client("document").create_item(doc_data)
-                    registration_docs.append(doc_id)
-        
-        # Create customer record
+        # Customer data
         customer_data = {
             "id": customer_id,
             "customer_id": customer_id,
@@ -281,10 +278,9 @@ def signup():
             "premium_plan": request.form.get('premiumPlan', '')
         }
         
-        # Save to database
         database.get_container_client("customer").create_item(customer_data)
         
-        # Update document records with customer_id
+        # Update documents with customer_id
         for doc_id in request.form.getlist('document_ids'):
             try:
                 doc_data = cosmos_retrive_data(
@@ -299,13 +295,10 @@ def signup():
             except Exception as e:
                 print(f"Error updating document {doc_id}: {e}")
         
-        # Handle policy record for non-policy holders
+        # Handle policy for non-policy holders
         is_policy_holder = request.form.get('isPemegangPolis') == 'true'
-        print(f"Is policy holder: {is_policy_holder}")
         
         if not is_policy_holder:
-            print(f"Adding insured person to policy {policy_id}")
-            # Check if policy record exists
             existing_policy = cosmos_retrive_data(
                 "SELECT * FROM c WHERE c.policy_id = @policyId",
                 "policy",
@@ -313,8 +306,6 @@ def signup():
             )
             
             if existing_policy:
-                print("Found existing policy, updating insured list")
-                # Update existing policy with new insured person
                 policy_record = existing_policy[0]
                 if 'insured' not in policy_record:
                     policy_record['insured'] = []
@@ -326,12 +317,9 @@ def signup():
                     "added_date": datetime.now().isoformat()
                 }
                 policy_record['insured'].append(insured_info)
-                print(f"Updated policy with insured: {insured_info}")
                 database.get_container_client("policy").upsert_item(policy_record)
-            else:
-                print("No existing policy found, this shouldn't happen for non-policy holders")
         
-        # Store user data in session
+        # Session
         session['customer_id'] = customer_id
         session['email'] = email
         session['role'] = 'customer'
@@ -357,16 +345,13 @@ def signup():
 
 @app.route('/api/signin', methods=['POST'])
 def signin():
-    """User login"""
     data = request.json
     email = data.get('email', '')
     password = data.get('password', '')
 
     if not email or not password:
-        print(f"Signin attempt for email: {email}")
         return jsonify({'error': 'Email and password are required'}), 400
 
-    # Check user credentials
     user = cosmos_retrive_data(
         "SELECT * FROM c WHERE c.email = @Email",
         "customer",
@@ -379,10 +364,8 @@ def signin():
     if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
         return jsonify({'error': 'Invalid email or password'}), 401
 
-    # Set default role if not present
     user_role = user.get('role', 'customer')
     
-    # Store user data in session
     session['customer_id'] = user['customer_id']
     session['email'] = email
     session['role'] = user_role
@@ -390,7 +373,6 @@ def signin():
     session['login_time'] = datetime.now().isoformat()
     session.permanent = True
 
-    print("-"*10,"User session data:", session)
     return jsonify({
         'status': 'success',
         'message': 'Login successful',
@@ -402,11 +384,202 @@ def signin():
         }
     })
 
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    session.clear()
+    session.permanent = False
+    return jsonify({'status': 'success', 'message': 'Logged out successfully'})
+
+@app.route('/api/session-status', methods=['GET'])
+def session_status():
+    if ('customer_id' in session or 'admin_id' in session) and not check_session_expired():
+        return jsonify({
+            'status': 'authenticated',
+            'user': {
+                'id': session.get('customer_id') or session.get('admin_id'),
+                'customer_id': session.get('customer_id'),
+                'admin_id': session.get('admin_id'),
+                'email': session.get('email'),
+                'role': session.get('role'),
+                'name': session.get('name')
+            }
+        })
+    else:
+        return jsonify({'status': 'not_authenticated'}), 401
+
+# =============================================================================
+# MICROSOFT AUTH ROUTES
+# =============================================================================
+@app.route('/api/auth/microsoft', methods=['GET'])
+def microsoft_auth():
+    state = str(uuid.uuid4())
+    session['oauth_state'] = state
+    
+    params = {
+        'client_id': AZURE_CLIENT_ID,
+        'response_type': 'code',
+        'redirect_uri': AZURE_REDIRECT_URI,
+        'response_mode': 'query',
+        'scope': 'openid profile email User.Read',
+        'state': state
+    }
+    
+    auth_url = f"{AUTHORIZE_URL}?{urlencode(params)}"
+    return redirect(auth_url)
+
+@app.route('/api/auth/microsoft/callback', methods=['GET'])
+def microsoft_callback():
+    try:
+        error = request.args.get('error')
+        if error:
+            error_desc = request.args.get('error_description', 'Unknown error')
+            print("OAuth authentication failed")
+            return redirect(f'/signin?error={error}')
+        
+        if request.args.get('state') != session.get('oauth_state'):
+            return redirect('/signin?error=invalid_state')
+        
+        code = request.args.get('code')
+        if not code:
+            return redirect('/signin?error=no_code')
+        
+        token_data = {
+            'client_id': AZURE_CLIENT_ID,
+            'client_secret': AZURE_CLIENT_SECRET,
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': AZURE_REDIRECT_URI,
+            'scope': 'openid profile email User.Read'
+        }
+        
+        token_response = requests.post(TOKEN_URL, data=token_data)
+        
+        if token_response.status_code != 200:
+            return redirect('/signin?error=token_request_failed')
+            
+        token_json = token_response.json()
+        
+        if 'access_token' not in token_json:
+            return redirect('/signin?error=token_failed')
+        
+        headers = {'Authorization': f"Bearer {token_json['access_token']}"}
+        user_response = requests.get(USER_INFO_URL, headers=headers)
+        user_data = user_response.json()
+        
+        email = user_data.get('mail') or user_data.get('userPrincipalName')
+        if not email:
+            return redirect('/signin?error=no_email')
+        
+        admin_user = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.email = @email",
+            "insurance_admin",
+            [{"name": "@email", "value": email}]
+        )
+        
+        if not admin_user:
+            return redirect('/signin?error=user_not_found')
+        
+        admin = admin_user[0]
+        
+        session['customer_id'] = admin.get('admin_id', admin.get('id'))
+        session['email'] = admin['email']
+        session['role'] = 'approver'
+        session['name'] = admin['name']
+        session['admin_id'] = admin.get('admin_id', admin.get('id'))
+        session['login_time'] = datetime.now().isoformat()
+        session.permanent = True
+        
+        return redirect('/signin')
+        
+    except Exception as e:
+        print(f"Microsoft auth error: {e}")
+        return redirect('/signin?error=auth_failed')
+
+# =============================================================================
+# DOCUMENT ROUTES
+# =============================================================================
+@app.route('/api/extract-registration-info', methods=['POST'])
+def extract_registration_info():
+    try:
+        extracted_data = {}
+        uploaded_doc_ids = []
+        
+        if 'insurance_card' in request.files:
+            file = request.files['insurance_card']
+            if file.filename:
+                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
+                blob_name = f"registration/insurance_card/{doc_id}_{file.filename}"
+                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+                content_type = get_content_type(file)
+                blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
+                
+                insurance_data = analize_doc_registration(blob_name, "insuranceCard")
+                if insurance_data and not insurance_data.get('error'):
+                    extracted_data.update({
+                        'policy_number': insurance_data.get('No. Polis', ''),
+                        'participant_number': insurance_data.get('No. Peserta', ''),
+                        'card_number': insurance_data.get('No. Kartu', '')
+                    })
+                
+                doc_data = {
+                    "id": doc_id,
+                    "doc_id": doc_id,
+                    "doc_type": "insurance_card",
+                    "doc_blob_address": blob_name,
+                    "upload_date": datetime.now().isoformat(),
+                    "doc_contents": insurance_data or {}
+                }
+                database.get_container_client("document").create_item(doc_data)
+                uploaded_doc_ids.append(doc_id)
+        
+        if 'id_card' in request.files:
+            file = request.files['id_card']
+            if file.filename:
+                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
+                blob_name = f"registration/id_card/{doc_id}_{file.filename}"
+                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+                content_type = get_content_type(file)
+                blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
+                
+                id_data = analize_doc_registration(blob_name, "idCard")
+                if id_data:
+                    extracted_data.update({
+                        'nik': id_data.get('NIK', ''),
+                        'full_name': id_data.get('Nama', ''),
+                        'birth_date': id_data.get('Tempat/Tgl Lahir', ''),
+                        'gender': id_data.get('Jenis Kelamin', ''),
+                        'address': id_data.get('Alamat', ''),
+                        'rt_rw': id_data.get('RT/RW', ''),
+                        'kelurahan': id_data.get('Kel/Desa', ''),
+                        'kecamatan': id_data.get('Kecamatan', ''),
+                        'marital_status': id_data.get('Status Perkawinan', ''),
+                        'occupation': id_data.get('Pekerjaan', '')
+                    })
+                
+                doc_data = {
+                    "id": doc_id,
+                    "doc_id": doc_id,
+                    "doc_type": "id_card",
+                    "doc_blob_address": blob_name,
+                    "upload_date": datetime.now().isoformat(),
+                    "doc_contents": id_data or {}
+                }
+                database.get_container_client("document").create_item(doc_data)
+                uploaded_doc_ids.append(doc_id)
+        
+        return jsonify({
+            'status': 'success',
+            'data': extracted_data,
+            'document_ids': uploaded_doc_ids
+        })
+    
+    except Exception as e:
+        print(f"Error in document extraction: {e}")
+        return jsonify({'error': 'Document processing failed'}), 500
+
 @app.route('/api/documents/<doc_id>/download', methods=['GET'])
 def download_document(doc_id):
-    """Generate secure download URL for document"""
     try:
-        # Get document metadata
         doc_data = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.doc_id = @docId",
             "document",
@@ -422,10 +595,6 @@ def download_document(doc_id):
         if not blob_address:
             return jsonify({'error': 'Document file not found'}), 404
         
-        # Generate SAS URL for secure download
-        from azure.storage.blob import generate_blob_sas, BlobSasPermissions
-        from datetime import datetime, timedelta, timezone
-        
         account_name = blob_service_client.account_name
         account_key = blob_service_client.credential.account_key
         
@@ -435,7 +604,7 @@ def download_document(doc_id):
             blob_name=blob_address,
             account_key=account_key,
             permission=BlobSasPermissions(read=True),
-            expiry=datetime.now(timezone.utc) + timedelta(minutes=15)  # 15-minute expiry
+            expiry=datetime.now(timezone.utc) + timedelta(minutes=15)
         )
         
         download_url = f"https://{account_name}.blob.core.windows.net/{container_name}/{blob_address}?{sas_token}"
@@ -444,43 +613,177 @@ def download_document(doc_id):
             'status': 'success',
             'download_url': download_url,
             'filename': doc.get('doc_type', 'document') + '.pdf',
-            'expires_in': 900  # 15 minutes in seconds
+            'expires_in': 900
         })
         
     except Exception as e:
         print(f"Error generating download URL: {e}")
         return jsonify({'error': 'Failed to generate download URL'}), 500
 
+@app.route('/api/documents/<doc_id>', methods=['GET'])
+def get_document_metadata(doc_id):
+    try:
+        query = f"SELECT * FROM c WHERE c.doc_id = @docId"
+        items = cosmos_retrive_data(query, "document",[{"name": "@docId", "value": doc_id}])
+        if not items:
+            return jsonify({"error": "Document not found"}), 404
+        document = items[0]
+        blob_path = document['doc_blob_address']
+        document_url = get_sas_url(blob_path)
+        document['doc_url'] = document_url
+        return jsonify(document)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-def safe_fetch_documents(claim_documents):
-    """Safely fetch documents with download URLs"""
-    documents = []
-    if not claim_documents:
-        return documents
-    
-    for doc_id in claim_documents:
+# =============================================================================
+# CLAIM ROUTES
+# =============================================================================
+@app.route('/api/submit-claim', methods=['POST'])
+def submit_claim():
+    try:
+        if 'customer_id' not in session or check_session_expired():
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        is_edit = request.form.get('isEdit') == 'true'
+        existing_claim_id = request.form.get('claimId') if is_edit else None
+        
+        claim_type = request.form.get('claimType')
+        claim_amount = request.form.get('claimAmount')
+        currency = request.form.get('currency')
+        customer_id = session['customer_id']
+        policy_id = request.form.get('policyId')
+        date_checkin = request.form.get('treatmentStartDate')
+        date_checkout = request.form.get('treatmentEndDate')
+        insurance_company = request.form.get('insuranceCompany')
+        
         try:
-            doc_data = cosmos_retrive_data(
-                "SELECT * FROM c WHERE c.doc_id = @docId", 
-                "document", 
-                [{"name": "@docId", "value": doc_id}]
+            claim_amount_float = float(claim_amount) if claim_amount else 0
+            if claim_amount_float <= 0:
+                return jsonify({'error': 'Invalid claim amount'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid claim amount format'}), 400
+        
+        customer_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId", 
+            "customer", 
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        is_valid, message = validate_customer_data(request.form, customer_data)
+        if not is_valid:
+            return jsonify({'error': message}), 400
+        
+        if is_edit:
+            claim_data = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.claim_id = @claimId",
+                "claim",
+                [{"name": "@claimId", "value": existing_claim_id}]
             )
-            if doc_data:
-                doc = doc_data[0]
-                # Add download URL reference
-                doc['download_url'] = f"/api/documents/{doc_id}/download"
-                documents.append(doc)
-            else:
-                print(f"Document {doc_id} not found in database")
-        except Exception as e:
-            print(f"Error fetching document {doc_id}: {e}")
-            continue
+            if not claim_data or claim_data[0]['claim_status'] != 'Rejected':
+                return jsonify({'error': 'Can only edit rejected claims'}), 400
+            
+            claim = claim_data[0]
+            claim_id = existing_claim_id
+            uploaded_docs = claim.get('documents', [])
+        else:
+            claim_id = f"C{uuid.uuid4().hex[:8].upper()}"
+            uploaded_docs = []
+        
+        file_mappings = {
+            'hospitalInvoice': ('invoice', 'Input_document/invoice/'),
+            'doctorForm': ('doctor form', 'Input_document/Docform/'),
+            'reportLab': ('report lab', 'Input_document/lab_results/'),
+            'additionalDoc': ('additional doc', 'Input_document/additional_docs/')
+        }
+        
+        for form_field, (doc_type, blob_path) in file_mappings.items():
+            if form_field in request.files:
+                file = request.files[form_field]
+                if file.filename:
+                    is_valid, message = validate_file(file)
+                    if not is_valid:
+                        return jsonify({'error': f'{form_field}: {message}'}), 400
+                    
+                    doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
+                    blob_name = f"{blob_path}{doc_id}_{file.filename}"
+                    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+                    content_type = get_content_type(file)
+                    blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
+                    doc_data = {
+                        "id": doc_id,
+                        "doc_id": doc_id,
+                        "claim_id": claim_id,
+                        "doc_type": doc_type,
+                        "doc_blob_address": blob_name,
+                        "upload_date": datetime.now().isoformat()
+                    }
+                    database.get_container_client("document").create_item(doc_data)
+                    uploaded_docs.append(doc_id)
+        
+        claim_data = {
+            "id": claim_id,
+            "claim_id": claim_id,
+            "customer_id": customer_data[0]['customer_id'],
+            "name": customer_data[0]['name'],
+            "policy_id": customer_data[0]['policy_id'], 
+            "claim_type": claim_type,
+            "claim_amount": claim_amount_float,
+            "currency": currency, 
+            "claim_date": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "claim_status": "Proses",
+            "documents": uploaded_docs,
+            "insurance_company": insurance_company,
+            "date_checkin": date_checkin,
+            "date_checkout": date_checkout,
+            "resubmitted": is_edit
+        }
+        
+        database.get_container_client("claim").upsert_item(claim_data)
+        run_analysis_async(customer_id, claim_id)
+        
+        return jsonify({
+            'status': 'success', 
+            'message': 'Claim updated successfully' if is_edit else 'Claim submitted successfully',
+            'claim_id': claim_id,
+            'documents_uploaded': len(uploaded_docs)
+        })
     
-    return documents
+    except Exception as e:
+        print(f"Error submitting claim: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/analyze-claim', methods=['POST'])
+def analyze_claim():
+    try:
+        data = request.json
+        customer_id = data.get('customer_id')
+        claim_id = data.get('claim_id')
+        
+        if not customer_id or not claim_id:
+            return jsonify({'error': 'customer_id and claim_id required'}), 400
+        
+        run_analysis_async(customer_id, claim_id)
+        
+        return jsonify({'status': 'success', 'message': 'Analysis started'})
+    
+    except Exception as e:
+        print(f"Error in analyze_claim: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/claims', methods=['GET'])
+def get_all_claims():
+    try:
+        claims = list(database.get_container_client("claim").query_items(
+            query="SELECT * FROM c",
+            enable_cross_partition_query=True
+        ))
+        return claims
+    except Exception as e:
+        print(f"Error retrieving claims: {e}", file=sys.stderr)
+        return []
 
 @app.route('/api/claims/all-detailed', methods=['GET'])
 def get_all_claims_detailed():
-    """Get all claims with customer details for approvers"""
     try:
         claims = cosmos_retrive_data(
             "SELECT * FROM c ORDER BY c._ts DESC", 
@@ -494,7 +797,6 @@ def get_all_claims_detailed():
                 'claims': []
             })
         
-        # Enrich each claim
         for claim in claims:
             claim['customer_details'] = claim.get('customer_id')
             claim['document_details'] = safe_fetch_documents(claim.get('documents', []))
@@ -510,7 +812,6 @@ def get_all_claims_detailed():
 
 @app.route('/api/claims/<claim_id>', methods=['GET'])
 def get_claim_details(claim_id):
-    """Get claim details for editing"""
     try:
         claim_data = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.claim_id = @claimId",
@@ -550,18 +851,17 @@ def update_claim_status(claim_id):
 
         claim = claim_data[0]
         
-        # Check if already processed and not resubmitted
         if claim.get('claim_status') in ['Approved', 'Rejected'] and not claim.get('resubmitted'):
             return jsonify({'error': 'Claim already processed'}), 400
         
         claim['claim_status'] = status
         claim['admin_id'] = admin_id
-        if notes == "" :
+        if notes == "":
             claim['admin_notes'] = claim["AI_reasoning"]
-        else :
+        else:
             claim['admin_notes'] = notes
         claim['processed_date'] = datetime.now().isoformat()
-        claim['resubmitted'] = False  # Reset resubmission flag
+        claim['resubmitted'] = False
         claim['approved_by'] = admin_id
         claim['approved_date'] = datetime.now().isoformat()
         updated_claim = database.get_container_client("claim").upsert_item(claim)
@@ -577,11 +877,52 @@ def update_claim_status(claim_id):
         print(f"Error updating claim status: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/update-claim', methods=['POST'])
+def update_claim():
+    try:
+        data = request.json
+        claim_id = data.get('claim_id')
+        status = data.get('status')
+        admin_id = data.get('admin_id')
+        notes = data.get('notes', '')
+
+        if not claim_id or not status or not admin_id:
+            return jsonify({'error': 'claim_id, status, and admin_id required'}), 400
+
+        claim_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.claim_id = @claimId",
+            "claim",
+            [{"name": "@claimId", "value": claim_id}]
+        )
+        if not claim_data:
+            return jsonify({'error': 'Claim not found'}), 404
+
+        claim = claim_data[0]
+        claim['claim_status'] = status
+        claim['admin_id'] = admin_id
+        claim['admin_notes'] = notes
+        claim['processed_date'] = datetime.now().isoformat()
+        
+        if status == 'Rejected':
+            claim['rejected_by'] = admin_id
+            claim['rejected_date'] = datetime.now().isoformat()
+        elif status == 'Approved':
+            claim['approved_by'] = admin_id
+            claim['approved_date'] = datetime.now().isoformat()
+
+        updated_claim = database.get_container_client("claim").upsert_item(claim)
+        return jsonify({'status': 'success', 'claim': updated_claim})
+
+    except Exception as e:
+        print(f"Error updating claim: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+# =============================================================================
+# CUSTOMER ROUTES
+# =============================================================================
 @app.route('/api/customer/<customer_id>/claims-detailed', methods=['GET'])
 def get_customer_claims_detailed(customer_id):
-    """Get detailed claims for a specific customer with documents"""
     try:
-        # Check if user is logged in
         if 'customer_id' not in session or check_session_expired():
             return jsonify({'error': 'Authentication required'}), 401
         
@@ -609,29 +950,9 @@ def get_customer_claims_detailed(customer_id):
         print(f"Error in get_customer_claims_detailed: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-def validate_customer_data(form_data, customer_data):
-    """Validate form data against database customer record"""
-    if not customer_data:
-        return False, "Customer not found in database"
-    
-    customer = customer_data[0]
-    form_customer_id = form_data.get('customerId')
-    form_policy_id = form_data.get('policyId')
-    
-    if customer['customer_id'] != form_customer_id:
-        return False, "Customer ID mismatch"
-    
-    if customer['policy_id'] != form_policy_id:
-        return False, "Policy ID mismatch"
-    
-    return True, "Valid customer"
-
-
 @app.route('/api/customer-claim-history/<customer_id>', methods=['GET'])
 def get_customer_claim_history(customer_id):
-    """Get claim history for a specific customer with hospital names from invoices"""
     try:
-        print (f"Session data: {session}")
         if 'customer_id' not in session or check_session_expired():
             return jsonify({'error': 'Authentication required'}), 401
         
@@ -639,7 +960,6 @@ def get_customer_claim_history(customer_id):
         if user_role != 'customer':
             return jsonify({'error': 'Access forbidden: Customers only'}), 403
         
-        # Verify customer can only access their own data
         session_customer_id = session['customer_id']
         if customer_id != session_customer_id:
             return jsonify({'error': 'Access forbidden: Can only access own data'}), 403
@@ -685,214 +1005,11 @@ def get_customer_claim_history(customer_id):
         print(f"Error in get_customer_claim_history: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/api/submit-claim', methods=['POST'])
-def submit_claim():
-    """Submit or update claim form with file uploads"""
-    try:
-        # Check if user is logged in
-        if 'customer_id' not in session or check_session_expired():
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        # Check if this is an edit
-        is_edit = request.form.get('isEdit') == 'true'
-        existing_claim_id = request.form.get('claimId') if is_edit else None
-        
-        # Get form data
-        claim_type = request.form.get('claimType')
-        claim_amount = request.form.get('claimAmount')
-        currency = request.form.get('currency')
-        customer_id = request.form.get('customerId')
-
-        # Get customer_id from session
-        customer_id = session['customer_id']
-
-        policy_id = request.form.get('policyId')
-        date_checkin = request.form.get('treatmentStartDate')
-        date_checkout = request.form.get('treatmentEndDate')
-        insurance_company = request.form.get('insuranceCompany')
-        
-        # Validate claim amount
-        try:
-            claim_amount_float = float(claim_amount) if claim_amount else 0
-            if claim_amount_float <= 0:
-                return jsonify({'error': 'Invalid claim amount'}), 400
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid claim amount format'}), 400
-        
-        # Get customer data
-        customer_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.customer_id = @customerId", 
-            "customer", 
-            [{"name": "@customerId", "value": customer_id}]
-        )
-        
-        is_valid, message = validate_customer_data(request.form, customer_data)
-        if not is_valid:
-            return jsonify({'error': message}), 400
-        
-        if is_edit:
-            # Get existing claim
-            claim_data = cosmos_retrive_data(
-                "SELECT * FROM c WHERE c.claim_id = @claimId",
-                "claim",
-                [{"name": "@claimId", "value": existing_claim_id}]
-            )
-            if not claim_data or claim_data[0]['claim_status'] != 'Rejected':
-                return jsonify({'error': 'Can only edit rejected claims'}), 400
-            
-            claim = claim_data[0]
-            claim_id = existing_claim_id
-            uploaded_docs = claim.get('documents', [])
-        else:
-            claim_id = f"C{uuid.uuid4().hex[:8].upper()}"
-            uploaded_docs = []
-        
-        # Process file uploads with validation
-        file_mappings = {
-            'hospitalInvoice': ('invoice', 'Input_document/invoice/'),
-            'doctorForm': ('doctor form', 'Input_document/Docform/'),
-            'reportLab': ('report lab', 'Input_document/lab_results/'),
-            'additionalDoc': ('additional doc', 'Input_document/additional_docs/')
-        }
-        
-        for form_field, (doc_type, blob_path) in file_mappings.items():
-            if form_field in request.files:
-                file = request.files[form_field]
-                if file.filename:
-                    # Validate file
-                    is_valid, message = validate_file(file)
-                    if not is_valid:
-                        return jsonify({'error': f'{form_field}: {message}'}), 400
-                    
-                    doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                    blob_name = f"{blob_path}{doc_id}_{file.filename}"
-                    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                    content_type = get_content_type(file)
-                    blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
-                    doc_data = {
-                        "id": doc_id,
-                        "doc_id": doc_id,
-                        "claim_id": claim_id,
-                        "doc_type": doc_type,
-                        "doc_blob_address": blob_name,
-                        "upload_date": datetime.now().isoformat()
-                    }
-                    database.get_container_client("document").create_item(doc_data)
-                    uploaded_docs.append(doc_id)
-        
-        # Save or update claim
-        claim_data = {
-            "id": claim_id,
-            "claim_id": claim_id,
-            "customer_id": customer_data[0]['customer_id'],
-            "name": customer_data[0]['name'],
-            "policy_id": customer_data[0]['policy_id'], 
-            "claim_type": claim_type,
-            "claim_amount": claim_amount_float,
-            "currency": currency, 
-            "claim_date": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-            "claim_status": "Proses",
-            "documents": uploaded_docs,
-            "insurance_company": insurance_company,
-            "date_checkin": date_checkin,
-            "date_checkout": date_checkout,
-            "resubmitted": is_edit  # Mark as resubmitted if editing
-        }
-        
-        database.get_container_client("claim").upsert_item(claim_data)
-        run_analysis_async(customer_id, claim_id)
-        
-        return jsonify({
-            'status': 'success', 
-            'message': 'Claim updated successfully' if is_edit else 'Claim submitted successfully',
-            'claim_id': claim_id,
-            'documents_uploaded': len(uploaded_docs)
-        })
-    
-    except Exception as e:
-        print(f"Error submitting claim: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-import json
-
-@app.route('/api/chatbot', methods=['POST'])
-def chatbot_api():
-    """Chatbot endpoint for insurance claim officer"""
-    try:
-        data = request.json
-        user_message = data.get('message')
-        if not user_message:
-            return jsonify({'error': 'Message is required'}), 400
-
-        # Ensure user_message is a valid string
-        user_message = str(user_message)    
-        # Ensure that the message is in the correct format
-        formatted_input = {
-            "messages": [{"role": "user", "content": user_message}]
-        }
-
-        try:
-            response = ''
-            for chunk in agent.stream(input=formatted_input, config=config, stream_mode="values"):
-                response = chunk   # i just want the AI Final answer
-            response = response['messages'][-1].content  
-            response = str(response)
-            return jsonify({'response': response})
-        except Exception as agent_error:
-            print(f"Agent error: {agent_error}")
-            return jsonify({'response': 'Maaf, chatbot sedang mengalami gangguan. Silakan coba lagi nanti.'}), 500
-
-    except Exception as e:
-        print(f"Error in chatbot: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-
-
-
-@app.route('/api/update-claim', methods=['POST'])
-def update_claim():
-    """Update claim details"""
-    try:
-        data = request.json
-        claim_id = data.get('claim_id')
-        status = data.get('status')
-        admin_id = data.get('admin_id')
-        notes = data.get('notes', '')
-
-        if not claim_id or not status or not admin_id:
-            return jsonify({'error': 'claim_id, status, and admin_id required'}), 400
-
-        claim_data = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.claim_id = @claimId",
-            "claim",
-            [{"name": "@claimId", "value": claim_id}]
-        )
-        if not claim_data:
-            return jsonify({'error': 'Claim not found'}), 404
-
-        claim = claim_data[0]
-        claim['claim_status'] = status
-        claim['admin_id'] = admin_id
-        claim['admin_notes'] = notes
-        claim['processed_date'] = datetime.now().isoformat()
-        
-        if status == 'Rejected':
-            claim['rejected_by'] = admin_id
-            claim['rejected_date'] = datetime.now().isoformat()
-        elif status == 'Approved':
-            claim['approved_by'] = admin_id
-            claim['approved_date'] = datetime.now().isoformat()
-
-        updated_claim = database.get_container_client("claim").upsert_item(claim)
-        return jsonify({'status': 'success', 'claim': updated_claim})
-
-    except Exception as e:
-        print(f"Error updating claim: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
+# =============================================================================
+# VALIDATION ROUTES
+# =============================================================================
 @app.route('/api/validate-participant', methods=['POST'])
 def validate_participant():
-    """Validate participant number and return policy holder info if exists"""
     try:
         data = request.json
         participant_no = data.get('nomorPeserta')
@@ -901,7 +1018,6 @@ def validate_participant():
         if not participant_no:
             return jsonify({'valid': True})
         
-        # Check for duplicate participant number
         existing_participant = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.customer_no = @participantNo",
             "customer",
@@ -911,7 +1027,6 @@ def validate_participant():
         if existing_participant:
             return jsonify({'valid': False, 'error': 'Participant number already exists', 'field': 'nomorPeserta'}), 400
         
-        # If policy_id provided, check for existing policy holder
         policy_holder_info = {}
         if policy_id:
             existing_policy_holder = cosmos_retrive_data(
@@ -937,242 +1052,45 @@ def validate_participant():
         print(f"Error in validate_participant: {e}")
         return jsonify({'error': 'Validation failed'}), 500
 
-@app.route('/api/extract-registration-info', methods=['POST'])
-def extract_registration_info():
-    """Extract information from uploaded documents for registration"""
+# =============================================================================
+# CHATBOT
+# =============================================================================
+@app.route('/api/chatbot', methods=['POST'])
+def chatbot_api():
     try:
-        extracted_data = {}
-        uploaded_doc_ids = []
-        
-        # Process insurance card - upload
-        if 'insurance_card' in request.files:
-            file = request.files['insurance_card']
-            if file.filename:
-                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"registration/insurance_card/{doc_id}_{file.filename}"
-                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                content_type = get_content_type(file)
-                blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
-                
-                # Extract insurance card data
-                insurance_data = analize_doc_registration(blob_name, "insuranceCard")
-                if insurance_data and not insurance_data.get('error'):
-                    extracted_data.update({
-                        'policy_number': insurance_data.get('No. Polis', ''),
-                        'participant_number': insurance_data.get('No. Peserta', ''),
-                        'card_number': insurance_data.get('No. Kartu', '')
-                    })
-                
-                # Create document record with extracted content
-                doc_data = {
-                    "id": doc_id,
-                    "doc_id": doc_id,
-                    "doc_type": "insurance_card",
-                    "doc_blob_address": blob_name,
-                    "upload_date": datetime.now().isoformat(),
-                    "doc_contents": insurance_data or {}
-                }
-                database.get_container_client("document").create_item(doc_data)
-                uploaded_doc_ids.append(doc_id)
-        
-        # Process ID card with Azure Document Intelligence
-        if 'id_card' in request.files:
-            file = request.files['id_card']
-            if file.filename:
-                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"registration/id_card/{doc_id}_{file.filename}"
-                blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                content_type = get_content_type(file)
-                blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
-                
-                # Extract using Azure Document Intelligence with fallback
-                id_data = analize_doc_registration(blob_name, "idCard")
-                if id_data:
-                    extracted_data.update({
-                        'nik': id_data.get('NIK', ''),
-                        'full_name': id_data.get('Nama', ''),
-                        'birth_date': id_data.get('Tempat/Tgl Lahir', ''),
-                        'gender': id_data.get('Jenis Kelamin', ''),
-                        'address': id_data.get('Alamat', ''),
-                        'rt_rw': id_data.get('RT/RW', ''),
-                        'kelurahan': id_data.get('Kel/Desa', ''),
-                        'kecamatan': id_data.get('Kecamatan', ''),
-                        'marital_status': id_data.get('Status Perkawinan', ''),
-                        'occupation': id_data.get('Pekerjaan', '')
-                    })
-                
-                # Create document record with extracted content
-                doc_data = {
-                    "id": doc_id,
-                    "doc_id": doc_id,
-                    "doc_type": "id_card",
-                    "doc_blob_address": blob_name,
-                    "upload_date": datetime.now().isoformat(),
-                    "doc_contents": id_data or {}
-                }
-                database.get_container_client("document").create_item(doc_data)
-                uploaded_doc_ids.append(doc_id)
-        
-        return jsonify({
-            'status': 'success',
-            'data': extracted_data,
-            'document_ids': uploaded_doc_ids
-        })
-    
+        data = request.json
+        user_message = data.get('message')
+        if not user_message:
+            return jsonify({'error': 'Message is required'}), 400
+
+        user_message = str(user_message)    
+        formatted_input = {
+            "messages": [{"role": "user", "content": user_message}]
+        }
+
+        try:
+            response = ''
+            for chunk in agent.stream(input=formatted_input, config=config, stream_mode="values"):
+                response = chunk
+            response = response['messages'][-1].content  
+            response = str(response)
+            return jsonify({'response': response})
+        except Exception as agent_error:
+            print(f"Agent error: {agent_error}")
+            return jsonify({'response': 'Maaf, chatbot sedang mengalami gangguan. Silakan coba lagi nanti.'}), 500
+
     except Exception as e:
-        print(f"Error in document extraction: {e}")
-        return jsonify({'error': 'Document processing failed'}), 500
+        print(f"Error in chatbot: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
     return jsonify({'status': 'healthy'})
 
-@app.route('/api/documents/<doc_id>', methods=['GET'])
-def get_document_metadata(doc_id):
-    try:
-        # Query Cosmos DB for document metadata
-        query = f"SELECT * FROM c WHERE c.doc_id = @docId"
-        items = cosmos_retrive_data(query, "document",[{"name": "@docId", "value": doc_id}])
-        if not items:
-            return jsonify({"error": "Document not found"}), 404
-        document = items[0]
-        # Construct the full URL for the document
-        blob_path = document['doc_blob_address']
-        document_url = get_sas_url(blob_path)
-        # Add the document URL to the response
-        document['doc_url'] = document_url
-        return jsonify(document)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/session-status', methods=['GET'])
-def session_status():
-    """Check session status"""
-    if ('customer_id' in session or 'admin_id' in session) and not check_session_expired():
-        return jsonify({
-            'status': 'authenticated',
-            'user': {
-                'id': session.get('customer_id') or session.get('admin_id'),
-                'customer_id': session.get('customer_id'),
-                'admin_id': session.get('admin_id'),
-                'email': session.get('email'),
-                'role': session.get('role'),
-                'name': session.get('name')
-            }
-        })
-    else:
-        print("Session not authenticated or expired")
-        return jsonify({'status': 'not_authenticated'}), 401
-
-@app.route('/api/logout', methods=['POST'])
-def logout():
-    """User logout"""
-    session.clear()
-    session.permanent = False
-    return jsonify({'status': 'success', 'message': 'Logged out successfully'})
-
-
-@app.route('/api/auth/microsoft', methods=['GET'])
-def microsoft_auth():
-    """Redirect to Microsoft Entra ID for authentication"""
-    state = str(uuid.uuid4())
-    session['oauth_state'] = state
-    
-    params = {
-        'client_id': AZURE_CLIENT_ID,
-        'response_type': 'code',
-        'redirect_uri': AZURE_REDIRECT_URI,
-        'response_mode': 'query',
-        'scope': 'openid profile email User.Read',
-        'state': state
-    }
-    
-    auth_url = f"{AUTHORIZE_URL}?{urlencode(params)}"
-    return redirect(auth_url)
-
-@app.route('/api/auth/microsoft/callback', methods=['GET'])
-def microsoft_callback():
-    """Handle Microsoft Entra ID callback"""
-    try:
-        # Debug: Print all query parameters
-        # Check for error in callback
-        error = request.args.get('error')
-        if error:
-            error_desc = request.args.get('error_description', 'Unknown error')
-            print(f"OAuth error: {error} - {error_desc}")
-            return redirect(f'http://localhost:5173/signin?error={error}')
-        
-        # Verify state parameter
-        if request.args.get('state') != session.get('oauth_state'):
-            return redirect('http://localhost:5173/signin?error=invalid_state')
-        
-        # Get authorization code
-        code = request.args.get('code')
-        if not code:
-            print("No authorization code received")
-            return redirect('http://localhost:5173/signin?error=no_code')
-        
-        # Exchange code for token
-        token_data = {
-            'client_id': AZURE_CLIENT_ID,
-            'client_secret': AZURE_CLIENT_SECRET,
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': AZURE_REDIRECT_URI,
-            'scope': 'openid profile email User.Read'
-        }
-        
-        token_response = requests.post(TOKEN_URL, data=token_data)
-        
-        if token_response.status_code != 200:
-            return redirect('http://localhost:5173/signin?error=token_request_failed')
-            
-        token_json = token_response.json()
-        
-        if 'access_token' not in token_json:
-            error_desc = token_json.get('error_description', 'Unknown error')
-            print(f"Token error: {error_desc}")
-            return redirect('http://localhost:5173/signin?error=token_failed')
-        
-        # Get user info from Microsoft Graph
-        headers = {'Authorization': f"Bearer {token_json['access_token']}"}
-        user_response = requests.get(USER_INFO_URL, headers=headers)
-        user_data = user_response.json()
-        
-        email = user_data.get('mail') or user_data.get('userPrincipalName')
-        if not email:
-            return redirect('http://localhost:5173/signin?error=no_email')
-        
-        # Check if email exists in insurance_admin container
-        admin_user = cosmos_retrive_data(
-            "SELECT * FROM c WHERE c.email = @email",
-            "insurance_admin",
-            [{"name": "@email", "value": email}]
-        )
-        
-        if not admin_user:
-            return redirect('http://localhost:5173/signin?error=user_not_found')
-        
-        admin = admin_user[0]
-        
-        # Set session with insurance_admin data and role as approver
-        session['customer_id'] = admin.get('admin_id', admin.get('id'))
-        session['email'] = admin['email']
-        session['role'] = 'approver'
-        session['name'] = admin['name']
-        session['admin_id'] = admin.get('admin_id', admin.get('id'))
-        session['login_time'] = datetime.now().isoformat()
-        session.permanent = True
-        
-
-        
-        # Redirect to signin page, frontend will check session and handle redirect
-        return redirect('http://localhost:5173/signin')
-        
-    except Exception as e:
-        print(f"Microsoft auth error: {e}")
-        return redirect('http://localhost:5173/signin?error=auth_failed')
-
+# =============================================================================
+# APPLICATION STARTUP
+# =============================================================================
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    host = '127.0.0.1' if os.environ.get('FLASK_ENV') == 'development' else '0.0.0.0'
+    app.run(debug=False, host=host, port=port)

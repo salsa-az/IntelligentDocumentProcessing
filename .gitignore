@@ -13,4 +13,6 @@ idp-venv
 .gitignore
 coba*
 
+__pycache__
+
 token*

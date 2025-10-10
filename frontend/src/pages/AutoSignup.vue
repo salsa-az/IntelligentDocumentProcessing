@@ -517,7 +517,7 @@ export default {
       if (!this.form.nomorPolis) return;
       
       try {
-        const response = await fetch('http://localhost:5000/api/validate-participant', {
+        const response = await fetch('/api/validate-participant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -604,7 +604,7 @@ export default {
         this.processingStatus = step.status;
         }
 
-        const response = await fetch('http://localhost:5000/api/extract-registration-info', {
+        const response = await fetch('/api/extract-registration-info', {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -730,7 +730,7 @@ export default {
       }
       
       try {
-        const response = await fetch('http://localhost:5000/api/validate-participant', {
+        const response = await fetch('/api/validate-participant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -834,7 +834,7 @@ export default {
           formData.append('document_ids', docId);
         });
         
-        const response = await fetch('http://localhost:5000/api/signup', {
+        const response = await fetch('/api/signup', {
           method: 'POST',
           credentials: 'include',
           body: formData

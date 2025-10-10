@@ -370,7 +370,7 @@ export default {
     const fetchClaims = async () => {
       loading.value = true
       try {
-        const response = await fetch(`http://localhost:5000/api/customer-claim-history/${currentUser.value.id}`, {
+        const response = await fetch(`/api/customer-claim-history/${currentUser.value.id}`, {
           credentials: 'include'
         })
         const data = await response.json()
@@ -390,7 +390,7 @@ export default {
 
     const fetchPolicyData = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/customer/${currentUser.value.id}/policy`, {
+        const response = await fetch(`/api/customer/${currentUser.value.id}/policy`, {
           credentials: 'include'
         })
         const data = await response.json()

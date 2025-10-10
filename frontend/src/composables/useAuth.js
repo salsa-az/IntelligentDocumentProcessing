@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { getUserById } from '../utils/dummyUsers.js'
+
 
 // Global reactive state
 const currentUser = ref(null)
@@ -28,7 +28,7 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       // Call backend logout API to clear session
-      await fetch('http://localhost:5000/api/logout', {
+      await fetch('/api/logout', {
         method: 'POST',
         credentials: 'include'
       })
@@ -52,11 +52,14 @@ export const useAuth = () => {
 
   // Refresh user data from storage
   const refreshUser = () => {
-    if (currentUser.value?.id) {
-      const updatedUser = getUserById(currentUser.value.id)
-      if (updatedUser) {
-        currentUser.value = updatedUser
-        localStorage.setItem('user', JSON.stringify(updatedUser))
+    // User data refresh now handled by backend session
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      try {
+        currentUser.value = JSON.parse(storedUser)
+      } catch (error) {
+        console.error('Error parsing stored user:', error)
+        localStorage.removeItem('user')
       }
     }
   }

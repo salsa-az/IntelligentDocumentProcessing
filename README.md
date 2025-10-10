@@ -41,7 +41,7 @@ npm run dev
 ```
 
 ## Access URLs
-- **Frontend**: http://localhost:5174
+- **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:5000
 
 ## Test Credentials

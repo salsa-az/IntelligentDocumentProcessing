@@ -144,13 +144,11 @@ def get_all_claims():
     
 @app.route('/api/signup', methods=['POST'])
 def signup():
-    """Customer signup with JWT authentication"""
+    """Customer signup with document upload support"""
     try:
-        data = request.json
-        
-        # Extract registration data
-        email = data.get('email')
-        password = data.get('password')
+        # Extract registration data from form
+        email = request.form.get('email')
+        password = request.form.get('password')
         
         if not email or not password:
             return jsonify({'error': 'Email and password required'}), 400
@@ -171,9 +169,40 @@ def signup():
         # Generate customer ID
         customer_id = f"CU{uuid.uuid4().hex[:8].upper()}"
         
+        # Check for existing policy and validate participant number
+        policy_id = request.form.get('nomorPolis', '')
+        participant_no = request.form.get('nomorPeserta', '')
+        
+        if policy_id and participant_no:
+            # Check for duplicate participant number
+            existing_participant = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.customer_no = @participantNo",
+                "customer",
+                [{"name": "@participantNo", "value": participant_no}]
+            )
+            
+            if existing_participant:
+                return jsonify({'error': 'Participant number already exists', 'field': 'nomorPeserta'}), 400
+            
+            # Check for existing policy holder
+            existing_policy_holder = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.policy_id = @policyId AND c.is_policy_holder = true",
+                "customer",
+                [{"name": "@policyId", "value": policy_id}]
+            )
+            
+            if existing_policy_holder:
+                policy_holder = existing_policy_holder[0]
+                # Auto-fill policy holder information
+                policy_holder_name = policy_holder.get('name', '')
+            else:
+                policy_holder_name = request.form.get('namaPemegang', '')
+        else:
+            policy_holder_name = request.form.get('namaPemegang', '')
+        
         # Calculate age from birth date
         age = None
-        dob = data.get('tanggalLahir', '')
+        dob = request.form.get('tanggalLahir', '')
         if dob:
             try:
                 birth_date = datetime.strptime(dob, '%Y-%m-%d')
@@ -185,38 +214,122 @@ def signup():
         
         # Map gender
         gender_map = {'laki-laki': 'Male', 'perempuan': 'Female'}
-        gender = gender_map.get(data.get('jenisKelamin', ''), '')
+        gender = gender_map.get(request.form.get('jenisKelamin', ''), '')
         
         # Map marital status
         marital_map = {'menikah': 'Married', 'belum-menikah': 'Single', 'cerai': 'Divorced', 'janda-duda': 'Widowed'}
-        marital_status = marital_map.get(data.get('statusPernikahan', ''), '')
+        marital_status = marital_map.get(request.form.get('statusPernikahan', ''), '')
+        
+        # Process document uploads
+        registration_docs = []
+        file_mappings = {
+            'insurance_card': ('insurance_card', 'registration/insurance_card/'),
+            'id_card': ('id_card', 'registration/id_card/')
+        }
+        
+        for form_field, (doc_type, blob_path) in file_mappings.items():
+            if form_field in request.files:
+                file = request.files[form_field]
+                if file.filename:
+                    # Validate file
+                    is_valid, message = validate_file(file)
+                    if not is_valid:
+                        return jsonify({'error': f'{form_field}: {message}'}), 400
+                    
+                    doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
+                    blob_name = f"{blob_path}{doc_id}_{file.filename}"
+                    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+                    content_type = get_content_type(file)
+                    blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
+                    
+                    doc_data = {
+                        "id": doc_id,
+                        "doc_id": doc_id,
+                        "customer_id": customer_id,
+                        "doc_type": doc_type,
+                        "doc_blob_address": blob_name,
+                        "upload_date": datetime.now().isoformat(),
+                        # "doc_content": 
+                    }
+                    database.get_container_client("document").create_item(doc_data)
+                    registration_docs.append(doc_id)
         
         # Create customer record
         customer_data = {
             "id": customer_id,
             "customer_id": customer_id,
-            "policy_id": data.get('nomorPolis', ''),
-            "customer_no": data.get('nomorPeserta', ''),
-            "card_no": data.get('nomorKartu', ''),
-            "name": data.get('namaPemegang', ''),
+            "policy_id": request.form.get('nomorPolis', ''),
+            "customer_no": request.form.get('nomorPeserta', ''),
+            "card_no": request.form.get('nomorKartu', ''),
+            "name": request.form.get('namaPeserta', '') if not request.form.get('isPemegangPolis') == 'true' else policy_holder_name,
             "dob": dob,
             "age": age,
             "gender": gender,
-            "NIK": data.get('nik', ''),
-            "phone": data.get('nomorTelepon', ''),
-            "address": data.get('alamat', ''),
+            "NIK": request.form.get('nik', ''),
+            "phone": request.form.get('nomorTelepon', ''),
+            "address": request.form.get('alamat', ''),
             "email": email,
             "password": password_hash,
-            "is_policy_holder": data.get('isPemegangPolis', True),
-            "relation_with_policy_holder": "Self" if data.get('isPemegangPolis', True) else data.get('hubungan', ''),
+            "is_policy_holder": request.form.get('isPemegangPolis') == 'true',
+            "relation_with_policy_holder": "Self" if request.form.get('isPemegangPolis') == 'true' else request.form.get('hubungan', ''),
             "employment_status": "",
             "marital_status": marital_status,
             "income": None,
-            "claim_id": []
+            "claim_id": [],
+            "registration_docs": request.form.getlist('document_ids') or [],
+            "insurance_company": request.form.get('perusahaanAsuransi', ''),
+            "premium_plan": request.form.get('premiumPlan', '')
         }
         
         # Save to database
         database.get_container_client("customer").create_item(customer_data)
+        
+        # Update document records with customer_id
+        for doc_id in request.form.getlist('document_ids'):
+            try:
+                doc_data = cosmos_retrive_data(
+                    "SELECT * FROM c WHERE c.doc_id = @docId",
+                    "document",
+                    [{"name": "@docId", "value": doc_id}]
+                )
+                if doc_data:
+                    doc = doc_data[0]
+                    doc['customer_id'] = customer_id
+                    database.get_container_client("document").upsert_item(doc)
+            except Exception as e:
+                print(f"Error updating document {doc_id}: {e}")
+        
+        # Handle policy record for non-policy holders
+        is_policy_holder = request.form.get('isPemegangPolis') == 'true'
+        print(f"Is policy holder: {is_policy_holder}")
+        
+        if not is_policy_holder:
+            print(f"Adding insured person to policy {policy_id}")
+            # Check if policy record exists
+            existing_policy = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.policy_id = @policyId",
+                "policy",
+                [{"name": "@policyId", "value": policy_id}]
+            )
+            
+            if existing_policy:
+                print("Found existing policy, updating insured list")
+                # Update existing policy with new insured person
+                policy_record = existing_policy[0]
+                if 'insured' not in policy_record:
+                    policy_record['insured'] = []
+                
+                insured_info = {
+                    "customer_id": customer_id,
+                    "name": request.form.get('namaPeserta', ''),
+                    "relation": request.form.get('hubungan', ''),
+                    "added_date": datetime.now().isoformat()
+                }
+                policy_record['insured'].append(insured_info)
+                print(f"Updated policy with insured: {insured_info}")
+                database.get_container_client("policy").upsert_item(policy_record)
+            else:
+                print("No existing policy found, this shouldn't happen for non-policy holders")
         
         # Store user data in session
         session['customer_id'] = customer_id
@@ -234,7 +347,8 @@ def signup():
                 'name': customer_data['name'],
                 'email': email,
                 'role': 'customer'
-            }
+            },
+            'documents_uploaded': len(request.form.getlist('document_ids'))
         })
         
     except Exception as e:
@@ -249,6 +363,7 @@ def signin():
     password = data.get('password', '')
 
     if not email or not password:
+        print(f"Signin attempt for email: {email}")
         return jsonify({'error': 'Email and password are required'}), 400
 
     # Check user credentials
@@ -775,20 +890,69 @@ def update_claim():
         print(f"Error updating claim: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/validate-participant', methods=['POST'])
+def validate_participant():
+    """Validate participant number and return policy holder info if exists"""
+    try:
+        data = request.json
+        participant_no = data.get('nomorPeserta')
+        policy_id = data.get('nomorPolis')
+        
+        if not participant_no:
+            return jsonify({'valid': True})
+        
+        # Check for duplicate participant number
+        existing_participant = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_no = @participantNo",
+            "customer",
+            [{"name": "@participantNo", "value": participant_no}]
+        )
+        
+        if existing_participant:
+            return jsonify({'valid': False, 'error': 'Participant number already exists', 'field': 'nomorPeserta'}), 400
+        
+        # If policy_id provided, check for existing policy holder
+        policy_holder_info = {}
+        if policy_id:
+            existing_policy_holder = cosmos_retrive_data(
+                "SELECT * FROM c WHERE c.policy_id = @policyId AND c.is_policy_holder = true",
+                "customer",
+                [{"name": "@policyId", "value": policy_id}]
+            )
+            
+            if existing_policy_holder:
+                policy_holder = existing_policy_holder[0]
+                policy_holder_info = {
+                    'namaPemegang': policy_holder.get('name', ''),
+                    'perusahaanAsuransi': policy_holder.get('insurance_company', ''),
+                    'premiumPlan': policy_holder.get('premium_plan', '')
+                }
+        
+        return jsonify({
+            'valid': True,
+            'policy_holder_info': policy_holder_info
+        })
+        
+    except Exception as e:
+        print(f"Error in validate_participant: {e}")
+        return jsonify({'error': 'Validation failed'}), 500
+
 @app.route('/api/extract-registration-info', methods=['POST'])
 def extract_registration_info():
     """Extract information from uploaded documents for registration"""
     try:
         extracted_data = {}
+        uploaded_doc_ids = []
         
         # Process insurance card - upload
         if 'insurance_card' in request.files:
             file = request.files['insurance_card']
             if file.filename:
-                doc_id = f"REG{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"registration/{doc_id}_{file.filename}"
+                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
+                blob_name = f"registration/insurance_card/{doc_id}_{file.filename}"
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                blob_client.upload_blob(file.read(), overwrite=True)
+                content_type = get_content_type(file)
+                blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
                 
                 # Extract insurance card data
                 insurance_data = analize_doc_registration(blob_name, "insuranceCard")
@@ -798,19 +962,31 @@ def extract_registration_info():
                         'participant_number': insurance_data.get('No. Peserta', ''),
                         'card_number': insurance_data.get('No. Kartu', '')
                     })
+                
+                # Create document record with extracted content
+                doc_data = {
+                    "id": doc_id,
+                    "doc_id": doc_id,
+                    "doc_type": "insurance_card",
+                    "doc_blob_address": blob_name,
+                    "upload_date": datetime.now().isoformat(),
+                    "doc_contents": insurance_data or {}
+                }
+                database.get_container_client("document").create_item(doc_data)
+                uploaded_doc_ids.append(doc_id)
         
         # Process ID card with Azure Document Intelligence
         if 'id_card' in request.files:
             file = request.files['id_card']
             if file.filename:
-                doc_id = f"REG{uuid.uuid4().hex[:8].upper()}"
-                blob_name = f"registration/{doc_id}_{file.filename}"
+                doc_id = f"DOC{uuid.uuid4().hex[:8].upper()}"
+                blob_name = f"registration/id_card/{doc_id}_{file.filename}"
                 blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-                blob_client.upload_blob(file.read(), overwrite=True)
+                content_type = get_content_type(file)
+                blob_client.upload_blob(file.read(), overwrite=True, content_settings=ContentSettings(content_type=content_type))
                 
                 # Extract using Azure Document Intelligence with fallback
                 id_data = analize_doc_registration(blob_name, "idCard")
-                # Map ID card data to expected format
                 if id_data:
                     extracted_data.update({
                         'nik': id_data.get('NIK', ''),
@@ -824,9 +1000,23 @@ def extract_registration_info():
                         'marital_status': id_data.get('Status Perkawinan', ''),
                         'occupation': id_data.get('Pekerjaan', '')
                     })
+                
+                # Create document record with extracted content
+                doc_data = {
+                    "id": doc_id,
+                    "doc_id": doc_id,
+                    "doc_type": "id_card",
+                    "doc_blob_address": blob_name,
+                    "upload_date": datetime.now().isoformat(),
+                    "doc_contents": id_data or {}
+                }
+                database.get_container_client("document").create_item(doc_data)
+                uploaded_doc_ids.append(doc_id)
+        
         return jsonify({
             'status': 'success',
-            'data': extracted_data
+            'data': extracted_data,
+            'document_ids': uploaded_doc_ids
         })
     
     except Exception as e:

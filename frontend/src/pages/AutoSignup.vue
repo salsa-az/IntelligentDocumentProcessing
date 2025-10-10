@@ -246,7 +246,9 @@
                       type="text" 
                       required 
                       placeholder="Masukkan nama perusahaan asuransi"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('perusahaanAsuransi') }"
                     />
+                    <p v-if="autoFilledFields.includes('perusahaanAsuransi')" class="text-xs text-violet-600 mt-1">Auto-filled from existing policy</p>
                   </div>
                   <div>
                     <label class="block text-sm font-medium mb-1" for="premiumPlan">Paket Premi <span class="text-red-500">*</span></label>
@@ -256,6 +258,7 @@
                       class="form-select w-full" 
                       required
                       @change="updateClaimLimit"
+                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('premiumPlan') }"
                     >
                       <option value="">Pilih Paket Premi</option>
                       <option value="basic">Basic - IDR 5,000,000</option>
@@ -263,6 +266,7 @@
                       <option value="premium">Premium - IDR 25,000,000</option>
                       <option value="platinum">Platinum - IDR 50,000,000</option>
                     </select>
+                    <p v-if="autoFilledFields.includes('premiumPlan')" class="text-xs text-violet-600 mt-1">Auto-filled from existing policy</p>
                   </div>
                 </div>
 
@@ -472,6 +476,7 @@ export default {
       extractedData: {},
       autoFilledFields: [],
       errorFields: [],
+      documentIds: [],
       isPemegangPolis: false,
       dataDeclaration: false,
       form: {
@@ -497,7 +502,56 @@ export default {
       }
     }
   },
+  watch: {
+    'form.nomorPolis': {
+      handler: 'validateAndAutoFill',
+      immediate: false
+    },
+    'form.nomorPeserta': {
+      handler: 'validateParticipantNumber',
+      immediate: false
+    }
+  },
   methods: {
+    async validateAndAutoFill() {
+      if (!this.form.nomorPolis) return;
+      
+      try {
+        const response = await fetch('http://localhost:5000/api/validate-participant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            nomorPolis: this.form.nomorPolis
+          })
+        });
+        
+        const result = await response.json();
+        if (response.ok && result.policy_holder_info) {
+          const info = result.policy_holder_info;
+          if (info.namaPemegang) {
+            this.form.namaPemegang = info.namaPemegang;
+            if (!this.autoFilledFields.includes('namaPemegang')) {
+              this.autoFilledFields.push('namaPemegang');
+            }
+          }
+          if (info.perusahaanAsuransi) {
+            this.form.perusahaanAsuransi = info.perusahaanAsuransi;
+            if (!this.autoFilledFields.includes('perusahaanAsuransi')) {
+              this.autoFilledFields.push('perusahaanAsuransi');
+            }
+          }
+          if (info.premiumPlan) {
+            this.form.premiumPlan = info.premiumPlan;
+            if (!this.autoFilledFields.includes('premiumPlan')) {
+              this.autoFilledFields.push('premiumPlan');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Auto-fill error:', error);
+      }
+    },
     handleInsuranceCardUpload(event) {
       const file = event.target.files[0];
       if (file) {
@@ -560,6 +614,7 @@ export default {
         const result = await response.json();
         if (result.status === 'success') {
             this.applyExtractedData(result.data);
+            this.documentIds = result.document_ids || [];
         }
         
         // Check for duplicate participant number after processing
@@ -669,7 +724,10 @@ export default {
       this.form.claimLimit = limits[this.form.premiumPlan] || 0;
     },
     async validateParticipantNumber() {
-      if (!this.form.nomorPeserta || !this.form.nomorPolis || !this.form.nomorKartu) return;
+      if (!this.form.nomorPeserta) {
+        this.errorFields = this.errorFields.filter(f => f !== 'nomorPeserta');
+        return;
+      }
       
       try {
         const response = await fetch('http://localhost:5000/api/validate-participant', {
@@ -678,17 +736,17 @@ export default {
           credentials: 'include',
           body: JSON.stringify({
             nomorPeserta: this.form.nomorPeserta,
-            nomorPolis: this.form.nomorPolis,
-            nomorKartu: this.form.nomorKartu,
-            perusahaanAsuransi: this.form.perusahaanAsuransi
+            nomorPolis: this.form.nomorPolis
           })
         });
         
         const result = await response.json();
         if (!response.ok && result.field) {
-          this.errorFields = [result.field];
+          if (!this.errorFields.includes(result.field)) {
+            this.errorFields.push(result.field);
+          }
         } else {
-          this.errorFields = [];
+          this.errorFields = this.errorFields.filter(f => f !== 'nomorPeserta');
         }
       } catch (error) {
         console.error('Validation error:', error);
@@ -757,19 +815,29 @@ export default {
           return date;
         };
         
-        const registrationData = {
-          ...this.form,
-          tanggalLahir: formatDateForBackend(this.form.tanggalLahir),
-          isPemegangPolis: this.isPemegangPolis
-        };
+        // Create FormData for file upload support
+        const formData = new FormData();
+        
+        // Add form fields
+        Object.keys(this.form).forEach(key => {
+          if (key === 'tanggalLahir') {
+            formData.append(key, formatDateForBackend(this.form[key]));
+          } else {
+            formData.append(key, this.form[key]);
+          }
+        });
+        
+        formData.append('isPemegangPolis', this.isPemegangPolis);
+        
+        // Add document IDs from extraction
+        this.documentIds.forEach(docId => {
+          formData.append('document_ids', docId);
+        });
         
         const response = await fetch('http://localhost:5000/api/signup', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
           credentials: 'include',
-          body: JSON.stringify(registrationData)
+          body: formData
         });
         
         const result = await response.json();

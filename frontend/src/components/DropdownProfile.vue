@@ -87,11 +87,16 @@ export default {
     const trigger = ref(null)
     const dropdown = ref(null)
 
-    // Handle sign out
-    const handleSignOut = () => {
-      logout()
-      dropdownOpen.value = false
-      router.push('/signin')
+    // Handle sign out: wait for backend logout to complete before navigating
+    const handleSignOut = async () => {
+      try {
+        await logout()
+      } catch (e) {
+        console.error('Error during logout:', e)
+      } finally {
+        dropdownOpen.value = false
+        router.push('/signin')
+      }
     }
 
     // close on click outside

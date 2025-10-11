@@ -11,9 +11,20 @@
       <main class="grow">
         <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
           <!-- Page header -->
-          <div class="mb-8">
-            <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Approver - Claims Approval</h1>
-            <p class="text-gray-600 dark:text-gray-400">Review and approve submitted insurance claims</p>
+          <div class="mb-8 flex items-center justify-between">
+            <div>
+              <h1 class="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Approver - Claims Approval</h1>
+              <p class="text-gray-600 dark:text-gray-400">Review and approve submitted insurance claims</p>
+            </div>
+            <div class="flex items-center gap-4">
+              <button @click="reloadClaims" :disabled="loading" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded transition flex items-center gap-2">
+                <svg v-if="loading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span>{{ loading ? 'Loading...' : 'Reload' }}</span>
+              </button>
+              <div v-if="reloadMessage" class="text-sm text-gray-600 dark:text-gray-300">{{ reloadMessage }}</div>
+            </div>
           </div>
 
           <!-- Filters and Search -->
@@ -76,15 +87,8 @@
             </div>
           </div>
 
-          <!-- Loading State -->
-          <div v-if="loading" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
-            <!-- Blue spinner: solid blue border with transparent top for the spinning effect -->
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent dark:border-blue-300 dark:border-t-transparent mb-4"></div>
-            <p class="text-gray-600 dark:text-gray-400">Loading claims data...</p>
-          </div>
-
-          <!-- Claims List -->
-          <div v-else class="space-y-4">
+          <!-- Claims List (always render; loading state is handled silently) -->
+          <div class="space-y-4">
             <div v-for="claim in filteredClaims" :key="claim.id" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-6">
               <!-- Claim Summary -->
               <div class="flex items-center justify-between">
@@ -160,16 +164,17 @@ export default {
     const showDetailModal = ref(false)
     const selectedClaim = ref(null)
   // show spinner until first backend response arrives
-  const loading = ref(true)
-  const refreshInterval = ref(null)
+  const loading = ref(false)
 
     // Get current admin user
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
 
+    const reloadMessage = ref('')
+
     const fetchAllClaims = async () => {
       loading.value = true
       try {
-        const response = await fetch('http://localhost:5000/api/claims/all-detailed')
+      const response = await fetch('/api/claims/all-detailed', { credentials: 'include' })
         const result = await response.json()
         
         if (result.status === 'success') {
@@ -278,7 +283,7 @@ export default {
 
     const approveClaim = async (notes) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/claims/${selectedClaim.value.id}/update-status`, {
+        const response = await fetch(`/api/claims/${selectedClaim.value.id}/update-status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -312,7 +317,7 @@ export default {
 
     const rejectClaim = async (notes) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/claims/${selectedClaim.value.id}/update-status`, {
+        const response = await fetch(`/api/claims/${selectedClaim.value.id}/update-status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -476,18 +481,17 @@ export default {
       alert(`Opening ${document.name} for review`)
     }
 
-   onMounted(() => {
-      fetchAllClaims()
-
-      // Set up auto-refresh every 30 seconds and keep the id to clear later
-      refreshInterval.value = setInterval(fetchAllClaims, 30000)
+    onMounted(() => {
       document.addEventListener('click', handleClickOutside)
     })
 
     onUnmounted(() => {
-      if (refreshInterval.value) clearInterval(refreshInterval.value)
       document.removeEventListener('click', handleClickOutside)
     })
+
+    const reloadClaims = () => {
+      fetchAllClaims()
+    }
 
     return {
       sidebarOpen,
@@ -509,7 +513,8 @@ export default {
       closeDetailModal,
       downloadDocument,
       approveClaim,
-      rejectClaim
+      rejectClaim,
+      reloadClaims
     }
   }
 }

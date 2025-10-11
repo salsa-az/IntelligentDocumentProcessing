@@ -386,12 +386,22 @@ def signin():
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
+    # Clear all session data
     session.clear()
     session.permanent = False
+    
+    # Create response
     response = jsonify({'status': 'success', 'message': 'Logged out successfully'})
-    response.set_cookie('session', '', expires=0, path='/')
-    #print session for debug 
-    print(session)
+    
+    # Clear all possible session cookies
+    response.set_cookie('session', '', expires=0, path='/', domain=None, secure=False, httponly=True, samesite='Lax')
+    response.set_cookie('flask-session', '', expires=0, path='/', domain=None, secure=False, httponly=True, samesite='Lax')
+    
+    # Add cache control headers to prevent caching
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
     return response
 
 @app.route('/api/session-status', methods=['GET'])
@@ -925,7 +935,68 @@ def update_claim():
 # CUSTOMER ROUTES
 # =============================================================================
 
+@app.route('/api/customer/profile', methods=['GET'])
+def get_customer_profile():
+    try:
+        if 'customer_id' not in session or check_session_expired():
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        customer_id = session['customer_id']
+        customer_data = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.customer_id = @customerId",
+            "customer",
+            [{"name": "@customerId", "value": customer_id}]
+        )
+        
+        if not customer_data:
+            return jsonify({'error': 'Customer not found'}), 404
+        
+        customer = customer_data[0]
+        return jsonify({
+            'status': 'success',
+            'customer': customer
+        })
+        
+    except Exception as e:
+        print(f"Error getting customer profile: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/customer/<customer_id>/policy-limits', methods=['GET'])
+def get_customer_policy_limits(customer_id):
+    try:
+        print(customer_id)  # Debugging line
+        policy_data = cosmos_retrive_data(
+            "SELECT c.total_claim_limit, c.policy_id FROM c WHERE ARRAY_CONTAINS(c.insured, {'customer_id': @CustomerId}, true) OR c.customer_id = @CustomerId",
+            "policy",
+            [{"name": "@CustomerId", "value": customer_id}]
+        )
+        print("policy_data:", policy_data)  # Debugging line
+        if not policy_data:
+            return jsonify({'status': 'error', 'message': 'Policy not found'}), 404
+
+        policy = policy_data[0]
+        policy_limit = float(policy['total_claim_limit'])
+        policy_id = policy['policy_id']
+        print("policy_id:", policy_id)  # Debugging line
+        current_year = datetime.now().year
+        claims_data = cosmos_retrive_data(
+            "SELECT c.claim_amount FROM c WHERE c.policy_id = @PolicyId AND c.claim_status = 'Approved' AND CONTAINS(c.claim_date, @Year)",
+            "claim",
+            [{"name": "@PolicyId", "value": policy_id}, {"name": "@Year", "value": str(current_year)}]
+        )
+        print("claims_data:", claims_data)  # Debugging line
+        total_used = sum(float(claim['claim_amount']) for claim in claims_data)
+        print("total_used:", total_used)  # Debugging line
+        return jsonify({
+            'status': 'success',
+            'policy_limit': policy_limit,
+            'total_used': total_used,
+            'current_year': current_year
+        })
+
+    except Exception as e:
+        print(f"Error in get_customer_policy_limits: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
 
 @app.route('/api/customer/<customer_id>/claims-detailed', methods=['GET'])
 def get_customer_claims_detailed(customer_id):

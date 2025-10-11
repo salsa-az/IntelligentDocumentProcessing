@@ -305,7 +305,6 @@ export default {
           
           alert('Claim has been approved successfully!')
           closeDetailModal()
-          await fetchAllClaims()
         } else {
           alert(`Error: ${result.error}`)
         }
@@ -339,7 +338,6 @@ export default {
           
           alert('Claim has been rejected.')
           closeDetailModal()
-          await fetchAllClaims()
         } else {
           alert(`Error: ${result.error}`)
         }

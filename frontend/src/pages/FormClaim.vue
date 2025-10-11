@@ -383,17 +383,8 @@ export default {
           form.value.email = customer.email || ''
           form.value.nomorTelepon = customer.phone || ''
           
-          // Load policy data for premium plan and limits
-          const policyResponse = await fetch(`http://localhost:5000/api/customer/${customer.customer_id}/policy`, {
-            credentials: 'include'
-          })
-          if (policyResponse.ok) {
-            const policyResult = await policyResponse.json()
-            if (policyResult.status === 'success' && policyResult.policy) {
-              form.value.premiumPlan = policyResult.policy.insurance_plan_type || 'basic'
-              form.value.claimLimit = policyResult.policy.total_claim_limit || 5000000
-            }
-          }
+          // Set premium plan from customer data
+          form.value.premiumPlan = customer.premium_plan || 'basic'
           return
         }
       } catch (error) {

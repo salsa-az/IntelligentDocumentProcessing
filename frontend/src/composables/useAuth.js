@@ -28,18 +28,32 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       // Call backend logout API to clear session
-      await fetch('/api/logout', {
+      const response = await fetch('/api/logout', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
       })
+      
+      // Check if logout was successful
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Logout successful:', result.message)
+      } else {
+        console.warn('Logout API returned non-OK status:', response.status)
+      }
     } catch (error) {
       console.error('Logout API error:', error)
     } finally {
-      // Always clear frontend state
+      // Always clear frontend state regardless of API response
       currentUser.value = null
       localStorage.removeItem('user')
       localStorage.removeItem('token')
       sessionStorage.clear()
+      
+      // Force page reload to ensure clean state
+      window.location.href = '/signin'
     }
   }
 

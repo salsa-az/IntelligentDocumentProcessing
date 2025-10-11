@@ -37,12 +37,24 @@ allowed_origins = [
     "https://idp-insurance.azurewebsites.net",
     "https://*.azurewebsites.net"
 ]
-CORS(app, resources={r"/api/*": {"origins": allowed_origins, "supports_credentials": True}})
 
-app.config['SECRET_KEY'] = secrets.token_hex(32)
-app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') != 'development'
+# Enhanced CORS configuration
+CORS(app, resources={
+    r"/api/*": {
+        "origins": allowed_origins, 
+        "supports_credentials": True,
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+    }
+})
+
+# Enhanced session configuration
+is_production = os.getenv('FLASK_ENV') != 'development'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
+app.config['SESSION_COOKIE_SECURE'] = is_production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'
+app.config['SESSION_COOKIE_DOMAIN'] = None
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 
 # Azure setup
@@ -59,7 +71,12 @@ database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE_NAME"
 AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
 AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
 AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
-AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback')
+# Dynamic redirect URI based on environment and request host
+if is_production:
+    AZURE_REDIRECT_URI = 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback'
+else:
+    # Will be set dynamically based on request host
+    AZURE_REDIRECT_URI = None
 JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
 
 # Constants
@@ -393,14 +410,32 @@ def logout():
     # Create response
     response = jsonify({'status': 'success', 'message': 'Logged out successfully'})
     
-    # Clear all possible session cookies
-    response.set_cookie('session', '', expires=0, path='/', domain=None, secure=False, httponly=True, samesite='Lax')
-    response.set_cookie('flask-session', '', expires=0, path='/', domain=None, secure=False, httponly=True, samesite='Lax')
+    # Determine if we're in production
+    is_production = os.getenv('FLASK_ENV') != 'development'
+    
+    # Clear all possible session cookies with proper settings
+    cookie_settings = {
+        'expires': 0,
+        'path': '/',
+        'secure': is_production,
+        'httponly': True,
+        'samesite': 'Lax' if not is_production else 'None'
+    }
+    
+    # Clear session cookies
+    response.set_cookie('session', '', **cookie_settings)
+    response.set_cookie('flask-session', '', **cookie_settings)
     
     # Add cache control headers to prevent caching
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
+    
+    # Add CORS headers explicitly for logout
+    origin = request.headers.get('Origin')
+    if origin in allowed_origins or any(origin.endswith(allowed.replace('*', '')) for allowed in allowed_origins if '*' in allowed):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
     
     return response
 
@@ -429,10 +464,21 @@ def microsoft_auth():
     state = str(uuid.uuid4())
     session['oauth_state'] = state
     
+    # Dynamic redirect URI based on request host
+    if is_production:
+        redirect_uri = 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback'
+    else:
+        # Use the same host as the current request
+        host = request.host
+        redirect_uri = f"http://{host}/api/auth/microsoft/callback"
+    
+    # Store redirect URI in session for callback
+    session['redirect_uri'] = redirect_uri
+    
     params = {
         'client_id': AZURE_CLIENT_ID,
         'response_type': 'code',
-        'redirect_uri': AZURE_REDIRECT_URI,
+        'redirect_uri': redirect_uri,
         'response_mode': 'query',
         'scope': 'openid profile email User.Read',
         'state': state
@@ -444,45 +490,77 @@ def microsoft_auth():
 @app.route('/api/auth/microsoft/callback', methods=['GET'])
 def microsoft_callback():
     try:
+        print(f"Callback received with args: {request.args}")
+        
         error = request.args.get('error')
         if error:
             error_desc = request.args.get('error_description', 'Unknown error')
-            print("OAuth authentication failed")
+            print(f"OAuth authentication failed: {error} - {error_desc}")
             return redirect(f'/signin?error={error}')
         
-        if request.args.get('state') != session.get('oauth_state'):
+        state = request.args.get('state')
+        stored_state = session.get('oauth_state')
+        print(f"State comparison - received: {state}, stored: {stored_state}")
+        
+        if state != stored_state:
+            print("State mismatch in OAuth callback")
             return redirect('/signin?error=invalid_state')
         
         code = request.args.get('code')
         if not code:
+            print("No authorization code received")
             return redirect('/signin?error=no_code')
+        
+        # Get redirect URI from session
+        redirect_uri = session.get('redirect_uri')
+        if not redirect_uri:
+            # Fallback to dynamic generation
+            if is_production:
+                redirect_uri = 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback'
+            else:
+                host = request.host
+                redirect_uri = f"http://{host}/api/auth/microsoft/callback"
+        
+        print(f"Requesting token with redirect_uri: {redirect_uri}")
         
         token_data = {
             'client_id': AZURE_CLIENT_ID,
             'client_secret': AZURE_CLIENT_SECRET,
             'code': code,
             'grant_type': 'authorization_code',
-            'redirect_uri': AZURE_REDIRECT_URI,
+            'redirect_uri': redirect_uri,
             'scope': 'openid profile email User.Read'
         }
         
         token_response = requests.post(TOKEN_URL, data=token_data)
+        print(f"Token response status: {token_response.status_code}")
         
         if token_response.status_code != 200:
+            print(f"Token request failed: {token_response.text}")
             return redirect('/signin?error=token_request_failed')
             
         token_json = token_response.json()
         
         if 'access_token' not in token_json:
+            print(f"No access token in response: {token_json}")
             return redirect('/signin?error=token_failed')
         
         headers = {'Authorization': f"Bearer {token_json['access_token']}"}
         user_response = requests.get(USER_INFO_URL, headers=headers)
+        
+        if user_response.status_code != 200:
+            print(f"User info request failed: {user_response.status_code}")
+            return redirect('/signin?error=user_info_failed')
+            
         user_data = user_response.json()
+        print(f"User data received: {user_data}")
         
         email = user_data.get('mail') or user_data.get('userPrincipalName')
         if not email:
+            print("No email found in user data")
             return redirect('/signin?error=no_email')
+        
+        print(f"Looking for admin user with email: {email}")
         
         admin_user = cosmos_retrive_data(
             "SELECT * FROM c WHERE c.email = @email",
@@ -491,10 +569,16 @@ def microsoft_callback():
         )
         
         if not admin_user:
+            print(f"Admin user not found for email: {email}")
             return redirect('/signin?error=user_not_found')
         
         admin = admin_user[0]
+        print(f"Admin user found: {admin.get('name', 'Unknown')}")
         
+        # Clear any existing session
+        session.clear()
+        
+        # Set new session data
         session['customer_id'] = admin.get('admin_id', admin.get('id'))
         session['email'] = admin['email']
         session['role'] = 'approver'
@@ -502,11 +586,26 @@ def microsoft_callback():
         session['admin_id'] = admin.get('admin_id', admin.get('id'))
         session['login_time'] = datetime.now().isoformat()
         session.permanent = True
-        # Redirect directly to approver dashboard so frontend does not need to check session on Signin page
-        return redirect('/approver-dashboard')
+        
+        print(f"Session set for user: {admin['name']} with role: approver")
+        
+        # Create response with proper headers
+        response = redirect('/approver-dashboard')
+        
+        # Set session cookie explicitly if needed
+        if is_production:
+            response.set_cookie('session_auth', 'true', 
+                              secure=True, 
+                              httponly=True, 
+                              samesite='None',
+                              max_age=3600)
+        
+        return response
 
     except Exception as e:
         print(f"Microsoft auth error: {e}")
+        import traceback
+        traceback.print_exc()
         return redirect('/signin?error=auth_failed')
 
 # =============================================================================

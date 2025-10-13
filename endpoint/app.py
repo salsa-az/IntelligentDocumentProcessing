@@ -526,15 +526,6 @@ def microsoft_callback():
         
         # Get redirect URI from session
         redirect_uri = session.get('redirect_uri')
-        if not redirect_uri:
-            # Fallback to dynamic generation
-            if is_production:
-                redirect_uri = 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback'
-            else:
-                host = request.host
-                redirect_uri = f"http://{host}/api/auth/microsoft/callback"
-        
-        print(f"Requesting token with redirect_uri: {redirect_uri}")
         
         token_data = {
             'client_id': AZURE_CLIENT_ID,
@@ -546,7 +537,6 @@ def microsoft_callback():
         }
         
         token_response = requests.post(TOKEN_URL, data=token_data)
-        print(f"Token response status: {token_response.status_code}")
         
         if token_response.status_code != 200:
             print(f"Token request failed: {token_response.text}")
@@ -598,12 +588,12 @@ def microsoft_callback():
         session['name'] = admin['name']
         session['admin_id'] = admin.get('admin_id', admin.get('id'))
         session['login_time'] = datetime.now().isoformat()
-        session.permanent = True
+        session.permanent = False
         
         print(f"Session set for user: {admin['name']} with role: approver")
         
         # Create response with proper headers
-        response = redirect('/approver-dashboard')
+        response = redirect('/signin')
         
         # Set session cookie explicitly if needed
         if is_production:

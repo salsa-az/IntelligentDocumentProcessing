@@ -343,7 +343,7 @@ def signup():
         session['role'] = 'customer'
         session['name'] = customer_data['name']
         session['login_time'] = datetime.now().isoformat()
-        session.permanent = True
+        session.permanent = False
         
         return jsonify({
             'status': 'success',

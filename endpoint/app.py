@@ -485,21 +485,13 @@ def microsoft_auth():
     state = str(uuid.uuid4())
     session['oauth_state'] = state
     
-    # Dynamic redirect URI based on request host
-    if is_production:
-        redirect_uri = 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback'
-    else:
-        # Use the same host as the current request
-        host = request.host
-        redirect_uri = f"http://{host}/api/auth/microsoft/callback"
-    
     # Store redirect URI in session for callback
-    session['redirect_uri'] = redirect_uri
+    session['redirect_uri'] = AZURE_REDIRECT_URI
     
     params = {
         'client_id': AZURE_CLIENT_ID,
         'response_type': 'code',
-        'redirect_uri': redirect_uri,
+        'redirect_uri': AZURE_REDIRECT_URI,
         'response_mode': 'query',
         'scope': 'openid profile email User.Read',
         'state': state

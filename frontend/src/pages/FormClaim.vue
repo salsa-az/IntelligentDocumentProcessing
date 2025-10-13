@@ -358,7 +358,7 @@ export default {
     const loadUserProfile = async () => {
       try {
         // First try to load from API
-        const response = await fetch('http://localhost:5000/api/customer/profile', {
+        const response = await fetch('/api/customer/profile', {
           headers: {
             'Content-Type': 'application/json',
           },
@@ -370,7 +370,7 @@ export default {
           const customer = result.customer
           console.log('Customer profile loaded from API:', customer)
           
-          // Auto-fill form with API data
+          // Auto-fill form with API data - mapping sesuai struktur database
           form.value.nomorPolis = customer.policy_id || ''
           form.value.namaPerusahaan = customer.insurance_company || 'PT XYZ Asuransi'
           form.value.nomorPeserta = customer.customer_no || ''
@@ -383,8 +383,17 @@ export default {
           form.value.email = customer.email || ''
           form.value.nomorTelepon = customer.phone || ''
           
-          // Set premium plan from customer data
+          // Set premium plan and claim limits
           form.value.premiumPlan = customer.premium_plan || 'basic'
+          
+          // Set claim limits based on premium plan
+          const claimLimits = {
+            'basic': 50000000,
+            'premium': 100000000,
+            'platinum': 200000000
+          }
+          form.value.claimLimit = claimLimits[customer.premium_plan] || 50000000
+          
           return
         }
       } catch (error) {
@@ -394,19 +403,37 @@ export default {
       // Fallback to localStorage if API fails
       const userData = JSON.parse(localStorage.getItem('user') || '{}')
       console.log('Loading user data from localStorage:', userData)
+      console.log('NIK from userData:', userData.NIK)
+      console.log('policy_id from userData:', userData.policy_id)
+      console.log('insurance_company from userData:', userData.insurance_company)
       
       if (userData && userData.id) {
-        form.value.nomorPolis = userData.policy_number || form.value.nomorPolis
-        form.value.namaPerusahaan = userData.insurance_company || form.value.namaPerusahaan
-        form.value.nomorPeserta = userData.customer_id || userData.id || form.value.nomorPeserta
-        form.value.namaPemegang = userData.name || form.value.namaPemegang
-        form.value.nik = userData.nik || form.value.nik
-        form.value.tanggalLahir = userData.birth_date || form.value.tanggalLahir
-        form.value.jenisKelamin = userData.gender || form.value.jenisKelamin
-        form.value.statusPernikahan = userData.marital_status || form.value.statusPernikahan
-        form.value.alamat = userData.address || form.value.alamat
-        form.value.email = userData.email || form.value.email
-        form.value.nomorTelepon = userData.phone || form.value.nomorTelepon
+        form.value.nomorPolis = userData.policy_id || ''
+        form.value.namaPerusahaan = userData.insurance_company || 'PT XYZ Asuransi'
+        form.value.nomorPeserta = userData.customer_no || ''
+        form.value.namaPemegang = userData.name || ''
+        form.value.nik = userData.NIK || ''
+        form.value.tanggalLahir = userData.dob || ''
+        form.value.jenisKelamin = userData.gender || ''
+        form.value.statusPernikahan = userData.marital_status || ''
+        form.value.alamat = userData.address || ''
+        form.value.email = userData.email || ''
+        form.value.nomorTelepon = userData.phone || ''
+        form.value.premiumPlan = userData.premium_plan || 'basic'
+        
+        console.log('Form values after setting:', {
+          nomorPolis: form.value.nomorPolis,
+          namaPerusahaan: form.value.namaPerusahaan,
+          nik: form.value.nik
+        })
+        
+        // Set claim limits
+        const claimLimits = {
+          'basic': 50000000,
+          'premium': 100000000,
+          'platinum': 200000000
+        }
+        form.value.claimLimit = claimLimits[userData.premium_plan] || 50000000
       }
     }
 

@@ -592,7 +592,7 @@ def microsoft_callback():
         
         print(f"Session set for user: {admin['name']} with role: approver")
         
-        # Create response with proper headers
+        # Redirect directly to approver dashboard after successful login
         response = redirect('/signin')
         
         # Set session cookie explicitly if needed

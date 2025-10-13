@@ -1,13 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Dashboard from './pages/Dashboard.vue'
 import CustomerDashboard from './pages/CustomerDashboard.vue'
 import FormClaim from './pages/FormClaim.vue'
 import ClaimHistory from './pages/ClaimHistory.vue'
 import Signin from './pages/Signin.vue'
-import ResetPassword from './pages/ResetPassword.vue'
+// import ResetPassword from './pages/ResetPassword.vue'
 import MyAccount from './pages/MyAccount.vue'
 import ClaimApproval from './pages/ClaimApproval.vue'
-import AlertDemo from './pages/AlertDemo.vue'
 import AutoSignup from './pages/AutoSignup.vue'
 import ApproverDashboard from './pages/ApproverDashboard.vue'
 
@@ -30,16 +28,11 @@ const router = createRouter({
       component: AutoSignup,
       meta: { title: 'Sign Up' }
     },
-    {
-      path: '/reset-password',
-      component: ResetPassword,
-      meta: { requiresAuth: true, title: 'Reset Password' }
-    },
-    {
-      path: '/dashboard',
-      component: Dashboard,
-      meta: { title: 'Dashboard' }
-    },
+    // {
+    //   path: '/dashboard',
+    //   component: Dashboard,
+    //   meta: { title: 'Dashboard' }
+    // },
     {
       path: '/customer-dashboard',
       component: CustomerDashboard,
@@ -70,11 +63,6 @@ const router = createRouter({
       path: '/approver-dashboard',
       component: ApproverDashboard,
       meta: { requiresAuth: true, role: 'approver', title: 'Approver Dashboard' }
-    },
-    {
-      path: '/alert-demo',
-      component: AlertDemo,
-      meta: { title: 'Alert Demo' }
     },
     {
       path: '/auto-signup',

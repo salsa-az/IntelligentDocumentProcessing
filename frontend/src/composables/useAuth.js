@@ -52,8 +52,8 @@ export const useAuth = () => {
       localStorage.removeItem('token')
       sessionStorage.clear()
       
-      // Force page reload to ensure clean state
-      window.location.href = '/signin'
+      // Redirect with logout parameter to skip session check
+      window.location.href = '/signin?logout=true'
     }
   }
 

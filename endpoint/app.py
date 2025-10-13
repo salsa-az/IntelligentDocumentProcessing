@@ -49,12 +49,13 @@ CORS(app, resources={
 })
 
 # Enhanced session configuration
-is_production = os.getenv('FLASK_ENV') != 'development'
+is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('WEBSITE_HOSTNAME') is not None
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 app.config['SESSION_COOKIE_SECURE'] = is_production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'
 app.config['SESSION_COOKIE_DOMAIN'] = None
+app.config['SESSION_COOKIE_NAME'] = 'idp_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 
 # Azure setup
@@ -395,9 +396,20 @@ def signin():
         'message': 'Login successful',
         'user': {
             'id': user['customer_id'],
+            'customer_id': user['customer_id'],
             'name': user['name'],
             'email': email,
-            'role': user_role
+            'role': user_role,
+            'policy_id': user.get('policy_id', ''),
+            'customer_no': user.get('customer_no', ''),
+            'NIK': user.get('NIK', ''),
+            'dob': user.get('dob', ''),
+            'gender': user.get('gender', ''),
+            'marital_status': user.get('marital_status', ''),
+            'address': user.get('address', ''),
+            'phone': user.get('phone', ''),
+            'insurance_company': user.get('insurance_company', ''),
+            'premium_plan': user.get('premium_plan', 'basic')
         }
     })
 
@@ -411,23 +423,26 @@ def logout():
     response = jsonify({'status': 'success', 'message': 'Logged out successfully'})
     
     # Determine if we're in production
-    is_production = os.getenv('FLASK_ENV') != 'development'
+    is_production_env = os.getenv('FLASK_ENV') == 'production' or os.getenv('WEBSITE_HOSTNAME') is not None
     
     # Clear all possible session cookies with proper settings
-    cookie_settings = {
-        'expires': 0,
-        'path': '/',
-        'secure': is_production,
-        'httponly': True,
-        'samesite': 'Lax' if not is_production else 'None'
-    }
+    cookie_names = ['session', 'flask-session', 'idp_session', 'session_auth']
     
-    # Clear session cookies
-    response.set_cookie('session', '', **cookie_settings)
-    response.set_cookie('flask-session', '', **cookie_settings)
+    for cookie_name in cookie_names:
+        response.set_cookie(
+            cookie_name, 
+            '', 
+            expires=0,
+            max_age=0,
+            path='/',
+            domain=None,
+            secure=is_production_env,
+            httponly=True,
+            samesite='None' if is_production_env else 'Lax'
+        )
     
     # Add cache control headers to prevent caching
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, private'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     
@@ -441,20 +456,32 @@ def logout():
 
 @app.route('/api/session-status', methods=['GET'])
 def session_status():
-    if ('customer_id' in session or 'admin_id' in session) and not check_session_expired():
-        return jsonify({
-            'status': 'authenticated',
-            'user': {
-                'id': session.get('customer_id') or session.get('admin_id'),
-                'customer_id': session.get('customer_id'),
-                'admin_id': session.get('admin_id'),
-                'email': session.get('email'),
-                'role': session.get('role'),
-                'name': session.get('name')
-            }
-        })
-    else:
+    # Check if session is expired first
+    if check_session_expired():
         return jsonify({'status': 'not_authenticated'}), 401
+    
+    # Validate session data integrity
+    required_fields = ['login_time', 'role']
+    if not all(field in session for field in required_fields):
+        session.clear()
+        return jsonify({'status': 'not_authenticated'}), 401
+    
+    # Check if user ID exists
+    if not (session.get('customer_id') or session.get('admin_id')):
+        session.clear()
+        return jsonify({'status': 'not_authenticated'}), 401
+    
+    return jsonify({
+        'status': 'authenticated',
+        'user': {
+            'id': session.get('customer_id') or session.get('admin_id'),
+            'customer_id': session.get('customer_id'),
+            'admin_id': session.get('admin_id'),
+            'email': session.get('email'),
+            'role': session.get('role'),
+            'name': session.get('name')
+        }
+    })
 
 # =============================================================================
 # MICROSOFT AUTH ROUTES
@@ -1046,7 +1073,7 @@ def get_customer_profile():
             "customer",
             [{"name": "@customerId", "value": customer_id}]
         )
-        
+        print(customer_data)
         if not customer_data:
             return jsonify({'error': 'Customer not found'}), 404
         

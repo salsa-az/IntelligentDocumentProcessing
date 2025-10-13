@@ -1,4 +1,8 @@
-name: Build and deploy Python and Vue.js app to Azure Web App - IDP-insurance
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+# More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
+
+name: Build and deploy Python + Vue.js app to Azure Web App - IDP-insurance
 
 on:
   push:
@@ -10,33 +14,42 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read # Required for actions/checkout
 
     steps:
+      # 🧩 1. Checkout source code
       - uses: actions/checkout@v4
 
-      # Setup Python (Backend)
+      # 🐍 2. Setup Python environment
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # 📦 3. Setup Node.js environment for Vue.js build
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'  # Use version compatible with your Vue project
+
+      # 🧱 4. Install frontend dependencies and build Vue.js
+      - name: Install dependencies and build Vue.js frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+          # Move built dist folder into endpoint/ so Flask can serve it
+          mv frontend/dist endpoint/dist
+
+      # 🧰 5. Create Python virtual environment and install backend dependencies
       - name: Create and Start virtual environment and Install dependencies
         run: |
           python -m venv antenv
           source antenv/bin/activate
           pip install -r requirements.txt
-      # Setup Node.js (Frontend)
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'  # Menentukan versi Node.js yang dibutuhkan oleh Vue.js
 
-      - name: Install dependencies for Vue.js
-        run: |
-          cd frontend  # Menyesuaikan dengan direktori tempat aplikasi Vue.js berada
-          npm install
-      # Upload artifact for deployment jobs
+      # 📤 6. Upload build artifacts for deployment
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
@@ -44,18 +57,21 @@ jobs:
           path: |
             .
             !antenv/
-            !frontend/node_modules/  # Menghindari upload node_modules
-            frontend/dist/  # Folder hasil build Vue.js
+            !frontend/node_modules/
+            !frontend/dist/
+      
   deploy:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
+      # 🔽 1. Download the artifact created by the build job
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
           name: python-vue-app
 
+      # ☁️ 2. Deploy to Azure Web App
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp

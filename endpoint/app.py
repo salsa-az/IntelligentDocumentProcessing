@@ -35,6 +35,7 @@ allowed_origins = [
     "http://127.0.0.1:5000", 
     "http://localhost:5000",
     "https://idp-insurance.azurewebsites.net",
+    "idp-insurance-g0crawavdnaggthj.southeastasia-01.azurewebsites.net/",
     "https://*.azurewebsites.net"
 ]
 
@@ -72,12 +73,7 @@ database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE_NAME"
 AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
 AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
 AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
-# Dynamic redirect URI based on environment and request host
-if is_production:
-    AZURE_REDIRECT_URI = 'https://idp-insurance.azurewebsites.net/api/auth/microsoft/callback'
-else:
-    # Will be set dynamically based on request host
-    AZURE_REDIRECT_URI = None
+
 JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
 
 # Constants
@@ -1124,6 +1120,36 @@ def get_customer_policy_limits(customer_id):
         print(f"Error in get_customer_policy_limits: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
 
+@app.route('/api/customer/<customer_id>/policy', methods=['GET'])
+def get_customer_policy(customer_id):
+    try:
+        print(customer_id)  # Debugging line
+        policy_data = cosmos_retrive_data(
+            "SELECT c.total_claim_limit, c.policy_id FROM c WHERE ARRAY_CONTAINS(c.insured, {'customer_id': @CustomerId}, true) OR c.customer_id = @CustomerId",
+            "policy",
+            [{"name": "@CustomerId", "value": customer_id}]
+        )
+        
+        if not policy_data:
+            return jsonify({'status': 'error', 'message': 'Policy not found'}), 404
+        policy = policy_data[0]
+        policy_limit = float(policy['total_claim_limit'])
+        policy_id = policy['policy_id']
+        current_year = datetime.now().year
+        claims_data = cosmos_retrive_data(
+            "SELECT c.claim_amount FROM c WHERE c.policy_id = @PolicyId AND c.claim_status = 'Approved' AND CONTAINS(c.claim_date, @Year)",
+            "claim",
+            [{"name": "@PolicyId", "value": policy_id}, {"name": "@Year", "value": str(current_year)}]
+        )
+        return jsonify({
+            'status': 'success',
+            'policy' : policy,
+        })
+
+    except Exception as e:
+        print(f"Error in get_customer_policy_limits: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
+
 @app.route('/api/customer/<customer_id>/claims-detailed', methods=['GET'])
 def get_customer_claims_detailed(customer_id):
     try:
@@ -1297,4 +1323,4 @@ def health_check():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     host = '127.0.0.1' if os.environ.get('FLASK_ENV') == 'development' else '0.0.0.0'
-    app.run(debug=False, host=host, port=port)
+    app.run(debug=True, host=host, port=port)

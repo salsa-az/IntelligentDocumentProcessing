@@ -332,15 +332,15 @@ export default {
 
     const chartData = computed(() => {
       const typeMap = {
-        'rawat-inap': { name: 'Rawat Inap', color: '#1e40af', count: 0 },
-        'rawat-jalan': { name: 'Rawat Jalan', color: '#0ea5e9', count: 0 },
-        'pra-pasca-rawat-inap': { name: 'Pra/Pasca Rawat Inap', color: '#3b82f6', count: 0 },
-        'kehamilan-melahirkan': { name: 'Kehamilan/Melahirkan', color: '#ec4899', count: 0 },
-        'santunan-harian': { name: 'Santunan Harian', color: '#f59e0b', count: 0 },
-        'gigi': { name: 'Gigi', color: '#10b981', count: 0 },
-        'penyakit-kritis': { name: 'Penyakit Kritis', color: '#5b21b6', count: 0 },
-        'medical-checkup': { name: 'Medical Checkup', color: '#9ca3af', count: 0 },
-        'lainnya': { name: 'Lainnya', color: '#6b7280', count: 0 }
+        'rawat-inap': { name: 'Rawat Inap', color: '#8b5cf6', hoverColor: '#7c3aed', count: 0 },
+        'rawat-jalan': { name: 'Rawat Jalan', color: '#0ea5e9', hoverColor: '#0284c7', count: 0 },
+        'pra-pasca-rawat-inap': { name: 'Pra/Pasca Rawat Inap', color: '#7c3aed', hoverColor: '#6d28d9', count: 0 },
+        'kehamilan-melahirkan': { name: 'Kehamilan/Melahirkan', color: '#ec4899', hoverColor: '#db2777', count: 0 },
+        'santunan-harian': { name: 'Santunan Harian', color: '#f59e0b', hoverColor: '#d97706', count: 0 },
+        'gigi': { name: 'Gigi', color: '#10b981', hoverColor: '#059669', count: 0 },
+        'penyakit-kritis': { name: 'Penyakit Kritis', color: '#5b21b6', hoverColor: '#4c1d95', count: 0 },
+        'medical-checkup': { name: 'Medical Checkup', color: '#9ca3af', hoverColor: '#6b7280', count: 0 },
+        'lainnya': { name: 'Lainnya', color: '#6b7280', hoverColor: '#4b5563', count: 0 }
       }
       
       claims.value.forEach(claim => {
@@ -352,13 +352,27 @@ export default {
       
       const types = Object.values(typeMap).filter(type => type.count > 0)
       
+      if (types.length === 0) {
+        return {
+          labels: ['Rawat Inap', 'Rawat Jalan', 'Lainnya'],
+          datasets: [{
+            label: 'Jenis Klaim',
+            data: [35, 30, 35],
+            backgroundColor: ['#8b5cf6', '#0ea5e9', '#7c3aed'],
+            hoverBackgroundColor: ['#7c3aed', '#0284c7', '#6d28d9'],
+            borderWidth: 0
+          }]
+        }
+      }
+      
       return {
         labels: types.map(type => type.name),
         datasets: [{
+          label: 'Jenis Klaim',
           data: types.map(type => type.count),
           backgroundColor: types.map(type => type.color),
-          borderWidth: 2,
-          borderColor: '#ffffff'
+          hoverBackgroundColor: types.map(type => type.hoverColor),
+          borderWidth: 0
         }]
       }
     })

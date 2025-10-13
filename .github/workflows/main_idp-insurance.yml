@@ -38,11 +38,6 @@ jobs:
           cd frontend  # Menyesuaikan dengan direktori tempat aplikasi Vue.js berada
           npm install
 
-      - name: Build Vue.js app
-        run: |
-          cd frontend
-          npm run build  # Membangun aplikasi Vue.js untuk production
-
       # Upload artifact for deployment jobs
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
@@ -71,3 +66,4 @@ jobs:
           app-name: 'IDP-insurance'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_8D12BD34FC064BCD98CD66A73C512DBD }}
+

@@ -389,7 +389,7 @@ def signin():
     session['role'] = user_role
     session['name'] = user['name']
     session['login_time'] = datetime.now().isoformat()
-    session.permanent = True
+    session.permanent = False
     
     return jsonify({
         'status': 'success',

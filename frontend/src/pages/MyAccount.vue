@@ -273,7 +273,7 @@ export default {
           address: user.address || '',
           // Customer fields
           nomorPolis: user.policy_id || '',
-          nomorKartu: user.cardNumber || '',
+          nomorKartu: user.card_no || '-',
           nomorPeserta: user.customer_no || '',
           namaPemegang: user.name || '',
           nik: user.NIK || user.nik || '',

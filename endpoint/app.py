@@ -35,7 +35,6 @@ allowed_origins = [
     "http://127.0.0.1:5000", 
     "http://localhost:5000",
     "https://idp-insurance.azurewebsites.net",
-    "idp-insurance-g0crawavdnaggthj.southeastasia-01.azurewebsites.net/",
     "https://*.azurewebsites.net"
 ]
 
@@ -73,8 +72,7 @@ database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE_NAME"
 AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
 AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
 AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
-
-JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
+AZURE_REDIRECT_URI= os.getenv('AZURE_REDIRECT_URI')
 
 # Constants
 ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
@@ -1119,7 +1117,6 @@ def get_customer_policy_limits(customer_id):
     except Exception as e:
         print(f"Error in get_customer_policy_limits: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
-
 @app.route('/api/customer/<customer_id>/policy', methods=['GET'])
 def get_customer_policy(customer_id):
     try:
@@ -1323,4 +1320,4 @@ def health_check():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     host = '127.0.0.1' if os.environ.get('FLASK_ENV') == 'development' else '0.0.0.0'
-    app.run(debug=True, host=host, port=port)
+    app.run(debug=False, host=host, port=port)

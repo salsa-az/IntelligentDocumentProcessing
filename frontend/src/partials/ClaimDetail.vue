@@ -512,7 +512,7 @@ export default {
 
     const fetchPolicyLimits = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/customer/${props.claim.customer_id}/policy-limits`, {
+        const response = await fetch(`/api/customer/${props.claim.customer_id}/policy-limits`, {
           credentials: 'include'
         })
         const data = await response.json()
@@ -544,7 +544,7 @@ export default {
 
     const downloadDocument = async (doc) => {
       try {
-        const response = await fetch(`http://localhost:5000/api/documents/${doc.doc_id}/download`)
+        const response = await fetch(`/api/documents/${doc.doc_id}/download`)
         const result = await response.json()
         
         if (result.status === 'success') {

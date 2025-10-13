@@ -13,7 +13,7 @@ export default {
   async mounted() {
     try {
       // Check session status from backend
-      const response = await fetch('http://localhost:5000/api/session-status', {
+      const response = await fetch('/api/session-status', {
         credentials: 'include'
       })
       

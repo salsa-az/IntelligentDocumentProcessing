@@ -64,7 +64,7 @@ export default {
     // Fetch document metadata and SAS URL
     const fetchDocumentData = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/documents/${props.docId}`);
+        const response = await fetch(`/api/documents/${props.docId}`);
         const data = await response.json();
         
         // Update metadata with document ID and type

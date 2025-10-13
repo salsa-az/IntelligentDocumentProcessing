@@ -442,7 +442,7 @@ export default {
       
       if (editId) {
         try {
-          const response = await fetch(`http://localhost:5000/api/claims/${editId}`, {
+          const response = await fetch(`/api/claims/${editId}`, {
             credentials: 'include'
           })
           const result = await response.json()
@@ -570,7 +570,7 @@ export default {
         }
         
         const token = localStorage.getItem('token')
-        const response = await fetch('http://localhost:5000/api/submit-claim', {
+        const response = await fetch('/api/submit-claim', {
           method: 'POST',
           credentials: 'include',
           body: formData

@@ -244,7 +244,7 @@ export default {
       try {
         const user = JSON.parse(localStorage.getItem('user') || '{}')
         if (user.id) {
-          const response = await fetch(`http://localhost:5000/api/query?query=SELECT * FROM c WHERE c.customer_id = "${user.id}"&container=customer`)
+          const response = await fetch(`/api/query?query=SELECT * FROM c WHERE c.customer_id = "${user.id}"&container=customer`)
           const userData = await response.json()
           if (userData && userData.length > 0) {
             const freshUser = userData[0]

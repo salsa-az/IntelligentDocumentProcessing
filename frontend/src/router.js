@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Dashboard from './pages/Dashboard.vue'
 import CustomerDashboard from './pages/CustomerDashboard.vue'
 import FormClaim from './pages/FormClaim.vue'
 import ClaimHistory from './pages/ClaimHistory.vue'
 import Signin from './pages/Signin.vue'
-// import ResetPassword from './pages/ResetPassword.vue'
 import MyAccount from './pages/MyAccount.vue'
 import ClaimApproval from './pages/ClaimApproval.vue'
 import AutoSignup from './pages/AutoSignup.vue'
@@ -28,11 +28,11 @@ const router = createRouter({
       component: AutoSignup,
       meta: { title: 'Sign Up' }
     },
-    // {
-    //   path: '/dashboard',
-    //   component: Dashboard,
-    //   meta: { title: 'Dashboard' }
-    // },
+    {
+      path: '/dashboard',
+      component: Dashboard,
+      meta: { title: 'Dashboard' }
+    },
     {
       path: '/customer-dashboard',
       component: CustomerDashboard,

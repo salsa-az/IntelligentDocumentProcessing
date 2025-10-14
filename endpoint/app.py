@@ -809,7 +809,7 @@ def submit_claim():
             'hospitalInvoice': ('invoice', 'Input_document/invoice/'),
             'doctorForm': ('doctor form', 'Input_document/Docform/'),
             'reportLab': ('report lab', 'Input_document/lab_results/'),
-            'additionalDoc': ('additional doc', 'Input_document/additional_docs/')
+            'additionalDoc': ('additional document', 'Input_document/additional_docs/')
         }
         
         for form_field, (doc_type, blob_path) in file_mappings.items():

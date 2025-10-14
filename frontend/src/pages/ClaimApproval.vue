@@ -261,7 +261,7 @@ export default {
           case 'report lab':
             name = 'Hasil Laboratorium'
             break
-          case 'additional doc':
+          case 'additional document':
             name = 'Dokumen Tambahan'
             break
           default:
@@ -481,6 +481,7 @@ export default {
 
     onMounted(() => {
       document.addEventListener('click', handleClickOutside)
+      fetchAllClaims()
     })
 
     onUnmounted(() => {
@@ -512,7 +513,8 @@ export default {
       downloadDocument,
       approveClaim,
       rejectClaim,
-      reloadClaims
+      reloadClaims,
+      fetchAllClaims
     }
   }
 }

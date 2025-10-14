@@ -330,7 +330,7 @@
                   </div>
                 </div>
                 
-                <div v-else-if="doc.doc_type === 'additional document' && doc.doc_contents?.fields">
+                <div v-else-if="doc.doc_type === 'ument' && doc.doc_contents?.fields">
                   <h6 class="font-semibold mb-2 text-gray-900 dark:text-gray-100">Dokumen Tambahan</h6>
                   <div class="space-y-2">
                     <div v-for="(value, key) in doc.doc_contents.fields" :key="key" class="text-sm text-gray-700 dark:text-gray-300">

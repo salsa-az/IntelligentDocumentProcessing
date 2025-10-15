@@ -87,8 +87,15 @@
             </div>
           </div>
 
-          <!-- Claims List (always render; loading state is handled silently) -->
-          <div class="space-y-4">
+          <!-- Loading State -->
+          <div v-if="loading" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-12 text-center">
+            <!-- Blue spinner: solid blue border with transparent top for the spinning effect -->
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent dark:border-blue-300 dark:border-t-transparent mb-4"></div>
+            <p class="text-gray-600 dark:text-gray-400">Loading claims data...</p>
+          </div>
+
+          <!-- Claims List -->
+          <div v-else class="space-y-4">
             <div v-for="claim in filteredClaims" :key="claim.id" class="bg-white dark:bg-gray-800 shadow-xs rounded-xl p-6">
               <!-- Claim Summary -->
               <div class="flex items-center justify-between">
@@ -145,6 +152,7 @@ import Sidebar from '../partials/Sidebar.vue'
 import Header from '../partials/Header.vue'
 import Banner from '../partials/Chatbot.vue'
 import ClaimDetail from '../partials/ClaimDetail.vue'
+import { useAlert } from '../composables/useAlert'
 
 export default {
   name: 'ClaimHistory',
@@ -155,6 +163,7 @@ export default {
     ClaimDetail,
   },
   setup() {
+    const { showSuccess, showError } = useAlert()
     const sidebarOpen = ref(false)
     const searchQuery = ref('')
     const statusFilter = ref('')
@@ -303,14 +312,14 @@ export default {
             claims.value[claimIndex].status = 'approved'
           }
           
-          alert('Claim has been approved successfully!')
+          showSuccess('Claim has been approved successfully!')
           closeDetailModal()
         } else {
-          alert(`Error: ${result.error}`)
+          showError(`Error: ${result.error}`)
         }
       } catch (error) {
         console.error('Error approving claim:', error)
-        alert('Error approving claim. Please try again.')
+        showError('Error approving claim. Please try again.')
       }
     }
 
@@ -336,14 +345,14 @@ export default {
             claims.value[claimIndex].status = 'rejected'
           }
           
-          alert('Claim has been rejected.')
+          showSuccess('Claim has been rejected.')
           closeDetailModal()
         } else {
-          alert(`Error: ${result.error}`)
+          showError(`Error: ${result.error}`)
         }
       } catch (error) {
         console.error('Error rejecting claim:', error)
-        alert('Error rejecting claim. Please try again.')
+        showError('Error rejecting claim. Please try again.')
       }
     }
 
@@ -476,7 +485,7 @@ export default {
 
     const downloadDocument = (document) => {
       console.log('Viewing document:', document.name)
-      alert(`Opening ${document.name} for review`)
+      showSuccess(`Opening ${document.name} for review`)
     }
 
     onMounted(() => {

@@ -12,7 +12,8 @@ frontend/node_modules/
 idp-new
 idp-venv
 .gitignore
-frontned/.gitignore
+frontend/.gitignore
+ui_reference/
 coba*
 
 __pycache__

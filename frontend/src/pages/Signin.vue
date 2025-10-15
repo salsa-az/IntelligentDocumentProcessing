@@ -22,10 +22,7 @@
                 </div>
               </div> -->
 
-              <!-- Error Message -->
-              <div v-if="errorMessage" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
-                <p class="text-sm text-red-700 dark:text-red-300">{{ errorMessage }}</p>
-              </div>
+
 
               <form @submit.prevent="isEntraIdDomain ? handleEntraIdLogin() : handleSignin()">
                 <div class="space-y-4">
@@ -74,18 +71,21 @@
 </template>
 
 <script>
-
+import { useAlert } from '../composables/useAlert.js';
 
 export default {
   name: 'Signin',
+  setup() {
+    const { showError } = useAlert();
+    return { showError };
+  },
   data() {
     return {
       form: {
         email: '',
         password: ''
       },
-      loading: false,
-      errorMessage: ''
+      loading: false
     }
   },
   computed: {
@@ -102,7 +102,7 @@ export default {
         // Redirect to Entra ID authentication
         window.location.href = '/api/auth/microsoft'
       } catch (error) {
-        this.errorMessage = 'Terjadi kesalahan saat menghubungkan ke Microsoft. Silakan coba lagi.'
+        this.showError('Login Error', 'Terjadi kesalahan saat menghubungkan ke Microsoft. Silakan coba lagi.')
         console.error('Entra ID login error:', error)
       } finally {
         this.loading = false
@@ -141,10 +141,10 @@ export default {
             this.$router.push('/dashboard')
           }
         } else {
-          this.errorMessage = data.error || 'Email atau password salah. Silakan coba lagi.'
+          this.showError('Login Failed', 'Email atau password salah. Silakan coba lagi.')
         }
       } catch (error) {
-        this.errorMessage = 'Terjadi kesalahan. Silakan coba lagi.'
+        this.showError('Connection Error', 'Terjadi kesalahan. Silakan coba lagi.')
         console.error('Sign in error:', error)
       } finally {
         this.loading = false
@@ -163,19 +163,19 @@ export default {
     if (error) {
       switch (error) {
         case 'user_not_found':
-          this.errorMessage = 'Email tidak terdaftar sebagai admin. Hubungi administrator.'
+          this.showError('Access Denied', 'Email tidak terdaftar sebagai admin. Hubungi administrator.')
           break
         case 'unauthorized_domain':
-          this.errorMessage = 'Domain email tidak diizinkan. Gunakan email @swosupport.id'
+          this.showError('Invalid Domain', 'Domain email tidak diizinkan. Gunakan email @swosupport.id')
           break
         case 'auth_failed':
-          this.errorMessage = 'Autentikasi Microsoft gagal. Silakan coba lagi.'
+          this.showError('Authentication Failed', 'Autentikasi Microsoft gagal. Silakan coba lagi.')
           break
         case 'invalid_state':
-          this.errorMessage = 'Session tidak valid. Silakan coba lagi.'
+          this.showError('Session Error', 'Session tidak valid. Silakan coba lagi.')
           break
         default:
-          this.errorMessage = 'Terjadi kesalahan saat login. Silakan coba lagi.'
+          this.showError('Login Error', 'Terjadi kesalahan saat login. Silakan coba lagi.')
       }
       // Clear URL parameters after showing error
       window.history.replaceState({}, document.title, window.location.pathname)

@@ -452,11 +452,16 @@
 
 <script>
 import Datepicker from '../components/Datepicker.vue'
+import { useAlert } from '../composables/useAlert.js'
 
 export default {
   name: 'AutoSignup',
   components: {
     Datepicker,
+  },
+  setup() {
+    const { showError, showSuccess } = useAlert()
+    return { showError, showSuccess }
   },
   data() {
     return {
@@ -788,12 +793,12 @@ export default {
         };
         
         const missingLabels = missingFields.map(field => fieldLabels[field]).join(', ');
-        alert(`Please fill in the following required fields: ${missingLabels}`);
+        this.showError('Missing Fields', `Please fill in the following required fields: ${missingLabels}`);
         return;
       }
       
       if (this.errorFields.length > 0) {
-        alert('Please fix the validation errors before continuing.');
+        this.showError('Validation Error', 'Please fix the validation errors before continuing.');
         return;
       }
       
@@ -802,7 +807,7 @@ export default {
     async handleSignup() {
       // Validate passwords match
       if (this.form.password !== this.form.confirmPassword) {
-        alert('Passwords do not match');
+        this.showError('Password Mismatch', 'Passwords do not match');
         return;
       }
 
@@ -847,14 +852,16 @@ export default {
           localStorage.setItem('token', result.token);
           localStorage.setItem('user', JSON.stringify(result.user));
           
-          alert('Registration successful!');
-          this.$router.push('/customer-dashboard');
+          this.showSuccess('Registration Successful!', 'Your account has been created successfully.');
+          setTimeout(() => {
+            this.$router.push('/customer-dashboard');
+          }, 2000);
         } else {
-          alert(result.error || 'Registration failed');
+          this.showError('Registration Failed', result.error || 'Registration failed');
         }
       } catch (error) {
         console.error('Registration error:', error);
-        alert('Registration failed. Please try again.');
+        this.showError('Registration Error', 'Registration failed. Please try again.');
       }
     }
   }

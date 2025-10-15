@@ -329,14 +329,25 @@
                     </div>
                   </div>
                 </div>
-                
-                <div v-else-if="doc.doc_type === 'ument' && doc.doc_contents?.fields">
-                  <h6 class="font-semibold mb-2 text-gray-900 dark:text-gray-100">Dokumen Tambahan</h6>
-                  <div class="space-y-2">
-                    <div v-for="(value, key) in doc.doc_contents.fields" :key="key" class="text-sm text-gray-700 dark:text-gray-300">
+
+                <div v-else-if="doc.doc_type === 'additional document' && doc.doc_contents?.fields">
+                  <h6 class="font-semibold mb-2">Dokumen Tambahan</h6>
+                  <div class="space-y-1">
+                    <div v-for="(value, key) in doc.doc_contents.fields" :key="key">
                       <div v-if="value && value !== 'None' && value !== ''">
-                        <strong class="text-gray-900 dark:text-gray-100">{{ key }}:</strong> 
-                        <span class="ml-1">{{ value }}</span>
+                        <strong>{{ key }}:</strong> {{ value }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!--Document Header Summary -->
+                <div v-if="doc.doc_contents['All content']" class="mt-4">
+                  <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-xs">
+                    <div v-if="doc.doc_contents['All content']['1']" class="mb-3">
+                      <h6 class="font-semibold mb-2 text-gray-900 dark:text-gray-100">Header Dokumen</h6>
+                      <div class="text-gray-600 dark:text-gray-500 space-y-1">
+                        <p v-for="(line, index) in doc.doc_contents['All content']['1'].lines.slice(0, 8)" :key="index">{{ line }}</p>
+                        <p v-if="doc.doc_contents['All content']['1'].lines.length > 5" class="text-gray-500 italic">... dan {{ doc.doc_contents['All content']['1'].lines.length - 5 }} baris lainnya</p>
                       </div>
                     </div>
                   </div>
@@ -346,7 +357,7 @@
                 <div v-else>
                   <h6 class="font-semibold mb-2">{{ doc.name }}</h6>
                   <div class="text-sm text-gray-600 dark:text-gray-400">
-                    <p>Document content extraction in progress...</p>
+                    <p>Document content is not extracted </p>
                     <p class="mt-2">Document Type: {{ doc.doc_type || 'Unknown' }}</p>
                   </div>
                 </div>

@@ -33,7 +33,7 @@
                 <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
               </svg>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 max-w-xs">
+            <div class="bg-gray-200 dark:bg-gray-800 rounded-lg p-3 max-w-xs">
               <p class="text-sm text-gray-800 dark:text-gray-200">Halo! Saya Chatbot Asisten untuk membantu Anda dengan pertanyaan seputar klaim asuransi. Ada yang bisa saya bantu?</p>
             </div>
           </div>
@@ -45,7 +45,7 @@
                 <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
               </svg>
             </div>
-            <div class="rounded-lg p-3 max-w-xs" :class="message.isUser ? 'bg-violet-500 text-white' : 'bg-white dark:bg-gray-800'">
+            <div class="rounded-lg p-3 max-w-xs" :class="message.isUser ? 'bg-violet-500 text-white' : 'bg-gray-200 dark:bg-gray-800'">
               <p class="text-sm" :class="message.isUser ? 'text-white' : 'text-gray-800 dark:text-gray-200'">{{ message.text }}</p>
             </div>
           </div>

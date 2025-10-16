@@ -129,7 +129,7 @@
             <div v-if="currentStep === 1" class="rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div class="text-center">
                 <div class="flex justify-center mb-6">
-                  <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-violet-500"></div>
+                  <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent dark:border-blue-300 dark:border-t-transparent mb-2"></div>
                 </div>
                 <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">Processing Documents</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
@@ -236,7 +236,7 @@
                   </select>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div v-if="!hasExistingPolicy" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="block text-sm font-medium mb-1" for="perusahaanAsuransi">Perusahaan Asuransi <span class="text-red-500">*</span></label>
                     <input 
@@ -246,9 +246,7 @@
                       type="text" 
                       required 
                       placeholder="Masukkan nama perusahaan asuransi"
-                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('perusahaanAsuransi') }"
                     />
-                    <p v-if="autoFilledFields.includes('perusahaanAsuransi')" class="text-xs text-violet-600 mt-1">Auto-filled from existing policy</p>
                   </div>
                   <div>
                     <label class="block text-sm font-medium mb-1" for="premiumPlan">Paket Premi <span class="text-red-500">*</span></label>
@@ -258,7 +256,6 @@
                       class="form-select w-full" 
                       required
                       @change="updateClaimLimit"
-                      :class="{ 'bg-violet-50 border-violet-200 dark:bg-gray-800 dark:border-gray-600': autoFilledFields.includes('premiumPlan') }"
                     >
                       <option value="">Pilih Paket Premi</option>
                       <option value="basic">Basic - IDR 5,000,000</option>
@@ -266,7 +263,19 @@
                       <option value="premium">Premium - IDR 25,000,000</option>
                       <option value="platinum">Platinum - IDR 50,000,000</option>
                     </select>
-                    <p v-if="autoFilledFields.includes('premiumPlan')" class="text-xs text-violet-600 mt-1">Auto-filled from existing policy</p>
+                  </div>
+                </div>
+
+                <div v-if="hasExistingPolicy" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div class="flex items-center mb-2">
+                    <svg class="h-5 w-5 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-sm font-medium text-blue-800">Existing Policy Detected</span>
+                  </div>
+                  <div class="text-sm text-blue-700">
+                    <p><strong>Perusahaan Asuransi:</strong> {{ form.perusahaanAsuransi }}</p>
+                    <p><strong>Paket Premi:</strong> {{ getPremiumPlanDisplay(form.premiumPlan) }}</p>
                   </div>
                 </div>
 
@@ -484,6 +493,7 @@ export default {
       documentIds: [],
       isPemegangPolis: false,
       dataDeclaration: false,
+      policyExists: false,
       form: {
         nomorPolis: '',
         // namaPerusahaan: '',
@@ -515,14 +525,33 @@ export default {
     'form.nomorPeserta': {
       handler: 'validateParticipantNumber',
       immediate: false
+    },
+    isPemegangPolis: {
+      handler: 'updatePesertaName',
+      immediate: true
+    },
+    'form.namaPemegang': {
+      handler: 'updatePesertaName',
+      immediate: false
+    }
+  },
+  computed: {
+    hasExistingPolicy() {
+      return this.policyExists;
     }
   },
   methods: {
     async validateAndAutoFill() {
-      if (!this.form.nomorPolis) return;
+      if (!this.form.nomorPolis) {
+        this.policyExists = false;
+        this.autoFilledFields = this.autoFilledFields.filter(field => 
+          !['namaPemegang', 'perusahaanAsuransi', 'premiumPlan'].includes(field)
+        );
+        return;
+      }
       
       try {
-        const response = await fetch('/api/validate-participant', {
+        const response = await fetch('/api/check-policy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -532,29 +561,40 @@ export default {
         });
         
         const result = await response.json();
-        if (response.ok && result.policy_holder_info) {
-          const info = result.policy_holder_info;
+        if (response.ok && result.exists) {
+          const info = result.policy_info;
+          
+          this.autoFilledFields = this.autoFilledFields.filter(field => 
+            !['namaPemegang', 'perusahaanAsuransi', 'premiumPlan'].includes(field)
+          );
+          
           if (info.namaPemegang) {
             this.form.namaPemegang = info.namaPemegang;
-            if (!this.autoFilledFields.includes('namaPemegang')) {
-              this.autoFilledFields.push('namaPemegang');
-            }
+            this.autoFilledFields.push('namaPemegang');
           }
           if (info.perusahaanAsuransi) {
             this.form.perusahaanAsuransi = info.perusahaanAsuransi;
-            if (!this.autoFilledFields.includes('perusahaanAsuransi')) {
-              this.autoFilledFields.push('perusahaanAsuransi');
-            }
+            this.autoFilledFields.push('perusahaanAsuransi');
           }
           if (info.premiumPlan) {
             this.form.premiumPlan = info.premiumPlan;
-            if (!this.autoFilledFields.includes('premiumPlan')) {
-              this.autoFilledFields.push('premiumPlan');
-            }
+            this.autoFilledFields.push('premiumPlan');
+            this.updateClaimLimit();
           }
+          
+          this.policyExists = true;
+        } else {
+          this.policyExists = false;
+          this.autoFilledFields = this.autoFilledFields.filter(field => 
+            !['namaPemegang', 'perusahaanAsuransi', 'premiumPlan'].includes(field)
+          );
         }
       } catch (error) {
         console.error('Auto-fill error:', error);
+        this.policyExists = false;
+        this.autoFilledFields = this.autoFilledFields.filter(field => 
+          !['namaPemegang', 'perusahaanAsuransi', 'premiumPlan'].includes(field)
+        );
       }
     },
     handleInsuranceCardUpload(event) {
@@ -718,6 +758,20 @@ export default {
       if (data.kelurahan) parts.push(data.kelurahan);
       if (data.kecamatan) parts.push(data.kecamatan);
       return parts.join(', ');
+    },
+    updatePesertaName() {
+      if (this.isPemegangPolis && this.form.namaPemegang) {
+        this.form.namaPeserta = this.form.namaPemegang;
+      }
+    },
+    getPremiumPlanDisplay(plan) {
+      const planMap = {
+        basic: 'Basic - IDR 5,000,000',
+        standard: 'Standard - IDR 10,000,000', 
+        premium: 'Premium - IDR 25,000,000',
+        platinum: 'Platinum - IDR 50,000,000'
+      };
+      return planMap[plan] || plan;
     },
     updateClaimLimit() {
       const limits = {

@@ -57,7 +57,7 @@
               <div class="flex items-center space-x-4">
                 <div class="text-right">
                   <div class="flex items-center text-sm text-blue-100">
-                    <span class="bg-orange-500 text-white px-2 py-1 rounded text-xs font-medium mr-2 premium capitalize">{{ policyData.premiumType || 'Basic' }}</span>
+                    <span class="bg-orange-500 text-white px-2 py-1 rounded text-xs font-medium mr-2 premium">{{ capitalizedPremiumType }}</span>
                   </div>
                   <!-- <div class="text-xs text-blue-200">{{ policyData.policyNumber }}</div> -->
                 </div>
@@ -88,7 +88,7 @@
                     <dl>
                       <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Claim Limit</dt>
                       <dd class="text-lg font-medium text-green-600 truncate">Rp {{ formatCurrency(policyData.claimLimit) }}</dd>
-                      <dd class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ policyData.premiumType || 'Basic' }} Plan</dd>
+                      <dd class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ capitalizedPremiumType }} Plan</dd>
                     </dl>
                   </div>
                 </div>
@@ -352,14 +352,13 @@ export default {
       
       const types = Object.values(typeMap).filter(type => type.count > 0)
       
-      if (types.length === 0) {
+     if (types.length === 0) {
         return {
-          labels: ['Rawat Inap', 'Rawat Jalan', 'Lainnya'],
+          labels: ['No Data'],
           datasets: [{
-            label: 'Jenis Klaim',
-            data: [35, 30, 35],
-            backgroundColor: ['#8b5cf6', '#0ea5e9', '#7c3aed'],
-            hoverBackgroundColor: ['#7c3aed', '#0284c7', '#6d28d9'],
+            data: [1],
+            backgroundColor: ['#899499'],
+            hoverBackgroundColor: ['#D3D3D3'],
             borderWidth: 0
           }]
         }
@@ -380,6 +379,11 @@ export default {
     const formatCurrency = (amount) => {
       return new Intl.NumberFormat('id-ID').format(amount)
     }
+
+    const capitalizedPremiumType = computed(() => {
+      const type = policyData.value.premiumType || 'Basic'
+      return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()
+    })
 
     const fetchClaims = async () => {
       loading.value = true
@@ -412,6 +416,7 @@ export default {
           policyData.value.premiumType = data.policy.insurance_plan_type || 'basic'
           policyData.value.claimLimit = data.policy.total_claim_limit || 5000000
         }
+        console.log('Fetched Policy Data:', data)
       } catch (error) {
         console.error('Error fetching policy:', error)
       }
@@ -421,6 +426,7 @@ export default {
       document.title = 'Dashboard - NexClaim'
       fetchClaims()
       fetchPolicyData()
+      console.log('Policy Data:', policyData.value)
     })
 
     return {
@@ -439,6 +445,7 @@ export default {
       recentActivity,
       chartData,
       formatCurrency,
+      capitalizedPremiumType,
       loading
     }  
   }

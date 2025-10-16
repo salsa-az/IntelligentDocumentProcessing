@@ -270,7 +270,7 @@ def signup():
             "policy_id": request.form.get('nomorPolis', ''),
             "customer_no": request.form.get('nomorPeserta', ''),
             "card_no": request.form.get('nomorKartu', ''),
-            "name": request.form.get('namaPeserta', '') if not request.form.get('isPemegangPolis') == 'true' else policy_holder_name,
+            "name": request.form.get('namaPeserta', ''),
             "dob": dob,
             "age": age,
             "gender": gender,
@@ -307,17 +307,19 @@ def signup():
             except Exception as e:
                 print(f"Error updating document {doc_id}: {e}")
         
-        # Handle policy for non-policy holders
+        # Handle policy creation/linking
         is_policy_holder = request.form.get('isPemegangPolis') == 'true'
         
-        if not is_policy_holder:
-            existing_policy = cosmos_retrive_data(
-                "SELECT * FROM c WHERE c.policy_id = @policyId",
-                "policy",
-                [{"name": "@policyId", "value": policy_id}]
-            )
-            
-            if existing_policy:
+        # Check if policy already exists
+        existing_policy = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.policy_no = @policyNo",
+            "policy",   
+            [{"name": "@policyNo", "value": request.form.get('nomorPolis', '')}]
+        )
+        
+        if existing_policy:
+            # Policy exists - add insured if not policy holder
+            if not is_policy_holder:
                 policy_record = existing_policy[0]
                 if 'insured' not in policy_record:
                     policy_record['insured'] = []
@@ -330,6 +332,27 @@ def signup():
                 }
                 policy_record['insured'].append(insured_info)
                 database.get_container_client("policy").upsert_item(policy_record)
+        else:
+            # Create new policy (only for policy holders)
+            if is_policy_holder:
+                policy_data = {
+                    "id": f"POL{uuid.uuid4().hex[:8].upper()}",
+                    "customer_id": customer_id,
+                    "policy_id": request.form.get('nomorPolis', ''),
+                    "policy_no": request.form.get('nomorPolis', ''),
+                    "policyholder_name": request.form.get('namaPemegang', ''),
+                    "start_date": datetime.now().strftime('%Y-%m-%d'),
+                    "expire_date": (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d'),
+                    "insurance_plan_type": request.form.get('premiumPlan', 'basic'),
+                    "total_claim_limit": int(request.form.get('claimLimit', '50000000')),
+                    "insurance_company": request.form.get('perusahaanAsuransi', ''),
+                    "insured": []
+                }
+                
+                database.get_container_client("policy").create_item(policy_data)
+                print("Policy created successfully")
+            else:
+                return jsonify({'error': 'Policy must be created by policy holder first'}), 400
         
         # Session
         session['customer_id'] = customer_id
@@ -1104,7 +1127,7 @@ def get_customer_policy(customer_id):
     try:
         print(customer_id)  # Debugging line
         policy_data = cosmos_retrive_data(
-            "SELECT c.total_claim_limit, c.policy_id FROM c WHERE ARRAY_CONTAINS(c.insured, {'customer_id': @CustomerId}, true) OR c.customer_id = @CustomerId",
+            "SELECT c.total_claim_limit, c.policy_id, c.insurance_plan_type FROM c WHERE ARRAY_CONTAINS(c.insured, {'customer_id': @CustomerId}, true) OR c.customer_id = @CustomerId",
             "policy",
             [{"name": "@CustomerId", "value": customer_id}]
         )
@@ -1217,6 +1240,39 @@ def get_customer_claim_history(customer_id):
 # =============================================================================
 # VALIDATION ROUTES
 # =============================================================================
+@app.route('/api/check-policy', methods=['POST'])
+def check_policy():
+    try:
+        data = request.json
+        policy_id = data.get('nomorPolis')
+        
+        if not policy_id:
+            return jsonify({'exists': False})
+        
+        # Check if policy exists in policy table
+        existing_policy = cosmos_retrive_data(
+            "SELECT * FROM c WHERE c.policy_no = @policyNo OR c.policy_id = @policyNo",
+            "policy",
+            [{"name": "@policyNo", "value": policy_id}]
+        )
+        
+        if existing_policy:
+            policy = existing_policy[0]
+            return jsonify({
+                'exists': True,
+                'policy_info': {
+                    'namaPemegang': policy.get('policyholder_name', ''),
+                    'perusahaanAsuransi': policy.get('insurance_company', ''),
+                    'premiumPlan': policy.get('insurance_plan_type', '')
+                }
+            })
+        
+        return jsonify({'exists': False})
+        
+    except Exception as e:
+        print(f"Error in check_policy: {e}")
+        return jsonify({'error': 'Policy check failed'}), 500
+
 @app.route('/api/validate-participant', methods=['POST'])
 def validate_participant():
     try:

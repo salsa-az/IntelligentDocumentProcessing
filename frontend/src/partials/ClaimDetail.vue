@@ -354,7 +354,7 @@
                 </div>
                 
                 <!-- Fallback for documents without extracted content -->
-                <div v-else>
+                <div v-else-if="!doc.doc_contents || Object.keys(doc.doc_contents).length === 0">
                   <h6 class="font-semibold mb-2">{{ doc.name }}</h6>
                   <div class="text-sm text-gray-600 dark:text-gray-400">
                     <p>Document content is not extracted </p>
